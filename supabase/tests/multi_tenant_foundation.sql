@@ -141,6 +141,12 @@ end;
 $$;
 
 reset role;
+
+-- Reproduce the legacy production schema where Stripe session identifiers were
+-- stored as varchar. The checkout RPC must still honor its text return contract.
+alter table public.payments
+    alter column stripe_checkout_session_id type varchar(255);
+
 set local role service_role;
 
 select
