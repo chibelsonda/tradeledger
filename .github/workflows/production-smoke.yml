@@ -29,5 +29,5 @@ jobs:
 
       - name: Verify production
         env:
-          APP_URL: ${{ vars.APP_URL }}
+          APP_URL: https://tradeledger-sepia.vercel.app
         run: npm run test:production

@@ -1,5 +1,13 @@
 project_id = "tradeledger"
 
+[auth]
+site_url = "https://tradeledger-sepia.vercel.app"
+additional_redirect_urls = [
+  "https://tradeledger-sepia.vercel.app/**",
+  "http://localhost:5173/**",
+  "http://127.0.0.1:5173/**",
+]
+
 [functions.create-checkout]
 verify_jwt = true
 

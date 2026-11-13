@@ -15,6 +15,8 @@ subcontractors, request and approve payment, launch a server-priced checkout,
 reconcile the result from an idempotent Stripe webhook, and issue an authorized
 full refund without trusting browser-supplied financial data.
 
+**Live demo:** [tradeledger-sepia.vercel.app](https://tradeledger-sepia.vercel.app)
+
 ## Why this project stands out
 
 - **Tenant isolation at the data boundary.** PostgreSQL Row-Level Security
