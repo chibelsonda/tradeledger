@@ -196,7 +196,30 @@ select public.attach_payment_checkout_session(
 ) as reattached
 \gset
 
+select public.mark_payment_checkout_failed(
+    :'checkout_payment_reference',
+    'database_retry_regression'
+) as checkout_failed
+\gset
+
+select
+    payment_reference as retry_payment_reference
+from public.prepare_payment_request_checkout(
+    :'payment_request_a_id',
+    '00000000-0000-4000-8000-000000000001',
+    '10000000-0000-4000-8000-000000000002'
+)
+\gset
+
+select public.attach_payment_checkout_session(
+    :'retry_payment_reference',
+    'cs_test_tradeledger_002'
+) as retry_attached
+\gset
+
 select set_config('test.checkout_reattached', :'reattached', true);
+select set_config('test.checkout_failed', :'checkout_failed', true);
+select set_config('test.retry_attached', :'retry_attached', true);
 
 select set_config(
     'test.rate_limit_first',
@@ -235,6 +258,11 @@ begin
         raise exception 'Attaching the same Checkout Session must be idempotent.';
     end if;
 
+    if not current_setting('test.checkout_failed')::boolean
+       or not current_setting('test.retry_attached')::boolean then
+        raise exception 'A failed Checkout Session must support a replacement session.';
+    end if;
+
     if not current_setting('test.rate_limit_first')::boolean
        or not current_setting('test.rate_limit_second')::boolean
        or current_setting('test.rate_limit_third')::boolean then
@@ -246,7 +274,7 @@ $$;
 select public.process_stripe_webhook(
     'evt_tradeledger_paid_001',
     'checkout.session.completed',
-    'cs_test_tradeledger_001',
+    'cs_test_tradeledger_002',
     'paid',
     'pi_tradeledger_001',
     'owner-a@example.test'
@@ -256,7 +284,7 @@ select public.process_stripe_webhook(
 select public.process_stripe_webhook(
     'evt_tradeledger_paid_001',
     'checkout.session.completed',
-    'cs_test_tradeledger_001',
+    'cs_test_tradeledger_002',
     'paid',
     'pi_tradeledger_001',
     'owner-a@example.test'
@@ -306,8 +334,8 @@ begin
         raise exception 'Expected one idempotent Stripe event, received %.', event_count;
     end if;
 
-    if audit_count <> 8 then
-        raise exception 'Expected 8 audit events after checkout, received %.', audit_count;
+    if audit_count <> 10 then
+        raise exception 'Expected 10 audit events after checkout retry, received %.', audit_count;
     end if;
 
     if notification_count <> 2 then

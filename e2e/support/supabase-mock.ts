@@ -203,7 +203,9 @@ export async function installSupabaseMock(
 export async function signInAsOwner(page: Page): Promise<void> {
   await page.goto('/')
   await page.getByLabel('Email').fill('owner@example.test')
-  await page.getByLabel('Password').fill('correct-horse-battery-staple')
+  await page
+    .getByLabel('Password', { exact: true })
+    .fill('correct-horse-battery-staple')
   await page.getByRole('button', { name: 'Sign in securely' }).click()
 }
 
