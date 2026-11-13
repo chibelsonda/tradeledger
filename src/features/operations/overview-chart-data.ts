@@ -1,7 +1,7 @@
 import type {
   PaymentRequest,
   PaymentRequestStatus,
-} from '../../lib/database.types'
+} from '@/lib/database.types'
 
 export type ChartPaymentRequest = Pick<
   PaymentRequest,

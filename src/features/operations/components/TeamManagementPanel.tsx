@@ -11,16 +11,16 @@ import type { FormEvent } from 'react'
 import type {
   OrganizationMember,
   OrganizationRole,
-} from '../../../lib/database.types'
-import { FieldError } from '../../../components/ui/FieldError'
-import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
-import { formatStatus } from '../../../lib/format'
-import { SelectControl } from '../../../components/ui/SelectControl'
-import { NotificationBanner } from '../../../components/ui/NotificationBanner'
+} from '@/lib/database.types'
+import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
+import { FieldError } from '@/components/ui/FieldError'
+import { NotificationBanner } from '@/components/ui/NotificationBanner'
+import { SelectControl } from '@/components/ui/SelectControl'
+import { formatStatus } from '@/lib/format'
 import {
   SidePanel,
   SidePanelCloseButton,
-} from '../../../components/ui/SidePanel'
+} from '@/components/ui/SidePanel'
 
 interface TeamManagementPanelProps {
   members: OrganizationMember[]
@@ -214,7 +214,7 @@ export function TeamManagementPanel({
               <NotificationBanner tone="error">{serverError}</NotificationBanner>
             )}
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5">
           <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
             <Label>Email</Label>
             <Input

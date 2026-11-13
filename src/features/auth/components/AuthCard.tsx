@@ -2,14 +2,14 @@ import { Button, Field, Input, Label } from '@headlessui/react'
 import type { FormEvent, MouseEvent, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 
-import { FieldError } from '../../../components/ui/FieldError'
-import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
-import { NotificationBanner } from '../../../components/ui/NotificationBanner'
-import { supabase } from '../../../lib/supabase'
+import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
+import { FieldError } from '@/components/ui/FieldError'
+import { NotificationBanner } from '@/components/ui/NotificationBanner'
+import { supabase } from '@/lib/supabase'
 import {
   fieldErrorsFromZod,
   type FieldErrors,
-} from '../../../lib/validation'
+} from '@/lib/validation'
 import {
   authCredentialsSchema,
   passwordResetRequestSchema,
@@ -17,7 +17,7 @@ import {
   type AuthCredentials,
   type PasswordResetRequest,
   type PasswordUpdate,
-} from '../auth.schemas'
+} from '@/features/auth/auth.schemas'
 
 type AuthMode =
   | 'sign-in'

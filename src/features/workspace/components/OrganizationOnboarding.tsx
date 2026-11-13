@@ -1,20 +1,20 @@
 import { Button, Field, Input, Label } from '@headlessui/react'
 import { useState } from 'react'
 
-import { FieldError } from '../../../components/ui/FieldError'
-import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
-import { NotificationBanner } from '../../../components/ui/NotificationBanner'
-import { organizationSlug } from '../../../lib/organizations'
-import { supabase } from '../../../lib/supabase'
-import { safeDatabaseErrorMessage } from '../../../lib/public-errors'
+import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
+import { FieldError } from '@/components/ui/FieldError'
+import { NotificationBanner } from '@/components/ui/NotificationBanner'
+import { organizationSlug } from '@/lib/organizations'
+import { safeDatabaseErrorMessage } from '@/lib/public-errors'
+import { supabase } from '@/lib/supabase'
 import {
   fieldErrorsFromZod,
   type FieldErrors,
-} from '../../../lib/validation'
+} from '@/lib/validation'
 import {
   organizationFormSchema,
   type OrganizationFormValues,
-} from '../workspace.schemas'
+} from '@/features/workspace/workspace.schemas'
 
 interface OrganizationOnboardingProps {
   onCreated: (organizationId: string) => void

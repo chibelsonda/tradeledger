@@ -2,11 +2,11 @@ import { Button, Field, Input, Label } from '@headlessui/react'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { useMemo, useState } from 'react'
 
-import { clampQuantity, formatCurrency } from '../../../lib/format'
-import { supabase } from '../../../lib/supabase'
-import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
-import { NotificationBanner } from '../../../components/ui/NotificationBanner'
-import { trustedStripeCheckoutUrl } from '../../../lib/navigation-security'
+import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
+import { NotificationBanner } from '@/components/ui/NotificationBanner'
+import { clampQuantity, formatCurrency } from '@/lib/format'
+import { trustedStripeCheckoutUrl } from '@/lib/navigation-security'
+import { supabase } from '@/lib/supabase'
 
 const product = {
   name: 'Launch Kit',

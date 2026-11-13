@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { organizationSlug } from '../../lib/organizations'
+import { organizationSlug } from '@/lib/organizations'
 
 export const organizationFormSchema = z.object({
   name: z

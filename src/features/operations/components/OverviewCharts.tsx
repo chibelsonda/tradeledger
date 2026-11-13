@@ -10,12 +10,12 @@ import {
   YAxis,
 } from 'recharts'
 
-import type { PaymentRequest } from '../../../lib/database.types'
-import { formatCurrency } from '../../../lib/format'
+import type { PaymentRequest } from '@/lib/database.types'
+import { formatCurrency } from '@/lib/format'
 import {
   buildMonthlyFinancialData,
   buildPaymentStatusData,
-} from '../overview-chart-data'
+} from '@/features/operations/overview-chart-data'
 
 interface OverviewChartsProps {
   paymentRequests: PaymentRequest[]

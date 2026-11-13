@@ -1,10 +1,10 @@
 import { Button } from '@headlessui/react'
 
-import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
+import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
 import type {
   PaymentRequestStatus,
   WaiverDocument,
-} from '../../../lib/database.types'
+} from '@/lib/database.types'
 
 interface WaiverDocumentControlProps {
   requestStatus: PaymentRequestStatus

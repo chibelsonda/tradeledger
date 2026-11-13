@@ -9,24 +9,24 @@ import {
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 
-import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
-import { FieldError } from '../../../components/ui/FieldError'
-import { NotificationBanner } from '../../../components/ui/NotificationBanner'
+import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
+import { FieldError } from '@/components/ui/FieldError'
+import { NotificationBanner } from '@/components/ui/NotificationBanner'
 import {
   SidePanel,
   SidePanelCloseButton,
-} from '../../../components/ui/SidePanel'
-import { projectCode } from '../../../lib/organizations'
+} from '@/components/ui/SidePanel'
+import { projectCode } from '@/lib/organizations'
 import {
   fieldErrorsFromZod,
   type FieldErrors,
-} from '../../../lib/validation'
+} from '@/lib/validation'
 import {
   projectFormSchema,
   subcontractorFormSchema,
   type ProjectFormValues,
   type SubcontractorFormValues,
-} from '../operations.schemas'
+} from '@/features/operations/operations.schemas'
 
 export type DirectoryCreateTarget = 'project' | 'subcontractor'
 
@@ -97,7 +97,7 @@ function ProjectCreateForm({
           <NotificationBanner tone="error">{serverError}</NotificationBanner>
         )}
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5">
           <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
             <Label>Project name</Label>
             <Input
@@ -224,7 +224,7 @@ function SubcontractorCreateForm({
           <NotificationBanner tone="error">{serverError}</NotificationBanner>
         )}
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5">
           <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
             <Label>Company name</Label>
             <Input

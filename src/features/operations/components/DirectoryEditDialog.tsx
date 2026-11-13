@@ -9,25 +9,25 @@ import {
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 
-import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
-import { FieldError } from '../../../components/ui/FieldError'
-import { NotificationBanner } from '../../../components/ui/NotificationBanner'
+import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
+import { FieldError } from '@/components/ui/FieldError'
+import { NotificationBanner } from '@/components/ui/NotificationBanner'
 import {
   SidePanel,
   SidePanelCloseButton,
-} from '../../../components/ui/SidePanel'
-import type { Project, Subcontractor } from '../../../lib/database.types'
-import { projectCode } from '../../../lib/organizations'
+} from '@/components/ui/SidePanel'
+import type { Project, Subcontractor } from '@/lib/database.types'
+import { projectCode } from '@/lib/organizations'
 import {
   fieldErrorsFromZod,
   type FieldErrors,
-} from '../../../lib/validation'
+} from '@/lib/validation'
 import {
   projectFormSchema,
   subcontractorFormSchema,
   type ProjectFormValues,
   type SubcontractorFormValues,
-} from '../operations.schemas'
+} from '@/features/operations/operations.schemas'
 
 export type DirectoryEditTarget =
   | { kind: 'project'; record: Project }
@@ -107,7 +107,7 @@ function ProjectEditForm({
           <NotificationBanner tone="error">{serverError}</NotificationBanner>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
           <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
             <Label>Project name</Label>
             <Input
@@ -247,7 +247,7 @@ function SubcontractorEditForm({
           <NotificationBanner tone="error">{serverError}</NotificationBanner>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
           <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
             <Label>Company name</Label>
             <Input

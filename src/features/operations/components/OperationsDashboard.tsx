@@ -32,30 +32,30 @@ import type {
   StripeWebhookFailure,
   Subcontractor,
   WaiverDocument,
-} from '../../../lib/database.types'
-import { FieldError } from '../../../components/ui/FieldError'
-import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
-import { NotificationBanner } from '../../../components/ui/NotificationBanner'
-import { formatCurrency, formatStatus } from '../../../lib/format'
+} from '@/lib/database.types'
+import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
+import { FieldError } from '@/components/ui/FieldError'
+import { NotificationBanner } from '@/components/ui/NotificationBanner'
+import { formatCurrency, formatStatus } from '@/lib/format'
 import {
   trustedStripeCheckoutUrl,
   trustedSupabaseWaiverUrl,
-} from '../../../lib/navigation-security'
-import { safeDatabaseErrorMessage } from '../../../lib/public-errors'
+} from '@/lib/navigation-security'
+import { safeDatabaseErrorMessage } from '@/lib/public-errors'
 import {
   calculateRetainage,
   dollarsToMinorUnits,
-} from '../../../lib/payment-calculations'
-import { supabase, supabaseUrl } from '../../../lib/supabase'
+} from '@/lib/payment-calculations'
+import { supabase, supabaseUrl } from '@/lib/supabase'
 import {
   fieldErrorsFromZod,
   type FieldErrors,
-} from '../../../lib/validation'
-import { SelectControl } from '../../../components/ui/SelectControl'
+} from '@/lib/validation'
+import { SelectControl } from '@/components/ui/SelectControl'
 import {
   SidePanel,
   SidePanelCloseButton,
-} from '../../../components/ui/SidePanel'
+} from '@/components/ui/SidePanel'
 import {
   organizationMemberFormSchema,
   paymentRequestFormSchema,
@@ -63,7 +63,7 @@ import {
   type PaymentRequestFormValues,
   type ProjectFormValues,
   type SubcontractorFormValues,
-} from '../operations.schemas'
+} from '@/features/operations/operations.schemas'
 import {
   DashboardSidebar,
   type DashboardNavigationItem,
@@ -1412,7 +1412,7 @@ export function OperationsDashboard({
                         setFormErrors({})
                       }}
                     />
-                    <div className="grid flex-1 content-start gap-4 p-6 pt-16 sm:grid-cols-2 sm:p-8 sm:pt-20">
+                    <div className="grid flex-1 content-start gap-x-4 gap-y-5 p-6 pt-16 sm:grid-cols-2 sm:p-8 sm:pt-20">
                     <div className="pr-10 sm:col-span-2">
                       <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-forest/80">
                         Financial workflow
@@ -1429,7 +1429,7 @@ export function OperationsDashboard({
                         {paymentCreateError}
                       </NotificationBanner>
                     )}
-                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
                   <Label>Project</Label>
                   <SelectControl
                     value={requestProjectId}
@@ -1459,7 +1459,7 @@ export function OperationsDashboard({
                     message={formErrors.projectId}
                   />
                 </Field>
-                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
                   <Label>Subcontractor</Label>
                   <SelectControl
                     value={requestSubcontractorId}

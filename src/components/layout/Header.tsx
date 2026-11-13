@@ -2,8 +2,8 @@ import { Button } from '@headlessui/react'
 import type { Session } from '@supabase/supabase-js'
 import { useState } from 'react'
 
-import { supabase } from '../../lib/supabase'
-import { ButtonSpinner } from '../ui/ButtonSpinner'
+import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
+import { supabase } from '@/lib/supabase'
 import { Brand } from './Brand'
 
 interface HeaderProps {

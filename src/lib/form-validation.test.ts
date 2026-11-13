@@ -4,14 +4,14 @@ import {
   authCredentialsSchema,
   passwordResetRequestSchema,
   passwordUpdateSchema,
-} from '../features/auth/auth.schemas'
+} from '@/features/auth/auth.schemas'
 import {
   organizationMemberFormSchema,
   paymentRequestFormSchema,
   projectFormSchema,
   subcontractorFormSchema,
-} from '../features/operations/operations.schemas'
-import { organizationFormSchema } from '../features/workspace/workspace.schemas'
+} from '@/features/operations/operations.schemas'
+import { organizationFormSchema } from '@/features/workspace/workspace.schemas'
 
 describe('form validation schemas', () => {
   it('normalizes valid authentication credentials', () => {

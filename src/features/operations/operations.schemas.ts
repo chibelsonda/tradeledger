@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { dollarsToMinorUnits } from '../../lib/payment-calculations'
+import { dollarsToMinorUnits } from '@/lib/payment-calculations'
 
 const optionalEmailSchema = z
   .string()

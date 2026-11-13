@@ -1,27 +1,27 @@
 import { lazy, Suspense } from 'react'
 
-import { Header } from './components/layout/Header'
-import { AuthCard } from './features/auth/components/AuthCard'
-import { useAuth } from './features/auth/hooks/useAuth'
-import { trustedStripeCheckoutSessionId } from './lib/navigation-security'
+import { Header } from '@/components/layout/Header'
+import { AuthCard } from '@/features/auth/components/AuthCard'
+import { useAuth } from '@/features/auth/hooks/useAuth'
+import { trustedStripeCheckoutSessionId } from '@/lib/navigation-security'
 
 const CheckoutCanceled = lazy(() =>
-  import('./features/checkout/components/CheckoutCanceled').then((module) => ({
+  import('@/features/checkout/components/CheckoutCanceled').then((module) => ({
     default: module.CheckoutCanceled,
   })),
 )
 const CheckoutCard = lazy(() =>
-  import('./features/checkout/components/CheckoutCard').then((module) => ({
+  import('@/features/checkout/components/CheckoutCard').then((module) => ({
     default: module.CheckoutCard,
   })),
 )
 const PaymentResult = lazy(() =>
-  import('./features/checkout/components/PaymentResult').then((module) => ({
+  import('@/features/checkout/components/PaymentResult').then((module) => ({
     default: module.PaymentResult,
   })),
 )
 const Workspace = lazy(() =>
-  import('./features/workspace/components/Workspace').then((module) => ({
+  import('@/features/workspace/components/Workspace').then((module) => ({
     default: module.Workspace,
   })),
 )

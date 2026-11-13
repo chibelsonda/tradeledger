@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import type { Payment } from '../../../lib/database.types'
-import { formatCurrency, formatStatus } from '../../../lib/format'
-import { supabase } from '../../../lib/supabase'
+import type { Payment } from '@/lib/database.types'
+import { formatCurrency, formatStatus } from '@/lib/format'
+import { supabase } from '@/lib/supabase'
 
 interface PaymentResultProps {
   sessionId: string

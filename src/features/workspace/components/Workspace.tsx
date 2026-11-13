@@ -6,12 +6,12 @@ import type {
   Organization,
   OrganizationMembership,
   OrganizationRole,
-} from '../../../lib/database.types'
-import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
-import { NotificationBanner } from '../../../components/ui/NotificationBanner'
-import { supabase } from '../../../lib/supabase'
-import { safeDatabaseErrorMessage } from '../../../lib/public-errors'
-import { OperationsDashboard } from '../../operations/components/OperationsDashboard'
+} from '@/lib/database.types'
+import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
+import { NotificationBanner } from '@/components/ui/NotificationBanner'
+import { OperationsDashboard } from '@/features/operations/components/OperationsDashboard'
+import { safeDatabaseErrorMessage } from '@/lib/public-errors'
+import { supabase } from '@/lib/supabase'
 import { OrganizationOnboarding } from './OrganizationOnboarding'
 
 interface WorkspaceProps {
