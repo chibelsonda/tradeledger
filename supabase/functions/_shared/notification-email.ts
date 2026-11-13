@@ -97,20 +97,36 @@ export function buildNotificationEmail(
             <tr>
               <td style="background:#0f4538;padding:28px 32px;color:#ffffff">
                 <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#c9ef9b">TRADELEDGER</div>
-                <h1 style="margin:12px 0 0;font-size:26px;line-height:1.2">${escapeHtml(heading)}</h1>
+                <h1 style="margin:12px 0 0;font-size:26px;line-height:1.2">${
+    escapeHtml(heading)
+  }</h1>
               </td>
             </tr>
             <tr>
               <td style="padding:32px">
-                <p style="margin:0 0 16px;font-size:16px;line-height:1.6">Hello ${escapeHtml(notification.recipient_name)},</p>
-                <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#42534f">${escapeHtml(summary)}</p>
+                <p style="margin:0 0 16px;font-size:16px;line-height:1.6">Hello ${
+    escapeHtml(notification.recipient_name)
+  },</p>
+                <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#42534f">${
+    escapeHtml(summary)
+  }</p>
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:1px solid #e2e5e2">
-                  <tr><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;color:#6b7774;font-size:12px">Project</td><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;text-align:right;font-weight:700">${escapeHtml(projectName)}${projectCode ? ` (${escapeHtml(projectCode)})` : ''}</td></tr>
-                  <tr><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;color:#6b7774;font-size:12px">Work</td><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;text-align:right">${escapeHtml(description)}</td></tr>
-                  <tr><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;color:#6b7774;font-size:12px">Net amount</td><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;text-align:right;font-size:18px;font-weight:800;color:#0f4538">${escapeHtml(amount)}</td></tr>
-                  <tr><td style="padding:12px 16px;color:#6b7774;font-size:12px">Status</td><td style="padding:12px 16px;text-align:right;font-weight:700">${escapeHtml(statusLabel)} · ${escapeHtml(eventDate)}</td></tr>
+                  <tr><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;color:#6b7774;font-size:12px">Project</td><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;text-align:right;font-weight:700">${
+    escapeHtml(projectName)
+  }${projectCode ? ` (${escapeHtml(projectCode)})` : ''}</td></tr>
+                  <tr><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;color:#6b7774;font-size:12px">Work</td><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;text-align:right">${
+    escapeHtml(description)
+  }</td></tr>
+                  <tr><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;color:#6b7774;font-size:12px">Net amount</td><td style="padding:12px 16px;border-bottom:1px solid #e2e5e2;text-align:right;font-size:18px;font-weight:800;color:#0f4538">${
+    escapeHtml(amount)
+  }</td></tr>
+                  <tr><td style="padding:12px 16px;color:#6b7774;font-size:12px">Status</td><td style="padding:12px 16px;text-align:right;font-weight:700">${
+    escapeHtml(statusLabel)
+  } · ${escapeHtml(eventDate)}</td></tr>
                 </table>
-                <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#7b8582">This automated message is a transaction record from ${escapeHtml(organizationName)} through TradeLedger.</p>
+                <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#7b8582">This automated message is a transaction record from ${
+    escapeHtml(organizationName)
+  } through TradeLedger.</p>
               </td>
             </tr>
           </table>

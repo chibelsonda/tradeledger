@@ -1,7 +1,8 @@
-import { withSupabase } from 'npm:@supabase/server@^1'
-import Stripe from 'npm:stripe@^22'
+import { withSupabase } from '@supabase/server'
+import Stripe from 'stripe'
 
 import { withObservability } from '../_shared/observability.ts'
+import { enforceUserRateLimit, safeDatabaseErrorResponse } from '../_shared/security.ts'
 
 interface CheckoutRequest {
   paymentRequestId?: unknown
@@ -51,296 +52,295 @@ function isUuid(value: unknown): value is string {
   )
 }
 
-function checkoutErrorStatus(code?: string): number {
-  if (code === '42501' || code === '28000') {
-    return 403
-  }
-
-  if (code === '55000' || code === '23505') {
-    return 409
-  }
-
-  if (code === 'P0002') {
-    return 404
-  }
-
-  return 500
-}
-
 export default {
   fetch: withObservability(
     'create-checkout',
     withSupabase({ auth: 'user' }, async (request, context) => {
-    if (request.method !== 'POST') {
-      return Response.json({ error: 'Method not allowed.' }, { status: 405 })
-    }
+      if (request.method !== 'POST') {
+        return Response.json({ error: 'Method not allowed.' }, { status: 405 })
+      }
 
-    let body: CheckoutRequest
+      let body: CheckoutRequest
 
-    try {
-      body = await request.json()
-    } catch {
-      return Response.json({ error: 'A JSON request body is required.' }, { status: 400 })
-    }
+      try {
+        body = await request.json()
+      } catch {
+        return Response.json({ error: 'A JSON request body is required.' }, {
+          status: 400,
+        })
+      }
 
-    const userId = context.userClaims?.id
-    const email =
-      typeof context.userClaims?.email === 'string'
+      const userId = context.userClaims?.id
+      const email = typeof context.userClaims?.email === 'string'
         ? context.userClaims.email
         : undefined
 
-    if (typeof userId !== 'string' || userId.length === 0) {
-      return Response.json({ error: 'Authenticated user is missing.' }, { status: 401 })
-    }
+      if (typeof userId !== 'string' || userId.length === 0) {
+        return Response.json({ error: 'Authenticated user is missing.' }, {
+          status: 401,
+        })
+      }
 
-    const siteUrl = requiredEnvironment('SITE_URL').replace(/\/$/, '')
-    const stripe = new Stripe(requiredEnvironment('STRIPE_SECRET'))
+      const rateLimitResponse = await enforceUserRateLimit(context.supabaseAdmin, {
+        bucket: 'create-checkout',
+        subject: userId,
+        limit: 10,
+        windowSeconds: 60,
+      })
 
-    if (body.paymentRequestId !== undefined) {
-      if (!isUuid(body.paymentRequestId)) {
+      if (rateLimitResponse) return rateLimitResponse
+
+      const siteUrl = requiredEnvironment('SITE_URL').replace(/\/$/, '')
+      const stripe = new Stripe(requiredEnvironment('STRIPE_SECRET'), {
+        maxNetworkRetries: 2,
+        timeout: 10_000,
+      })
+
+      if (body.paymentRequestId !== undefined) {
+        if (!isUuid(body.paymentRequestId)) {
+          return Response.json(
+            { error: 'A valid payment request ID is required.' },
+            { status: 422 },
+          )
+        }
+
+        const proposedReference = crypto.randomUUID()
+        const { data, error: preparationError } = await context.supabaseAdmin.rpc(
+          'prepare_payment_request_checkout',
+          {
+            p_payment_request_id: body.paymentRequestId,
+            p_user_id: userId,
+            p_reference: proposedReference,
+          },
+        )
+
+        if (preparationError) {
+          console.error('Unable to prepare payment request checkout:', preparationError)
+          return safeDatabaseErrorResponse(
+            preparationError,
+            'Unable to prepare checkout. Please try again.',
+          )
+        }
+
+        const prepared = (Array.isArray(data) ? data[0] : data) as
+          | PreparedPaymentRequest
+          | undefined
+
+        if (!prepared) {
+          return Response.json(
+            { error: 'Unable to prepare checkout. Please try again.' },
+            { status: 500 },
+          )
+        }
+
+        if (prepared.stripe_checkout_session_id) {
+          try {
+            const existingSession = await stripe.checkout.sessions.retrieve(
+              prepared.stripe_checkout_session_id,
+            )
+
+            if (existingSession.status === 'open' && existingSession.url) {
+              return Response.json({ url: existingSession.url, resumed: true })
+            }
+
+            await context.supabaseAdmin.rpc('mark_payment_checkout_failed', {
+              p_reference: prepared.payment_reference,
+              p_reason: 'existing_checkout_session_closed',
+            })
+
+            return Response.json(
+              { error: 'The previous checkout is no longer active. Please try again.' },
+              { status: 409 },
+            )
+          } catch (error) {
+            console.error('Unable to resume Stripe Checkout Session:', error)
+            return Response.json(
+              { error: 'Unable to resume checkout. Please try again.' },
+              { status: 502 },
+            )
+          }
+        }
+
+        try {
+          const session = await stripe.checkout.sessions.create(
+            {
+              client_reference_id: prepared.payment_reference,
+              customer_email: prepared.customer_email ?? email,
+              line_items: [
+                {
+                  price_data: {
+                    currency: prepared.currency,
+                    product_data: {
+                      name: `Payment to ${prepared.subcontractor_name}`,
+                      description:
+                        `${prepared.project_name} · ${prepared.request_description}`,
+                    },
+                    unit_amount: prepared.amount_total,
+                  },
+                  quantity: 1,
+                },
+              ],
+              metadata: {
+                payment_reference: prepared.payment_reference,
+                payment_request_id: prepared.payment_request_id,
+                organization_id: prepared.organization_id,
+                supabase_user_id: userId,
+              },
+              mode: 'payment',
+              payment_intent_data: {
+                metadata: {
+                  payment_reference: prepared.payment_reference,
+                  payment_request_id: prepared.payment_request_id,
+                  organization_id: prepared.organization_id,
+                },
+              },
+              success_url: siteUrl +
+                '/?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+              cancel_url: siteUrl + '/?checkout=canceled',
+            },
+            { idempotencyKey: prepared.payment_reference },
+          )
+
+          if (!session.url) {
+            throw new Error('Stripe did not return a Checkout URL.')
+          }
+
+          const { data: attached, error: attachError } = await context.supabaseAdmin
+            .rpc('attach_payment_checkout_session', {
+              p_reference: prepared.payment_reference,
+              p_session_id: session.id,
+            })
+
+          if (attachError || attached !== true) {
+            console.error('Unable to attach Stripe session:', attachError)
+            await stripe.checkout.sessions.expire(session.id).catch(() => undefined)
+            throw new Error('Unable to save the Checkout Session.')
+          }
+
+          return Response.json({ url: session.url })
+        } catch (error) {
+          console.error('Payment request Checkout Session creation failed:', error)
+
+          await context.supabaseAdmin.rpc('mark_payment_checkout_failed', {
+            p_reference: prepared.payment_reference,
+            p_reason: 'checkout_session_creation_failed',
+          })
+
+          return Response.json(
+            { error: 'Checkout is temporarily unavailable. Please try again.' },
+            { status: 502 },
+          )
+        }
+      }
+
+      const maximumQuantity = positiveInteger('CHECKOUT_MAX_QUANTITY', 10)
+      const quantity = Number(body.quantity)
+
+      if (
+        !Number.isSafeInteger(quantity) ||
+        quantity < 1 ||
+        quantity > maximumQuantity
+      ) {
         return Response.json(
-          { error: 'A valid payment request ID is required.' },
+          { error: `Quantity must be between 1 and ${maximumQuantity}.` },
           { status: 422 },
         )
       }
 
-      const proposedReference = crypto.randomUUID()
-      const { data, error: preparationError } = await context.supabaseAdmin.rpc(
-        'prepare_payment_request_checkout',
-        {
-          p_payment_request_id: body.paymentRequestId,
-          p_user_id: userId,
-          p_reference: proposedReference,
-        },
-      )
+      const productName = Deno.env.get('CHECKOUT_PRODUCT_NAME') ?? 'Launch Kit'
+      const productDescription = Deno.env.get('CHECKOUT_PRODUCT_DESCRIPTION') ??
+        'A polished starter pack for turning your next idea into a real launch.'
+      const unitAmount = positiveInteger('CHECKOUT_UNIT_AMOUNT', 4900)
+      const currency = (Deno.env.get('CHECKOUT_CURRENCY') ?? 'usd').toLowerCase()
+      const reference = crypto.randomUUID()
 
-      if (preparationError) {
-        console.error('Unable to prepare payment request checkout:', preparationError)
-        return Response.json(
-          { error: preparationError.message },
-          { status: checkoutErrorStatus(preparationError.code) },
-        )
-      }
+      const { error: insertError } = await context.supabaseAdmin
+        .from('payments')
+        .insert({
+          user_id: userId,
+          reference,
+          product_name: productName,
+          unit_amount: unitAmount,
+          quantity,
+          amount_total: unitAmount * quantity,
+          currency,
+          status: 'pending',
+          customer_email: email ?? null,
+        })
 
-      const prepared = (Array.isArray(data) ? data[0] : data) as
-        | PreparedPaymentRequest
-        | undefined
-
-      if (!prepared) {
+      if (insertError) {
+        console.error('Unable to create payment:', insertError)
         return Response.json(
           { error: 'Unable to prepare checkout. Please try again.' },
           { status: 500 },
         )
       }
 
-      if (prepared.stripe_checkout_session_id) {
-        try {
-          const existingSession = await stripe.checkout.sessions.retrieve(
-            prepared.stripe_checkout_session_id,
-          )
-
-          if (existingSession.status === 'open' && existingSession.url) {
-            return Response.json({ url: existingSession.url, resumed: true })
-          }
-
-          await context.supabaseAdmin.rpc('mark_payment_checkout_failed', {
-            p_reference: prepared.payment_reference,
-            p_reason: 'existing_checkout_session_closed',
-          })
-
-          return Response.json(
-            { error: 'The previous checkout is no longer active. Please try again.' },
-            { status: 409 },
-          )
-        } catch (error) {
-          console.error('Unable to resume Stripe Checkout Session:', error)
-          return Response.json(
-            { error: 'Unable to resume checkout. Please try again.' },
-            { status: 502 },
-          )
-        }
-      }
-
       try {
         const session = await stripe.checkout.sessions.create(
           {
-            client_reference_id: prepared.payment_reference,
-            customer_email: prepared.customer_email ?? email,
+            client_reference_id: reference,
+            customer_email: email,
             line_items: [
               {
                 price_data: {
-                  currency: prepared.currency,
+                  currency,
                   product_data: {
-                    name: `Payment to ${prepared.subcontractor_name}`,
-                    description: `${prepared.project_name} · ${prepared.request_description}`,
+                    name: productName,
+                    description: productDescription,
                   },
-                  unit_amount: prepared.amount_total,
+                  unit_amount: unitAmount,
                 },
-                quantity: 1,
+                quantity,
               },
             ],
             metadata: {
-              payment_reference: prepared.payment_reference,
-              payment_request_id: prepared.payment_request_id,
-              organization_id: prepared.organization_id,
+              payment_reference: reference,
               supabase_user_id: userId,
             },
             mode: 'payment',
             payment_intent_data: {
               metadata: {
-                payment_reference: prepared.payment_reference,
-                payment_request_id: prepared.payment_request_id,
-                organization_id: prepared.organization_id,
+                payment_reference: reference,
+                supabase_user_id: userId,
               },
             },
-            success_url:
-              siteUrl + '/?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+            success_url: siteUrl +
+              '/?checkout=success&session_id={CHECKOUT_SESSION_ID}',
             cancel_url: siteUrl + '/?checkout=canceled',
           },
-          { idempotencyKey: prepared.payment_reference },
+          { idempotencyKey: reference },
         )
 
         if (!session.url) {
           throw new Error('Stripe did not return a Checkout URL.')
         }
 
-        const { data: attached, error: attachError } =
-          await context.supabaseAdmin.rpc('attach_payment_checkout_session', {
-            p_reference: prepared.payment_reference,
-            p_session_id: session.id,
-          })
+        const { error: updateError } = await context.supabaseAdmin
+          .from('payments')
+          .update({ stripe_checkout_session_id: session.id })
+          .eq('reference', reference)
 
-        if (attachError || attached !== true) {
-          console.error('Unable to attach Stripe session:', attachError)
+        if (updateError) {
+          console.error('Unable to attach Stripe session:', updateError)
           await stripe.checkout.sessions.expire(session.id).catch(() => undefined)
           throw new Error('Unable to save the Checkout Session.')
         }
 
         return Response.json({ url: session.url })
       } catch (error) {
-        console.error('Payment request Checkout Session creation failed:', error)
+        console.error('Stripe Checkout Session creation failed:', error)
 
-        await context.supabaseAdmin.rpc('mark_payment_checkout_failed', {
-          p_reference: prepared.payment_reference,
-          p_reason: 'checkout_session_creation_failed',
-        })
+        await context.supabaseAdmin
+          .from('payments')
+          .update({ status: 'failed' })
+          .eq('reference', reference)
 
         return Response.json(
           { error: 'Checkout is temporarily unavailable. Please try again.' },
           { status: 502 },
         )
       }
-    }
-
-    const maximumQuantity = positiveInteger('CHECKOUT_MAX_QUANTITY', 10)
-    const quantity = Number(body.quantity)
-
-    if (
-      !Number.isSafeInteger(quantity) ||
-      quantity < 1 ||
-      quantity > maximumQuantity
-    ) {
-      return Response.json(
-        { error: `Quantity must be between 1 and ${maximumQuantity}.` },
-        { status: 422 },
-      )
-    }
-
-    const productName = Deno.env.get('CHECKOUT_PRODUCT_NAME') ?? 'Launch Kit'
-    const productDescription =
-      Deno.env.get('CHECKOUT_PRODUCT_DESCRIPTION') ??
-      'A polished starter pack for turning your next idea into a real launch.'
-    const unitAmount = positiveInteger('CHECKOUT_UNIT_AMOUNT', 4900)
-    const currency = (Deno.env.get('CHECKOUT_CURRENCY') ?? 'usd').toLowerCase()
-    const reference = crypto.randomUUID()
-
-    const { error: insertError } = await context.supabaseAdmin
-      .from('payments')
-      .insert({
-        user_id: userId,
-        reference,
-        product_name: productName,
-        unit_amount: unitAmount,
-        quantity,
-        amount_total: unitAmount * quantity,
-        currency,
-        status: 'pending',
-        customer_email: email ?? null,
-      })
-
-    if (insertError) {
-      console.error('Unable to create payment:', insertError)
-      return Response.json(
-        { error: 'Unable to prepare checkout. Please try again.' },
-        { status: 500 },
-      )
-    }
-
-    try {
-      const session = await stripe.checkout.sessions.create(
-        {
-          client_reference_id: reference,
-          customer_email: email,
-          line_items: [
-            {
-              price_data: {
-                currency,
-                product_data: {
-                  name: productName,
-                  description: productDescription,
-                },
-                unit_amount: unitAmount,
-              },
-              quantity,
-            },
-          ],
-          metadata: {
-            payment_reference: reference,
-            supabase_user_id: userId,
-          },
-          mode: 'payment',
-          payment_intent_data: {
-            metadata: {
-              payment_reference: reference,
-              supabase_user_id: userId,
-            },
-          },
-          success_url:
-            siteUrl + '/?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-          cancel_url: siteUrl + '/?checkout=canceled',
-        },
-        { idempotencyKey: reference },
-      )
-
-      if (!session.url) {
-        throw new Error('Stripe did not return a Checkout URL.')
-      }
-
-      const { error: updateError } = await context.supabaseAdmin
-        .from('payments')
-        .update({ stripe_checkout_session_id: session.id })
-        .eq('reference', reference)
-
-      if (updateError) {
-        console.error('Unable to attach Stripe session:', updateError)
-        await stripe.checkout.sessions.expire(session.id).catch(() => undefined)
-        throw new Error('Unable to save the Checkout Session.')
-      }
-
-      return Response.json({ url: session.url })
-    } catch (error) {
-      console.error('Stripe Checkout Session creation failed:', error)
-
-      await context.supabaseAdmin
-        .from('payments')
-        .update({ status: 'failed' })
-        .eq('reference', reference)
-
-      return Response.json(
-        { error: 'Checkout is temporarily unavailable. Please try again.' },
-        { status: 502 },
-      )
-    }
     }),
   ),
 }

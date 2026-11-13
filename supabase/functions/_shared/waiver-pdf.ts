@@ -1,10 +1,4 @@
-import {
-  PDFDocument,
-  StandardFonts,
-  rgb,
-  type PDFFont,
-  type PDFPage,
-} from 'npm:pdf-lib@^1.17.1'
+import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from 'pdf-lib'
 
 export interface WaiverPdfData {
   organizationName: string
@@ -45,7 +39,12 @@ function formatMoney(amount: number, currency: string): string {
   }).format(amount / 100)
 }
 
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+function wrapText(
+  text: string,
+  font: PDFFont,
+  size: number,
+  maxWidth: number,
+): string[] {
   const words = cleanText(text).split(/\s+/)
   const lines: string[] = []
   let current = ''
@@ -143,7 +142,16 @@ export async function buildWaiverPdf(data: WaiverPdfData): Promise<Uint8Array> {
   })
 
   let y = pageHeight - 170
-  y = drawLabelValue(page, regular, bold, 'Organization', cleanText(data.organizationName), margin, y, 230)
+  y = drawLabelValue(
+    page,
+    regular,
+    bold,
+    'Organization',
+    cleanText(data.organizationName),
+    margin,
+    y,
+    230,
+  )
   drawLabelValue(
     page,
     regular,
@@ -161,7 +169,11 @@ export async function buildWaiverPdf(data: WaiverPdfData): Promise<Uint8Array> {
   )
 
   y -= 12
-  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, color: line })
+  page.drawLine({
+    start: { x: margin, y },
+    end: { x: pageWidth - margin, y },
+    color: line,
+  })
   y -= 28
 
   y = drawLabelValue(
@@ -186,7 +198,16 @@ export async function buildWaiverPdf(data: WaiverPdfData): Promise<Uint8Array> {
   )
 
   y -= 18
-  y = drawLabelValue(page, regular, bold, 'Work description', data.description, margin, y, pageWidth - margin * 2)
+  y = drawLabelValue(
+    page,
+    regular,
+    bold,
+    'Work description',
+    data.description,
+    margin,
+    y,
+    pageWidth - margin * 2,
+  )
   y -= 18
 
   page.drawRectangle({
@@ -199,7 +220,7 @@ export async function buildWaiverPdf(data: WaiverPdfData): Promise<Uint8Array> {
     borderWidth: 1,
   })
 
-  const amounts = [
+  const amounts: Array<readonly [string, string]> = [
     ['Gross amount', formatMoney(data.grossAmount, data.currency)],
     ['Retainage', formatMoney(data.retainageAmount, data.currency)],
     ['Net payment', formatMoney(data.netAmount, data.currency)],
@@ -234,7 +255,9 @@ export async function buildWaiverPdf(data: WaiverPdfData): Promise<Uint8Array> {
 
   const acknowledgment =
     'This record confirms receipt of the net payment shown above for the described work. It preserves the payment facts recorded by TradeLedger at the time of generation. Any later refund automatically voids this document in the application ledger.'
-  for (const lineText of wrapText(acknowledgment, regular, 10.5, pageWidth - margin * 2)) {
+  for (
+    const lineText of wrapText(acknowledgment, regular, 10.5, pageWidth - margin * 2)
+  ) {
     page.drawText(lineText, { x: margin, y, size: 10.5, font: regular, color: ink })
     y -= 15
   }

@@ -17,7 +17,7 @@ import {
 } from '@headlessui/react'
 import type { Session } from '@supabase/supabase-js'
 import type { FormEvent } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
   AuditEvent,
@@ -215,6 +215,7 @@ export function OperationsDashboard({
     () => dashboardPageFromPath(window.location.pathname),
   )
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const dashboardLoadSequence = useRef(0)
 
   const [projectName, setProjectName] = useState('')
   const [projectReference, setProjectReference] = useState('')
@@ -314,6 +315,7 @@ export function OperationsDashboard({
   ])
 
   const loadDashboard = useCallback(async () => {
+    const loadSequence = ++dashboardLoadSequence.current
     setIsLoading(true)
     setError(null)
 
@@ -367,6 +369,8 @@ export function OperationsDashboard({
           : Promise.resolve({ data: [] as OrganizationMember[], error: null }),
       ])
 
+    if (loadSequence !== dashboardLoadSequence.current) return
+
     const firstError =
       projectResult.error ??
       subcontractorResult.error ??
@@ -392,9 +396,18 @@ export function OperationsDashboard({
     setWebhookFailures(failureResult.data ?? [])
     setWaiverDocuments(waiverResult.data ?? [])
     setOrganizationMembers(memberResult.data ?? [])
-    setRequestProjectId((current) => current || nextProjects[0]?.id || '')
+    setRequestProjectId((current) =>
+      nextProjects.some((project) => project.id === current)
+        ? current
+        : nextProjects[0]?.id ?? '',
+    )
     setRequestSubcontractorId(
-      (current) => current || nextSubcontractors[0]?.id || '',
+      (current) =>
+        nextSubcontractors.some(
+          (subcontractor) => subcontractor.id === current,
+        )
+          ? current
+          : nextSubcontractors[0]?.id ?? '',
     )
     setIsLoading(false)
   }, [canManageTeam, organization.id])
@@ -405,7 +418,10 @@ export function OperationsDashboard({
       void loadDashboard()
     }, 0)
 
-    return () => window.clearTimeout(timeout)
+    return () => {
+      window.clearTimeout(timeout)
+      dashboardLoadSequence.current += 1
+    }
   }, [loadDashboard])
 
   useEffect(() => {

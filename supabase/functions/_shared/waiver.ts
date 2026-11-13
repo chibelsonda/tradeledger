@@ -9,12 +9,6 @@ export function isUuid(value: unknown): value is string {
     )
   )
 }
-export function databaseErrorStatus(code?: string): number {
-  if (code === '42501' || code === '28000') return 403
-  if (code === 'P0002') return 404
-  if (code === '55000') return 409
-  return 500
-}
 
 export function safeDownloadName(value: string): string {
   const normalized = value
@@ -23,5 +17,7 @@ export function safeDownloadName(value: string): string {
     .replace(/-{2,}/g, '-')
     .replace(/^-+|-+$/g, '')
 
-  return normalized.endsWith('.pdf') ? normalized : `${normalized || 'payment-waiver'}.pdf`
+  return normalized.endsWith('.pdf')
+    ? normalized
+    : `${normalized || 'payment-waiver'}.pdf`
 }

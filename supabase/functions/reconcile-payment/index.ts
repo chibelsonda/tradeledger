@@ -1,7 +1,8 @@
-import { withSupabase } from 'npm:@supabase/server@^1'
-import Stripe from 'npm:stripe@^22'
+import { withSupabase } from '@supabase/server'
+import Stripe from 'stripe'
 
 import { withObservability } from '../_shared/observability.ts'
+import { enforceUserRateLimit, safeDatabaseErrorResponse } from '../_shared/security.ts'
 
 interface ReconciliationRequest {
   paymentRequestId?: unknown
@@ -34,85 +35,92 @@ function isUuid(value: unknown): value is string {
   )
 }
 
-function errorStatus(code?: string): number {
-  if (code === '42501' || code === '28000') return 403
-  if (code === 'P0002') return 404
-  if (code === '55000') return 409
-  return 500
-}
-
 export default {
   fetch: withObservability(
     'reconcile-payment',
     withSupabase({ auth: 'user' }, async (request, context) => {
-    if (request.method !== 'POST') {
-      return Response.json({ error: 'Method not allowed.' }, { status: 405 })
-    }
+      if (request.method !== 'POST') {
+        return Response.json({ error: 'Method not allowed.' }, { status: 405 })
+      }
 
-    let body: ReconciliationRequest
+      let body: ReconciliationRequest
 
-    try {
-      body = await request.json()
-    } catch {
-      return Response.json({ error: 'A JSON request body is required.' }, { status: 400 })
-    }
+      try {
+        body = await request.json()
+      } catch {
+        return Response.json({ error: 'A JSON request body is required.' }, {
+          status: 400,
+        })
+      }
 
-    if (!isUuid(body.paymentRequestId)) {
-      return Response.json(
-        { error: 'A valid payment request ID is required.' },
-        { status: 422 },
+      if (!isUuid(body.paymentRequestId)) {
+        return Response.json(
+          { error: 'A valid payment request ID is required.' },
+          { status: 422 },
+        )
+      }
+
+      const userId = context.userClaims?.id
+
+      if (typeof userId !== 'string' || userId.length === 0) {
+        return Response.json({ error: 'Authenticated user is missing.' }, {
+          status: 401,
+        })
+      }
+
+      const rateLimitResponse = await enforceUserRateLimit(context.supabaseAdmin, {
+        bucket: 'reconcile-payment',
+        subject: userId,
+        limit: 12,
+        windowSeconds: 60,
+      })
+
+      if (rateLimitResponse) return rateLimitResponse
+
+      const { data, error: preparationError } = await context.supabaseAdmin.rpc(
+        'prepare_payment_reconciliation',
+        {
+          p_payment_request_id: body.paymentRequestId,
+          p_user_id: userId,
+        },
       )
-    }
 
-    const userId = context.userClaims?.id
+      if (preparationError) {
+        console.error('Unable to prepare reconciliation:', preparationError)
+        return safeDatabaseErrorResponse(
+          preparationError,
+          'Unable to prepare reconciliation. Please try again.',
+        )
+      }
 
-    if (typeof userId !== 'string' || userId.length === 0) {
-      return Response.json({ error: 'Authenticated user is missing.' }, { status: 401 })
-    }
+      const prepared = (Array.isArray(data) ? data[0] : data) as
+        | PreparedReconciliation
+        | undefined
 
-    const { data, error: preparationError } = await context.supabaseAdmin.rpc(
-      'prepare_payment_reconciliation',
-      {
-        p_payment_request_id: body.paymentRequestId,
-        p_user_id: userId,
-      },
-    )
+      if (!prepared) {
+        return Response.json(
+          { error: 'Unable to prepare reconciliation. Please try again.' },
+          { status: 500 },
+        )
+      }
 
-    if (preparationError) {
-      console.error('Unable to prepare reconciliation:', preparationError)
-      return Response.json(
-        { error: preparationError.message },
-        { status: errorStatus(preparationError.code) },
-      )
-    }
+      const stripe = new Stripe(requiredEnvironment('STRIPE_SECRET'), {
+        maxNetworkRetries: 2,
+        timeout: 10_000,
+      })
 
-    const prepared = (Array.isArray(data) ? data[0] : data) as
-      | PreparedReconciliation
-      | undefined
-
-    if (!prepared) {
-      return Response.json(
-        { error: 'Unable to prepare reconciliation. Please try again.' },
-        { status: 500 },
-      )
-    }
-
-    const stripe = new Stripe(requiredEnvironment('STRIPE_SECRET'))
-
-    try {
-      const session = await stripe.checkout.sessions.retrieve(
-        prepared.stripe_checkout_session_id,
-      )
-      const sessionPaymentIntent = session.payment_intent
-      const paymentIntentId =
-        typeof sessionPaymentIntent === 'string'
+      try {
+        const session = await stripe.checkout.sessions.retrieve(
+          prepared.stripe_checkout_session_id,
+        )
+        const sessionPaymentIntent = session.payment_intent
+        const paymentIntentId = typeof sessionPaymentIntent === 'string'
           ? sessionPaymentIntent
           : sessionPaymentIntent?.id ?? prepared.stripe_payment_intent_id
-      const refundList = paymentIntentId
-        ? await stripe.refunds.list({ payment_intent: paymentIntentId, limit: 100 })
-        : null
-      const refunds =
-        refundList?.data.map((refund) => ({
+        const refundList = paymentIntentId
+          ? await stripe.refunds.list({ payment_intent: paymentIntentId, limit: 100 })
+          : null
+        const refunds = refundList?.data.map((refund) => ({
           id: refund.id,
           amount: refund.amount,
           currency: refund.currency,
@@ -121,37 +129,37 @@ export default {
           failure_reason: refund.failure_reason ?? null,
         })) ?? []
 
-      const { data: status, error: reconciliationError } =
-        await context.supabaseAdmin.rpc('reconcile_stripe_payment', {
-          p_payment_request_id: prepared.payment_request_id,
-          p_user_id: userId,
-          p_session_status: session.status,
-          p_payment_status: session.payment_status,
-          p_payment_intent_id: paymentIntentId,
-          p_refunds: refunds,
-        })
+        const { data: status, error: reconciliationError } = await context.supabaseAdmin
+          .rpc('reconcile_stripe_payment', {
+            p_payment_request_id: prepared.payment_request_id,
+            p_user_id: userId,
+            p_session_status: session.status,
+            p_payment_status: session.payment_status,
+            p_payment_intent_id: paymentIntentId,
+            p_refunds: refunds,
+          })
 
-      if (reconciliationError) {
-        console.error('Unable to apply reconciliation:', reconciliationError)
+        if (reconciliationError) {
+          console.error('Unable to apply reconciliation:', reconciliationError)
+          return Response.json(
+            { error: 'Stripe was reached, but the ledger could not be reconciled.' },
+            { status: 500 },
+          )
+        }
+
+        return Response.json({
+          status,
+          sessionStatus: session.status,
+          paymentStatus: session.payment_status,
+          refundCount: refunds.length,
+        })
+      } catch (error) {
+        console.error('Stripe reconciliation failed:', error)
         return Response.json(
-          { error: 'Stripe was reached, but the ledger could not be reconciled.' },
-          { status: 500 },
+          { error: 'Stripe reconciliation is temporarily unavailable.' },
+          { status: 502 },
         )
       }
-
-      return Response.json({
-        status,
-        sessionStatus: session.status,
-        paymentStatus: session.payment_status,
-        refundCount: refunds.length,
-      })
-    } catch (error) {
-      console.error('Stripe reconciliation failed:', error)
-      return Response.json(
-        { error: 'Stripe reconciliation is temporarily unavailable.' },
-        { status: 502 },
-      )
-    }
     }),
   ),
 }

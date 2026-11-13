@@ -15,9 +15,7 @@ const requestIdPattern = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{7,99}$/
 function requestIdFrom(request: Request): string {
   const candidate = request.headers.get(REQUEST_ID_HEADER)?.trim()
 
-  return candidate && requestIdPattern.test(candidate)
-    ? candidate
-    : crypto.randomUUID()
+  return candidate && requestIdPattern.test(candidate) ? candidate : crypto.randomUUID()
 }
 
 function errorCodeForStatus(status: number): string {
@@ -39,12 +37,16 @@ function errorCodeForStatus(status: number): string {
 }
 
 function writeCompletionLog(context: RequestContext, response: Response): void {
-  const level = response.status >= 500 ? 'error' : response.status >= 400 ? 'warn' : 'info'
+  const level = response.status >= 500
+    ? 'error'
+    : response.status >= 400
+    ? 'warn'
+    : 'info'
   const event = response.status >= 500
     ? 'request.failed'
     : response.status >= 400
-      ? 'request.rejected'
-      : 'request.completed'
+    ? 'request.rejected'
+    : 'request.completed'
   const entry = JSON.stringify({
     timestamp: new Date().toISOString(),
     level,

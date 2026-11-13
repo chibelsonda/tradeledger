@@ -44,6 +44,23 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
+  edge-functions:
+    name: Edge Function quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Format, lint, and type-check Edge Functions
+        run: deno task --config supabase/functions/deno.json check
+
   database:
     name: Database integration
     runs-on: ubuntu-latest

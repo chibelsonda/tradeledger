@@ -1,0 +1,10 @@
+{
+  "name": "tradeledger-edge-functions",
+  "private": true,
+  "dependencies": {
+    "@supabase/server": "1.9.2",
+    "@supabase/supabase-js": "2.119.0",
+    "pdf-lib": "1.17.1",
+    "stripe": "22.6.2"
+  }
+}

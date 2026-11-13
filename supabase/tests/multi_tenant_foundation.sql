@@ -184,6 +184,59 @@ select public.attach_payment_checkout_session(
 ) as attached
 \gset
 
+select public.attach_payment_checkout_session(
+    :'checkout_payment_reference',
+    'cs_test_tradeledger_001'
+) as reattached
+\gset
+
+select set_config('test.checkout_reattached', :'reattached', true);
+
+select set_config(
+    'test.rate_limit_first',
+    public.consume_edge_rate_limit(
+        'database-test',
+        '00000000-0000-4000-8000-000000000001',
+        2,
+        60
+    )::text,
+    true
+);
+select set_config(
+    'test.rate_limit_second',
+    public.consume_edge_rate_limit(
+        'database-test',
+        '00000000-0000-4000-8000-000000000001',
+        2,
+        60
+    )::text,
+    true
+);
+select set_config(
+    'test.rate_limit_third',
+    public.consume_edge_rate_limit(
+        'database-test',
+        '00000000-0000-4000-8000-000000000001',
+        2,
+        60
+    )::text,
+    true
+);
+
+do $$
+begin
+    if not current_setting('test.checkout_reattached')::boolean then
+        raise exception 'Attaching the same Checkout Session must be idempotent.';
+    end if;
+
+    if not current_setting('test.rate_limit_first')::boolean
+       or not current_setting('test.rate_limit_second')::boolean
+       or current_setting('test.rate_limit_third')::boolean then
+        raise exception 'The database rate limiter did not enforce its request limit.';
+    end if;
+end;
+$$;
+
 select public.process_stripe_webhook(
     'evt_tradeledger_paid_001',
     'checkout.session.completed',
@@ -362,7 +415,8 @@ begin
         perform *
         from public.reserve_waiver_document(
             current_setting('test.payment_request_a_id')::uuid,
-            '00000000-0000-4000-8000-000000000002'
+            '00000000-0000-4000-8000-000000000002',
+            '30000000-0000-4000-8000-000000000003'
         );
         raise exception 'An outsider must not be able to reserve a waiver.';
     exception
@@ -377,23 +431,32 @@ select
     storage_path as waiver_storage_path
 from public.reserve_waiver_document(
     :'payment_request_a_id',
-    '00000000-0000-4000-8000-000000000001'
+    '00000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001'
 )
 \gset
 
 select set_config('test.waiver_document_id', :'waiver_document_id', true);
 select set_config('test.waiver_storage_path', :'waiver_storage_path', true);
 
-select document_id as repeated_waiver_document_id
+select
+    document_id as repeated_waiver_document_id,
+    generation_required as repeated_generation_required
 from public.reserve_waiver_document(
     :'payment_request_a_id',
-    '00000000-0000-4000-8000-000000000001'
+    '00000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000002'
 )
 \gset
 
 select set_config(
     'test.repeated_waiver_document_id',
     :'repeated_waiver_document_id',
+    true
+);
+select set_config(
+    'test.repeated_generation_required',
+    :'repeated_generation_required',
     true
 );
 
@@ -404,6 +467,10 @@ begin
         raise exception 'Waiver reservation must be idempotent.';
     end if;
 
+    if current_setting('test.repeated_generation_required')::boolean then
+        raise exception 'A concurrent waiver request must not steal an active lease.';
+    end if;
+
     if current_setting('test.waiver_storage_path') not like
        current_setting('test.organization_a_id') || '/%' then
         raise exception 'Waiver storage path must begin with the tenant ID.';
@@ -411,9 +478,30 @@ begin
 end;
 $$;
 
+select set_config(
+    'test.stale_waiver_finalized',
+    public.finalize_waiver_document(
+        :'waiver_document_id',
+        '00000000-0000-4000-8000-000000000001',
+        '30000000-0000-4000-8000-000000000002',
+        'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        2048
+    )::text,
+    true
+);
+
+do $$
+begin
+    if current_setting('test.stale_waiver_finalized')::boolean then
+        raise exception 'A non-owner generation token finalized the waiver.';
+    end if;
+end;
+$$;
+
 select public.finalize_waiver_document(
     :'waiver_document_id',
     '00000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001',
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     1024
 ) as waiver_finalized
@@ -593,7 +681,8 @@ begin
         perform *
         from public.reserve_waiver_document(
             current_setting('test.payment_request_a_id')::uuid,
-            '00000000-0000-4000-8000-000000000001'
+            '00000000-0000-4000-8000-000000000001',
+            '30000000-0000-4000-8000-000000000004'
         );
         raise exception 'A refunded request must not generate another waiver.';
     exception

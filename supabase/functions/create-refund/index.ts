@@ -1,7 +1,8 @@
-import { withSupabase } from 'npm:@supabase/server@^1'
-import Stripe from 'npm:stripe@^22'
+import { withSupabase } from '@supabase/server'
+import Stripe from 'stripe'
 
 import { withObservability } from '../_shared/observability.ts'
+import { enforceUserRateLimit, safeDatabaseErrorResponse } from '../_shared/security.ts'
 
 interface RefundRequest {
   paymentRequestId?: unknown
@@ -38,76 +39,85 @@ function isUuid(value: unknown): value is string {
   )
 }
 
-function errorStatus(code?: string): number {
-  if (code === '42501' || code === '28000') return 403
-  if (code === 'P0002') return 404
-  if (code === '55000' || code === '23505') return 409
-  return 500
-}
-
 export default {
   fetch: withObservability(
     'create-refund',
     withSupabase({ auth: 'user' }, async (request, context) => {
-    if (request.method !== 'POST') {
-      return Response.json({ error: 'Method not allowed.' }, { status: 405 })
-    }
+      if (request.method !== 'POST') {
+        return Response.json({ error: 'Method not allowed.' }, { status: 405 })
+      }
 
-    let body: RefundRequest
+      let body: RefundRequest
 
-    try {
-      body = await request.json()
-    } catch {
-      return Response.json({ error: 'A JSON request body is required.' }, { status: 400 })
-    }
+      try {
+        body = await request.json()
+      } catch {
+        return Response.json({ error: 'A JSON request body is required.' }, {
+          status: 400,
+        })
+      }
 
-    if (!isUuid(body.paymentRequestId)) {
-      return Response.json(
-        { error: 'A valid payment request ID is required.' },
-        { status: 422 },
+      if (!isUuid(body.paymentRequestId)) {
+        return Response.json(
+          { error: 'A valid payment request ID is required.' },
+          { status: 422 },
+        )
+      }
+
+      const userId = context.userClaims?.id
+
+      if (typeof userId !== 'string' || userId.length === 0) {
+        return Response.json({ error: 'Authenticated user is missing.' }, {
+          status: 401,
+        })
+      }
+
+      const rateLimitResponse = await enforceUserRateLimit(context.supabaseAdmin, {
+        bucket: 'create-refund',
+        subject: userId,
+        limit: 5,
+        windowSeconds: 60,
+      })
+
+      if (rateLimitResponse) return rateLimitResponse
+
+      const { data, error: preparationError } = await context.supabaseAdmin.rpc(
+        'prepare_payment_refund',
+        {
+          p_payment_request_id: body.paymentRequestId,
+          p_user_id: userId,
+          p_reference: crypto.randomUUID(),
+        },
       )
-    }
 
-    const userId = context.userClaims?.id
+      if (preparationError) {
+        console.error('Unable to prepare refund:', preparationError)
+        return safeDatabaseErrorResponse(
+          preparationError,
+          'Unable to prepare the refund. Please try again.',
+        )
+      }
 
-    if (typeof userId !== 'string' || userId.length === 0) {
-      return Response.json({ error: 'Authenticated user is missing.' }, { status: 401 })
-    }
+      const prepared = (Array.isArray(data) ? data[0] : data) as
+        | PreparedRefund
+        | undefined
 
-    const { data, error: preparationError } = await context.supabaseAdmin.rpc(
-      'prepare_payment_refund',
-      {
-        p_payment_request_id: body.paymentRequestId,
-        p_user_id: userId,
-        p_reference: crypto.randomUUID(),
-      },
-    )
+      if (!prepared) {
+        return Response.json(
+          { error: 'Unable to prepare the refund. Please try again.' },
+          { status: 500 },
+        )
+      }
 
-    if (preparationError) {
-      console.error('Unable to prepare refund:', preparationError)
-      return Response.json(
-        { error: preparationError.message },
-        { status: errorStatus(preparationError.code) },
-      )
-    }
+      const stripe = new Stripe(requiredEnvironment('STRIPE_SECRET'), {
+        maxNetworkRetries: 2,
+        timeout: 10_000,
+      })
 
-    const prepared = (Array.isArray(data) ? data[0] : data) as
-      | PreparedRefund
-      | undefined
-
-    if (!prepared) {
-      return Response.json(
-        { error: 'Unable to prepare the refund. Please try again.' },
-        { status: 500 },
-      )
-    }
-
-    const stripe = new Stripe(requiredEnvironment('STRIPE_SECRET'))
-
-    try {
-      const refund = prepared.stripe_refund_id
-        ? await stripe.refunds.retrieve(prepared.stripe_refund_id)
-        : await stripe.refunds.create(
+      try {
+        const refund = prepared.stripe_refund_id
+          ? await stripe.refunds.retrieve(prepared.stripe_refund_id)
+          : await stripe.refunds.create(
             {
               payment_intent: prepared.stripe_payment_intent_id,
               amount: prepared.amount,
@@ -123,45 +133,45 @@ export default {
             { idempotencyKey: prepared.refund_reference },
           )
 
-      const refundStatus = refund.status ?? 'pending'
-      const { data: applied, error: applyError } = await context.supabaseAdmin.rpc(
-        'apply_payment_refund_status',
-        {
-          p_refund_reference: prepared.refund_reference,
-          p_stripe_refund_id: refund.id,
-          p_status: refundStatus,
-          p_failure_reason: refund.failure_reason ?? null,
-          p_actor_user_id: userId,
-        },
-      )
+        const refundStatus = refund.status ?? 'pending'
+        const { data: applied, error: applyError } = await context.supabaseAdmin.rpc(
+          'apply_payment_refund_status',
+          {
+            p_refund_reference: prepared.refund_reference,
+            p_stripe_refund_id: refund.id,
+            p_status: refundStatus,
+            p_failure_reason: refund.failure_reason ?? null,
+            p_actor_user_id: userId,
+          },
+        )
 
-      if (applyError || applied !== true) {
-        console.error('Unable to apply Stripe refund status:', applyError)
+        if (applyError || applied !== true) {
+          console.error('Unable to apply Stripe refund status:', applyError)
+          return Response.json(
+            {
+              error:
+                'Stripe accepted the refund, but ledger confirmation is pending webhook reconciliation.',
+            },
+            { status: 502 },
+          )
+        }
+
+        return Response.json({
+          refundId: refund.id,
+          status: refundStatus,
+          amount: refund.amount,
+          currency: refund.currency,
+        })
+      } catch (error) {
+        console.error('Stripe refund request failed:', error)
         return Response.json(
           {
             error:
-              'Stripe accepted the refund, but ledger confirmation is pending webhook reconciliation.',
+              'The refund could not be confirmed. No duplicate request will be created if you retry.',
           },
           { status: 502 },
         )
       }
-
-      return Response.json({
-        refundId: refund.id,
-        status: refundStatus,
-        amount: refund.amount,
-        currency: refund.currency,
-      })
-    } catch (error) {
-      console.error('Stripe refund request failed:', error)
-      return Response.json(
-        {
-          error:
-            'The refund could not be confirmed. No duplicate request will be created if you retry.',
-        },
-        { status: 502 },
-      )
-    }
     }),
   ),
 }

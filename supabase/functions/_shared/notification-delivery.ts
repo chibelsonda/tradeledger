@@ -1,4 +1,4 @@
-import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { buildNotificationEmail } from './notification-email.ts'
 
@@ -82,6 +82,7 @@ async function sendWithResend(claim: NotificationClaim): Promise<string> {
         html: content.html,
         text: content.text,
       }),
+      signal: AbortSignal.timeout(10_000),
     })
   } catch {
     throw new DeliveryError(
@@ -95,10 +96,9 @@ async function sendWithResend(claim: NotificationClaim): Promise<string> {
 
   if (!response.ok) {
     const errorName = typeof payload.name === 'string' ? payload.name : 'provider_error'
-    const message =
-      typeof payload.message === 'string'
-        ? payload.message
-        : `Email provider returned HTTP ${response.status}.`
+    const message = typeof payload.message === 'string'
+      ? payload.message
+      : `Email provider returned HTTP ${response.status}.`
 
     throw new DeliveryError(
       message,

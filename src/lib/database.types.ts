@@ -216,6 +216,8 @@ export type WaiverDocument = {
   sha256: string | null
   file_size: number | null
   failure_reason: string | null
+  generation_token: string | null
+  generation_started_at: string | null
   created_at: string
   updated_at: string
 }
@@ -478,6 +480,15 @@ export interface Database {
       }
       mark_payment_checkout_failed: {
         Args: { p_reference: string; p_reason?: string }
+        Returns: boolean
+      }
+      consume_edge_rate_limit: {
+        Args: {
+          p_bucket: string
+          p_subject: string
+          p_limit: number
+          p_window_seconds: number
+        }
         Returns: boolean
       }
       process_stripe_webhook: {
