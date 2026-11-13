@@ -1,3 +1,4 @@
+import { Button, Field, Input, Label, Radio, RadioGroup } from '@headlessui/react'
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 
@@ -78,30 +79,29 @@ export function AuthCard() {
       </div>
 
       <div className="border border-ink/10 bg-white p-7 shadow-[0_32px_80px_rgba(16,35,31,0.14)] sm:p-10">
-        <div className="flex bg-cream p-1">
+        <RadioGroup
+          value={mode}
+          onChange={changeMode}
+          aria-label="Authentication mode"
+          className="flex bg-cream p-1"
+        >
           {(['sign-in', 'sign-up'] as const).map((option) => (
-            <button
+            <Radio
               key={option}
-              type="button"
-              onClick={() => changeMode(option)}
-              className={
-                'flex-1 px-4 py-2.5 text-sm font-bold transition ' +
-                (mode === option
-                  ? 'bg-white text-ink shadow-sm'
-                  : 'text-ink/50 hover:text-ink')
-              }
+              value={option}
+              className="flex-1 cursor-pointer px-4 py-2.5 text-center text-sm font-bold text-ink/50 transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/30 data-checked:bg-white data-checked:text-ink data-checked:shadow-sm"
             >
               {option === 'sign-in' ? 'Sign in' : 'Create account'}
-            </button>
+            </Radio>
           ))}
-        </div>
+        </RadioGroup>
 
         <form onSubmit={(event) => void submit(event)} className="mt-8 flex flex-col gap-5">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="email" className="text-sm font-bold text-ink">
+          <Field className="flex flex-col gap-2">
+            <Label htmlFor="email" className="text-sm font-bold text-ink">
               Email
-            </label>
-            <input
+            </Label>
+            <Input
               id="email"
               type="email"
               value={email}
@@ -111,13 +111,13 @@ export function AuthCard() {
               className="h-12 border border-ink/15 bg-cream/60 px-4 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10"
               placeholder="you@example.com"
             />
-          </div>
+          </Field>
 
-          <div className="flex flex-col gap-2">
-            <label htmlFor="password" className="text-sm font-bold text-ink">
+          <Field className="flex flex-col gap-2">
+            <Label htmlFor="password" className="text-sm font-bold text-ink">
               Password
-            </label>
-            <input
+            </Label>
+            <Input
               id="password"
               type="password"
               value={password}
@@ -128,7 +128,7 @@ export function AuthCard() {
               className="h-12 border border-ink/15 bg-cream/60 px-4 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10"
               placeholder="At least 8 characters"
             />
-          </div>
+          </Field>
 
           {error && (
             <p
@@ -147,7 +147,7 @@ export function AuthCard() {
             </p>
           )}
 
-          <button
+          <Button
             type="submit"
             disabled={isSubmitting}
             className="inline-flex h-13 items-center justify-center bg-ink px-6 text-sm font-bold text-white shadow-[0_14px_32px_rgba(16,35,31,0.2)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:translate-y-0 disabled:opacity-60"
@@ -157,7 +157,7 @@ export function AuthCard() {
               : mode === 'sign-in'
                 ? 'Sign in securely'
                 : 'Create your account'}
-          </button>
+          </Button>
         </form>
       </div>
     </section>

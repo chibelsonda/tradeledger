@@ -1,8 +1,24 @@
+import {
+  Button,
+  Description,
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  DialogTitle,
+  Field,
+  Input,
+  Label,
+  Radio,
+  RadioGroup,
+  Select,
+} from '@headlessui/react'
+import type { Session } from '@supabase/supabase-js'
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type {
   AuditEvent,
+  NotificationDelivery,
   Organization,
   OrganizationRole,
   PaymentRequest,
@@ -18,6 +34,11 @@ import {
   dollarsToMinorUnits,
 } from '../lib/payment-calculations'
 import { supabase } from '../lib/supabase'
+import {
+  DashboardSidebar,
+  type DashboardNavigationItem,
+} from './DashboardSidebar'
+import { NotificationDeliveryPanel } from './NotificationDeliveryPanel'
 import { WaiverDocumentControl } from './WaiverDocumentControl'
 
 interface WorkspaceOrganization extends Organization {
@@ -25,6 +46,7 @@ interface WorkspaceOrganization extends Organization {
 }
 
 interface OperationsDashboardProps {
+  session: Session
   organization: WorkspaceOrganization
   organizations: WorkspaceOrganization[]
   onSelectOrganization: (organizationId: string) => void
@@ -93,6 +115,7 @@ async function edgeFunctionErrorMessage(
 }
 
 export function OperationsDashboard({
+  session,
   organization,
   organizations,
   onSelectOrganization,
@@ -103,6 +126,9 @@ export function OperationsDashboard({
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
   const [webhookFailures, setWebhookFailures] = useState<StripeWebhookFailure[]>([])
   const [waiverDocuments, setWaiverDocuments] = useState<WaiverDocument[]>([])
+  const [notificationDeliveries, setNotificationDeliveries] = useState<
+    NotificationDelivery[]
+  >([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -114,9 +140,15 @@ export function OperationsDashboard({
   )
   const [refundRequestId, setRefundRequestId] = useState<string | null>(null)
   const [waiverRequestId, setWaiverRequestId] = useState<string | null>(null)
+  const [notificationDeliveryId, setNotificationDeliveryId] = useState<
+    string | null
+  >(null)
   const [refundConfirmationId, setRefundConfirmationId] = useState<string | null>(
     null,
   )
+  const [isNavigationOpen, setIsNavigationOpen] = useState(false)
+  const [activeNavigationId, setActiveNavigationId] = useState('overview')
+  const [isSigningOut, setIsSigningOut] = useState(false)
 
   const [projectName, setProjectName] = useState('')
   const [projectReference, setProjectReference] = useState('')
@@ -136,6 +168,70 @@ export function OperationsDashboard({
   const canApprovePayments = ['owner', 'accountant'].includes(organization.role)
   const activeCreatePanel =
     !canManageProjects && canManagePayments ? 'payment' : createPanel
+  const createPanelOptions = (
+    [
+      canManageProjects && ['project', 'Project'],
+      canManageProjects && ['subcontractor', 'Subcontractor'],
+      canManagePayments && ['payment', 'Payment'],
+    ].filter(Boolean) as [CreatePanel, string][]
+  )
+  const navigationItems = useMemo<DashboardNavigationItem[]>(() => {
+    const deliveryAttentionCount = notificationDeliveries.filter((delivery) =>
+      ['failed', 'retry_scheduled'].includes(delivery.status),
+    ).length
+
+    return [
+      {
+        id: 'overview',
+        label: 'Overview',
+        detail: 'Workspace health and totals',
+      },
+      (canManageProjects || canManagePayments) && {
+        id: 'create',
+        label: 'Create',
+        detail: 'Add operational records',
+      },
+      {
+        id: 'directory',
+        label: 'Directory',
+        detail: 'Projects and subcontractors',
+        badge: String(projects.length + subcontractors.length),
+      },
+      {
+        id: 'payments',
+        label: 'Payments',
+        detail: 'Requests, checkout, and refunds',
+        badge: String(paymentRequests.length),
+      },
+      canManagePayments && {
+        id: 'delivery',
+        label: 'Email delivery',
+        detail: 'Transactional notification log',
+        badge: deliveryAttentionCount > 0 ? String(deliveryAttentionCount) : undefined,
+      },
+      canManagePayments && {
+        id: 'webhooks',
+        label: 'Webhook health',
+        detail: 'Stripe processing failures',
+        badge: webhookFailures.length > 0 ? String(webhookFailures.length) : undefined,
+      },
+      auditEvents.length > 0 && {
+        id: 'audit',
+        label: 'Audit trail',
+        detail: 'Immutable activity evidence',
+        badge: String(auditEvents.length),
+      },
+    ].filter(Boolean) as DashboardNavigationItem[]
+  }, [
+    auditEvents.length,
+    canManagePayments,
+    canManageProjects,
+    notificationDeliveries,
+    paymentRequests.length,
+    projects.length,
+    subcontractors.length,
+    webhookFailures.length,
+  ])
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true)
@@ -148,6 +244,7 @@ export function OperationsDashboard({
       auditResult,
       failureResult,
       waiverResult,
+      notificationResult,
     ] =
       await Promise.all([
         supabase
@@ -183,6 +280,12 @@ export function OperationsDashboard({
           .select('*')
           .eq('organization_id', organization.id)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('notification_deliveries')
+          .select('*')
+          .eq('organization_id', organization.id)
+          .order('created_at', { ascending: false })
+          .limit(8),
       ])
 
     const firstError =
@@ -191,7 +294,8 @@ export function OperationsDashboard({
       requestResult.error ??
       auditResult.error ??
       failureResult.error ??
-      waiverResult.error
+      waiverResult.error ??
+      notificationResult.error
 
     if (firstError) {
       setError(firstError.message)
@@ -208,6 +312,7 @@ export function OperationsDashboard({
     setAuditEvents(auditResult.data ?? [])
     setWebhookFailures(failureResult.data ?? [])
     setWaiverDocuments(waiverResult.data ?? [])
+    setNotificationDeliveries(notificationResult.data ?? [])
     setRequestProjectId((current) => current || nextProjects[0]?.id || '')
     setRequestSubcontractorId(
       (current) => current || nextSubcontractors[0]?.id || '',
@@ -223,6 +328,35 @@ export function OperationsDashboard({
 
     return () => window.clearTimeout(timeout)
   }, [loadDashboard])
+
+  useEffect(() => {
+    const sections = navigationItems.flatMap((item) => {
+      const element = document.getElementById(item.id)
+      return element ? [element] : []
+    })
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0]
+
+        if (visibleEntry) {
+          setActiveNavigationId(visibleEntry.target.id)
+        }
+      },
+      { rootMargin: '-18% 0px -68% 0px', threshold: [0, 0.2, 0.5] },
+    )
+
+    sections.forEach((section) => observer.observe(section))
+    return () => observer.disconnect()
+  }, [navigationItems])
+
+  async function signOut() {
+    setIsSigningOut(true)
+    await supabase.auth.signOut()
+    setIsSigningOut(false)
+  }
 
   const approvedNetAmount = useMemo(
     () =>
@@ -401,11 +535,67 @@ export function OperationsDashboard({
       return
     }
 
+    if (action === 'submit') {
+      setNotice('Payment request submitted for approval.')
+      await loadDashboard()
+      return
+    }
+
+    const { data: dispatchResult, error: dispatchError } =
+      await supabase.functions.invoke('dispatch-notification', {
+        body: { paymentRequestId: requestId },
+      })
+    const deliveryStatus = (dispatchResult as { status?: unknown } | null)?.status
+
     setNotice(
-      action === 'submit'
-        ? 'Payment request submitted for approval.'
-        : 'Payment request approved and recorded in the audit trail.',
+      dispatchError || deliveryStatus !== 'sent'
+        ? 'Payment request approved. Its email status is available in the delivery log.'
+        : 'Payment request approved and the subcontractor email was sent.',
     )
+    await loadDashboard()
+  }
+
+  async function retryNotification(delivery: NotificationDelivery) {
+    setError(null)
+    setNotice(null)
+    setNotificationDeliveryId(delivery.id)
+
+    const { data, error: dispatchError } = await supabase.functions.invoke(
+      'dispatch-notification',
+      {
+        body: {
+          paymentRequestId: delivery.payment_request_id,
+          retryDeliveryId: delivery.id,
+        },
+      },
+    )
+
+    setNotificationDeliveryId(null)
+
+    if (dispatchError) {
+      setError(
+        await edgeFunctionErrorMessage(
+          dispatchError,
+          'The notification retry could not be completed.',
+        ),
+      )
+      await loadDashboard()
+      return
+    }
+
+    const result = data as { status?: unknown; message?: unknown } | null
+
+    if (result?.status !== 'sent') {
+      setError(
+        typeof result?.message === 'string'
+          ? result.message
+          : 'The delivery still needs operator attention.',
+      )
+      await loadDashboard()
+      return
+    }
+
+    setNotice('The transactional email was delivered successfully.')
     await loadDashboard()
   }
 
@@ -553,42 +743,102 @@ export function OperationsDashboard({
   const selectedSubcontractor = (subcontractorId: string) =>
     subcontractors.find((item) => item.id === subcontractorId)?.company_name ??
     'Unknown subcontractor'
+  const refundConfirmation =
+    paymentRequests.find((request) => request.id === refundConfirmationId) ?? null
+
+  function navigateTo(itemId: string) {
+    setActiveNavigationId(itemId)
+    setIsNavigationOpen(false)
+  }
 
   return (
-    <section className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:px-8 lg:py-12">
-      <div className="flex flex-col justify-between gap-5 border-b border-ink/10 pb-7 md:flex-row md:items-end">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-forest/60">
-            Tenant operations workspace
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] text-ink sm:text-4xl">
-            {organization.name}
-          </h1>
-          <div className="mt-3 flex items-center gap-2 text-sm text-ink/55">
-            <span className="border border-forest/15 bg-white px-2.5 py-1 text-xs font-bold text-forest">
-              {formatStatus(organization.role)}
-            </span>
-            <span>Organization-scoped through RLS</span>
-          </div>
-        </div>
+    <div className="min-h-screen bg-cream lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
+      <aside className="sticky top-0 hidden h-screen lg:block">
+        <DashboardSidebar
+          organizationName={organization.name}
+          role={organization.role}
+          email={session.user.email}
+          items={navigationItems}
+          activeItemId={activeNavigationId}
+          isSigningOut={isSigningOut}
+          onNavigate={navigateTo}
+          onSignOut={() => void signOut()}
+        />
+      </aside>
 
-        {organizations.length > 1 && (
-          <label className="flex flex-col gap-2 text-xs font-bold uppercase tracking-[0.12em] text-ink/45">
-            Workspace
-            <select
-              value={organization.id}
-              onChange={(event) => onSelectOrganization(event.target.value)}
-              className="h-11 min-w-56 border border-ink/15 bg-white px-3 text-sm font-semibold tracking-normal text-ink outline-none focus:border-forest"
+      <div className="min-w-0">
+        <header className="sticky top-0 z-30 flex h-20 items-center justify-between gap-4 border-b border-ink/10 bg-cream/95 px-4 backdrop-blur sm:px-6 xl:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button
+              type="button"
+              onClick={() => setIsNavigationOpen(true)}
+              aria-label="Open navigation"
+              className="grid size-11 shrink-0 place-items-center border border-ink/15 bg-white text-ink transition hover:bg-cream lg:hidden"
             >
-              {organizations.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-      </div>
+              <svg viewBox="0 0 20 20" className="size-5" aria-hidden="true">
+                <path
+                  d="M3 5h14M3 10h14M3 15h14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </Button>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-forest/50">
+                Operations dashboard
+              </p>
+              <p className="truncate text-sm font-black text-ink sm:text-base">
+                {organization.name}
+              </p>
+            </div>
+          </div>
+
+          {organizations.length > 1 ? (
+            <Field className="flex items-center gap-3">
+              <Label className="hidden text-[10px] font-bold uppercase tracking-[0.14em] text-ink/40 sm:block">
+                Workspace
+              </Label>
+              <Select
+                value={organization.id}
+                onChange={(event) => onSelectOrganization(event.target.value)}
+                className="h-11 max-w-48 border border-ink/15 bg-white px-3 text-sm font-semibold text-ink outline-none focus:border-forest sm:min-w-56 sm:max-w-none"
+              >
+                {organizations.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : (
+            <span className="hidden border border-forest/15 bg-white px-3 py-2 text-xs font-bold text-forest sm:inline-flex">
+              {formatStatus(organization.role)} access
+            </span>
+          )}
+        </header>
+
+        <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8 xl:px-8 xl:py-10">
+          <section
+            id="overview"
+            className="scroll-mt-28 border-b border-ink/10 pb-7"
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-forest/60">
+              Tenant operations workspace
+            </p>
+            <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] text-ink sm:text-4xl">
+              Operations overview
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink/55">
+              <span className="border border-forest/15 bg-white px-2.5 py-1 text-xs font-bold text-forest">
+                {formatStatus(organization.role)}
+              </span>
+              <span>{organization.name}</span>
+              <span aria-hidden="true" className="text-ink/20">/</span>
+              <span>Organization-scoped through RLS</span>
+            </div>
+          </section>
 
       {error && (
         <div
@@ -630,7 +880,10 @@ export function OperationsDashboard({
       </div>
 
       {(canManageProjects || canManagePayments) && (
-        <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+        <section
+          id="create"
+          className="grid scroll-mt-28 gap-6 xl:grid-cols-[1.35fr_0.65fr]"
+        >
           <div className="border border-ink/10 bg-white p-6 shadow-[0_24px_60px_rgba(16,35,31,0.08)] sm:p-8">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
@@ -641,29 +894,22 @@ export function OperationsDashboard({
                   Add operations data
                 </h2>
               </div>
-              <div className="flex bg-cream p-1">
-                {(
-                  [
-                    canManageProjects && ['project', 'Project'],
-                    canManageProjects && ['subcontractor', 'Subcontractor'],
-                    canManagePayments && ['payment', 'Payment'],
-                  ].filter(Boolean) as [CreatePanel, string][]
-                ).map(([panel, label]) => (
-                  <button
+              <RadioGroup
+                value={activeCreatePanel}
+                onChange={setCreatePanel}
+                aria-label="Data type to create"
+                className="flex bg-cream p-1"
+              >
+                {createPanelOptions.map(([panel, label]) => (
+                  <Radio
                     key={panel}
-                    type="button"
-                    onClick={() => setCreatePanel(panel)}
-                    className={
-                      'px-3 py-2 text-xs font-bold transition ' +
-                      (activeCreatePanel === panel
-                        ? 'bg-white text-ink shadow-sm'
-                        : 'text-ink/45 hover:text-ink')
-                    }
+                    value={panel}
+                    className="cursor-pointer px-3 py-2 text-xs font-bold text-ink/45 transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/30 data-checked:bg-white data-checked:text-ink data-checked:shadow-sm"
                   >
                     {label}
-                  </button>
+                  </Radio>
                 ))}
-              </div>
+              </RadioGroup>
             </div>
 
             {activeCreatePanel === 'project' && canManageProjects && (
@@ -671,19 +917,19 @@ export function OperationsDashboard({
                 onSubmit={(event) => void createProject(event)}
                 className="mt-6 grid gap-4 sm:grid-cols-[1fr_0.7fr_auto] sm:items-end"
               >
-                <label className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  Project name
-                  <input
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+                  <Label>Project name</Label>
+                  <Input
                     required
                     value={projectName}
                     onChange={(event) => setProjectName(event.target.value)}
                     placeholder="Cedar Kitchen Remodel"
                     className={fieldClassName}
                   />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  Project code
-                  <input
+                </Field>
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+                  <Label>Project code</Label>
+                  <Input
                     value={projectReference}
                     onChange={(event) =>
                       setProjectReference(projectCode(event.target.value))
@@ -691,14 +937,14 @@ export function OperationsDashboard({
                     placeholder="CEDAR-01"
                     className={fieldClassName + ' font-mono'}
                   />
-                </label>
-                <button
+                </Field>
+                <Button
                   type="submit"
                   disabled={isSubmitting}
                   className="h-11 bg-ink px-5 text-sm font-bold text-white transition hover:bg-forest disabled:opacity-60"
                 >
                   Add project
-                </button>
+                </Button>
               </form>
             )}
 
@@ -707,42 +953,42 @@ export function OperationsDashboard({
                 onSubmit={(event) => void createSubcontractor(event)}
                 className="mt-6 grid gap-4 sm:grid-cols-2"
               >
-                <label className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  Company name
-                  <input
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+                  <Label>Company name</Label>
+                  <Input
                     required
                     value={subcontractorCompany}
                     onChange={(event) => setSubcontractorCompany(event.target.value)}
                     placeholder="Fine Finish Carpentry"
                     className={fieldClassName}
                   />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  Contact name
-                  <input
+                </Field>
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+                  <Label>Contact name</Label>
+                  <Input
                     value={subcontractorContact}
                     onChange={(event) => setSubcontractorContact(event.target.value)}
                     placeholder="Hector Ramirez"
                     className={fieldClassName}
                   />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
-                  Email
-                  <input
+                </Field>
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
+                  <Label>Email</Label>
+                  <Input
                     type="email"
                     value={subcontractorEmail}
                     onChange={(event) => setSubcontractorEmail(event.target.value)}
                     placeholder="hector@example.com"
                     className={fieldClassName}
                   />
-                </label>
-                <button
+                </Field>
+                <Button
                   type="submit"
                   disabled={isSubmitting}
                   className="h-11 bg-ink px-5 text-sm font-bold text-white transition hover:bg-forest disabled:opacity-60 sm:col-span-2 sm:justify-self-end"
                 >
                   Add subcontractor
-                </button>
+                </Button>
               </form>
             )}
 
@@ -751,9 +997,9 @@ export function OperationsDashboard({
                 onSubmit={(event) => void createPaymentRequest(event)}
                 className="mt-6 grid gap-4 sm:grid-cols-2"
               >
-                <label className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  Project
-                  <select
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+                  <Label>Project</Label>
+                  <Select
                     required
                     value={requestProjectId}
                     onChange={(event) => setRequestProjectId(event.target.value)}
@@ -765,11 +1011,11 @@ export function OperationsDashboard({
                         {project.name}
                       </option>
                     ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  Subcontractor
-                  <select
+                  </Select>
+                </Field>
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+                  <Label>Subcontractor</Label>
+                  <Select
                     required
                     value={requestSubcontractorId}
                     onChange={(event) =>
@@ -783,21 +1029,21 @@ export function OperationsDashboard({
                         {subcontractor.company_name}
                       </option>
                     ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
-                  Milestone description
-                  <input
+                  </Select>
+                </Field>
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
+                  <Label>Milestone description</Label>
+                  <Input
                     required
                     value={requestDescription}
                     onChange={(event) => setRequestDescription(event.target.value)}
                     placeholder="Kitchen trim milestone"
                     className={fieldClassName}
                   />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  Gross amount (USD)
-                  <input
+                </Field>
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+                  <Label>Gross amount (USD)</Label>
+                  <Input
                     required
                     inputMode="decimal"
                     value={requestGross}
@@ -805,10 +1051,10 @@ export function OperationsDashboard({
                     placeholder="2850.00"
                     className={fieldClassName}
                   />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  Retainage percentage
-                  <input
+                </Field>
+                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+                  <Label>Retainage percentage</Label>
+                  <Input
                     required
                     type="number"
                     min="0"
@@ -818,7 +1064,7 @@ export function OperationsDashboard({
                     onChange={(event) => setRequestRetainage(event.target.value)}
                     className={fieldClassName}
                   />
-                </label>
+                </Field>
 
                 <div className="flex flex-col gap-3 border border-ink/10 bg-cream/65 p-4 text-sm sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -847,7 +1093,7 @@ export function OperationsDashboard({
                   </div>
                 </div>
 
-                <button
+                <Button
                   type="submit"
                   disabled={
                     isSubmitting || projects.length === 0 || subcontractors.length === 0
@@ -855,7 +1101,7 @@ export function OperationsDashboard({
                   className="h-11 bg-ink px-5 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:justify-self-end"
                 >
                   Create draft request
-                </button>
+                </Button>
               </form>
             )}
           </div>
@@ -889,10 +1135,10 @@ export function OperationsDashboard({
               ))}
             </ul>
           </aside>
-        </div>
+        </section>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <section id="directory" className="grid scroll-mt-28 gap-6 xl:grid-cols-2">
         <div className="border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -980,9 +1226,12 @@ export function OperationsDashboard({
             )}
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="overflow-hidden border border-ink/10 bg-white shadow-[0_18px_42px_rgba(16,35,31,0.06)]">
+      <section
+        id="payments"
+        className="scroll-mt-28 overflow-hidden border border-ink/10 bg-white shadow-[0_18px_42px_rgba(16,35,31,0.06)]"
+      >
         <div className="flex flex-col justify-between gap-3 border-b border-ink/10 p-6 sm:flex-row sm:items-center">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/40">
@@ -1086,7 +1335,7 @@ export function OperationsDashboard({
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap items-center justify-end gap-2">
                       {request.status === 'draft' && canManagePayments && (
-                        <button
+                        <Button
                           type="button"
                           disabled={isSubmitting}
                           onClick={() =>
@@ -1095,10 +1344,10 @@ export function OperationsDashboard({
                           className="border border-ink/15 px-3 py-2 text-xs font-bold text-ink transition hover:bg-cream disabled:opacity-50"
                         >
                           Submit
-                        </button>
+                        </Button>
                       )}
                       {request.status === 'submitted' && canApprovePayments && (
-                        <button
+                        <Button
                           type="button"
                           disabled={isSubmitting}
                           onClick={() =>
@@ -1107,13 +1356,13 @@ export function OperationsDashboard({
                           className="bg-ink px-3 py-2 text-xs font-bold text-white transition hover:bg-forest disabled:opacity-50"
                         >
                           Approve
-                        </button>
+                        </Button>
                       )}
                       {['approved', 'checkout_created', 'failed'].includes(
                         request.status,
                       ) &&
                         canManagePayments && (
-                          <button
+                          <Button
                             type="button"
                             disabled={checkoutRequestId !== null}
                             aria-busy={checkoutRequestId === request.id}
@@ -1130,7 +1379,7 @@ export function OperationsDashboard({
                                 : request.status === 'checkout_created'
                                   ? 'Resume checkout'
                                   : 'Pay securely'}
-                          </button>
+                          </Button>
                         )}
                       {request.status === 'processing' && (
                         <span className="text-xs font-semibold text-amber-700">
@@ -1141,7 +1390,7 @@ export function OperationsDashboard({
                         request.status,
                       ) &&
                         canManagePayments && (
-                          <button
+                          <Button
                             type="button"
                             disabled={reconcilingRequestId !== null}
                             aria-busy={reconcilingRequestId === request.id}
@@ -1154,37 +1403,11 @@ export function OperationsDashboard({
                             {reconcilingRequestId === request.id
                               ? 'Checking…'
                               : 'Reconcile'}
-                          </button>
+                          </Button>
                         )}
                       {['paid', 'partially_refunded'].includes(request.status) &&
-                        canApprovePayments &&
-                        (refundConfirmationId === request.id ? (
-                          <div className="flex items-center gap-2 border border-red-200 bg-red-50 p-2">
-                            <span className="max-w-32 text-left text-[11px] font-semibold leading-4 text-red-800">
-                              Refund the remaining Stripe payment?
-                            </span>
-                            <button
-                              type="button"
-                              disabled={refundRequestId !== null}
-                              aria-busy={refundRequestId === request.id}
-                              onClick={() => void refundPayment(request.id)}
-                              className="bg-red-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-red-800 disabled:cursor-wait disabled:opacity-55"
-                            >
-                              {refundRequestId === request.id
-                                ? 'Refunding…'
-                                : 'Confirm'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={refundRequestId !== null}
-                              onClick={() => setRefundConfirmationId(null)}
-                              className="border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-800 disabled:opacity-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
+                        canApprovePayments && (
+                          <Button
                             type="button"
                             onClick={() => setRefundConfirmationId(request.id)}
                             className="border border-red-200 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-50"
@@ -1192,8 +1415,8 @@ export function OperationsDashboard({
                             {request.status === 'partially_refunded'
                               ? 'Refund remaining'
                               : 'Refund payment'}
-                          </button>
-                        ))}
+                          </Button>
+                        )}
                       {request.status === 'paid' && !canApprovePayments && (
                         <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
                           <span aria-hidden="true">✓</span> Settled
@@ -1213,12 +1436,24 @@ export function OperationsDashboard({
             </table>
           </div>
         )}
-      </div>
+      </section>
+
+      {canManagePayments && (
+        <div id="delivery" className="scroll-mt-28">
+          <NotificationDeliveryPanel
+            deliveries={notificationDeliveries}
+            paymentRequests={paymentRequests}
+            busyDeliveryId={notificationDeliveryId}
+            onRetry={(delivery) => void retryNotification(delivery)}
+          />
+        </div>
+      )}
 
       {canManagePayments && (
         <section
+          id="webhooks"
           className={
-            'border p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)] ' +
+            'scroll-mt-28 border p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)] ' +
             (webhookFailures.length > 0
               ? 'border-amber-300 bg-amber-50/60'
               : 'border-emerald-200 bg-emerald-50/50')
@@ -1292,7 +1527,10 @@ export function OperationsDashboard({
       )}
 
       {auditEvents.length > 0 && (
-        <div className="border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]">
+        <section
+          id="audit"
+          className="scroll-mt-28 border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]"
+        >
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/40">
             Immutable audit trail
           </p>
@@ -1316,8 +1554,102 @@ export function OperationsDashboard({
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
-    </section>
+        </main>
+      </div>
+
+      <Dialog
+        open={isNavigationOpen}
+        onClose={setIsNavigationOpen}
+        className="relative z-50 lg:hidden"
+      >
+        <DialogBackdrop className="fixed inset-0 bg-ink/60 backdrop-blur-sm" />
+        <div className="fixed inset-0 flex">
+          <DialogPanel className="h-full w-[min(88vw,18rem)] shadow-[24px_0_64px_rgba(16,35,31,0.28)]">
+            <DashboardSidebar
+              organizationName={organization.name}
+              role={organization.role}
+              email={session.user.email}
+              items={navigationItems}
+              activeItemId={activeNavigationId}
+              isSigningOut={isSigningOut}
+              onNavigate={navigateTo}
+              onSignOut={() => void signOut()}
+              onClose={() => setIsNavigationOpen(false)}
+            />
+          </DialogPanel>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={refundConfirmation !== null}
+        onClose={() => {
+          if (refundRequestId === null) {
+            setRefundConfirmationId(null)
+          }
+        }}
+        className="relative z-50"
+      >
+        <DialogBackdrop className="fixed inset-0 bg-ink/55 backdrop-blur-sm" />
+        <div className="fixed inset-0 grid place-items-center overflow-y-auto p-6">
+          <DialogPanel className="w-full max-w-lg border border-red-200 bg-white p-6 shadow-[0_32px_80px_rgba(16,35,31,0.24)] sm:p-8">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-red-700/70">
+              Irreversible Stripe action
+            </p>
+            <DialogTitle className="mt-2 text-2xl font-black tracking-tight text-ink">
+              Refund this payment?
+            </DialogTitle>
+            <Description className="mt-3 text-sm leading-6 text-ink/60">
+              This refunds the remaining Stripe payment for{' '}
+              <span className="font-bold text-ink">
+                {refundConfirmation?.description}
+              </span>
+              . The ledger and audit trail will be updated after Stripe accepts
+              the request.
+            </Description>
+            {refundConfirmation && (
+              <div className="mt-5 border border-ink/10 bg-cream/65 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink/40">
+                  Remaining refundable amount
+                </p>
+                <p className="mt-2 text-2xl font-black text-ink">
+                  {formatCurrency(
+                    refundConfirmation.net_amount -
+                      refundConfirmation.refunded_amount,
+                    refundConfirmation.currency,
+                  )}
+                </p>
+              </div>
+            )}
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                disabled={refundRequestId !== null}
+                onClick={() => setRefundConfirmationId(null)}
+                className="h-11 border border-ink/15 bg-white px-5 text-sm font-bold text-ink transition hover:bg-cream disabled:opacity-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={refundRequestId !== null || refundConfirmation === null}
+                aria-busy={refundRequestId !== null}
+                onClick={() => {
+                  if (refundConfirmation) {
+                    void refundPayment(refundConfirmation.id)
+                  }
+                }}
+                className="h-11 bg-red-700 px-5 text-sm font-bold text-white transition hover:bg-red-800 disabled:cursor-wait disabled:opacity-55"
+              >
+                {refundRequestId !== null
+                  ? 'Refunding payment…'
+                  : 'Confirm refund'}
+              </Button>
+            </div>
+          </DialogPanel>
+        </div>
+      </Dialog>
+    </div>
   )
 }

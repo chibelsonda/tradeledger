@@ -1,6 +1,8 @@
 import { withSupabase } from 'npm:@supabase/server@^1'
 import Stripe from 'npm:stripe@^22'
 
+import { dispatchPaymentNotification } from '../_shared/notification-delivery.ts'
+
 interface ReconciliationRequest {
   paymentRequestId?: unknown
 }
@@ -133,6 +135,17 @@ export default {
           { error: 'Stripe was reached, but the ledger could not be reconciled.' },
           { status: 500 },
         )
+      }
+
+      if (status === 'paid') {
+        try {
+          await dispatchPaymentNotification(context.supabaseAdmin, {
+            paymentRequestId: prepared.payment_request_id,
+            userId,
+          })
+        } catch (error) {
+          console.error('Reconciled payment notification dispatch failed:', error)
+        }
       }
 
       return Response.json({

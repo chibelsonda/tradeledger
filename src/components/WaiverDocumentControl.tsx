@@ -1,3 +1,5 @@
+import { Button } from '@headlessui/react'
+
 import type {
   PaymentRequestStatus,
   WaiverDocument,
@@ -26,7 +28,7 @@ export function WaiverDocumentControl({
 }: WaiverDocumentControlProps) {
   if (waiver?.status === 'ready' && canDownload) {
     return (
-      <button
+      <Button
         type="button"
         disabled={isDisabled}
         aria-busy={isBusy}
@@ -34,7 +36,7 @@ export function WaiverDocumentControl({
         className="inline-flex items-center justify-center gap-2 border border-forest/20 bg-mint/10 px-3 py-2 text-xs font-bold text-forest transition hover:bg-mint/20 disabled:cursor-wait disabled:opacity-50"
       >
         {isBusy ? 'Signing link…' : 'Download PDF'}
-      </button>
+      </Button>
     )
   }
 
@@ -59,7 +61,7 @@ export function WaiverDocumentControl({
 
   if (requestStatus === 'paid' && canGenerate) {
     return (
-      <button
+      <Button
         type="button"
         disabled={isDisabled}
         aria-busy={isBusy}
@@ -71,7 +73,7 @@ export function WaiverDocumentControl({
           : waiver?.status === 'failed'
             ? 'Retry waiver'
             : 'Generate waiver'}
-      </button>
+      </Button>
     )
   }
 

@@ -43,6 +43,12 @@ export type RefundStatus =
   | 'canceled'
 
 export type WaiverDocumentStatus = 'generating' | 'ready' | 'failed' | 'voided'
+export type NotificationDeliveryStatus =
+  | 'pending'
+  | 'processing'
+  | 'retry_scheduled'
+  | 'sent'
+  | 'failed'
 
 export type Organization = {
   id: string
@@ -205,6 +211,30 @@ export type WaiverDocument = {
   updated_at: string
 }
 
+export type NotificationDelivery = {
+  id: string
+  organization_id: string
+  payment_request_id: string
+  notification_type: 'payment_request_approved' | 'payment_succeeded'
+  recipient_email: string | null
+  recipient_name: string
+  subject: string
+  template_data: Json
+  status: NotificationDeliveryStatus
+  attempt_count: number
+  max_attempts: number
+  idempotency_key: string
+  provider_message_id: string | null
+  worker_token: string | null
+  next_attempt_at: string | null
+  last_attempt_at: string | null
+  sent_at: string | null
+  error_code: string | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -327,6 +357,12 @@ export interface Database {
       }
       waiver_documents: {
         Row: WaiverDocument
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
+      notification_deliveries: {
+        Row: NotificationDelivery
         Insert: Record<string, never>
         Update: Record<string, never>
         Relationships: []
@@ -494,6 +530,43 @@ export interface Database {
           p_refunds?: Json
         }
         Returns: PaymentStatus
+      }
+      claim_notification_delivery: {
+        Args: { p_payment_request_id: string; p_user_id?: string | null }
+        Returns: {
+          delivery_id: string
+          worker_token: string
+          notification_type: NotificationDelivery['notification_type']
+          recipient_email: string
+          recipient_name: string
+          subject: string
+          template_data: Json
+          idempotency_key: string
+          attempt_count: number
+          max_attempts: number
+        }[]
+      }
+      complete_notification_delivery: {
+        Args: {
+          p_delivery_id: string
+          p_worker_token: string
+          p_provider_message_id: string
+        }
+        Returns: boolean
+      }
+      fail_notification_delivery: {
+        Args: {
+          p_delivery_id: string
+          p_worker_token: string
+          p_error_code: string
+          p_error_message: string
+          p_retryable: boolean
+        }
+        Returns: NotificationDeliveryStatus
+      }
+      retry_notification_delivery: {
+        Args: { p_delivery_id: string; p_user_id: string }
+        Returns: string
       }
       reserve_waiver_document: {
         Args: { p_payment_request_id: string; p_user_id: string }

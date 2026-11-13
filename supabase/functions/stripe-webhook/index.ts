@@ -1,6 +1,8 @@
 import { withSupabase } from 'npm:@supabase/server@^1'
 import Stripe from 'npm:stripe@^22'
 
+import { dispatchPaymentNotification } from '../_shared/notification-delivery.ts'
+
 function requiredEnvironment(name: string): string {
   const value = Deno.env.get(name)
 
@@ -105,6 +107,24 @@ export default {
       }
 
       return Response.json({ error: 'Webhook processing failed.' }, { status: 500 })
+    }
+
+    const paymentRequestId = uuidOrNull(
+      checkoutSession?.metadata?.payment_request_id,
+    )
+    const paymentSucceeded =
+      event.type === 'checkout.session.async_payment_succeeded' ||
+      (event.type === 'checkout.session.completed' &&
+        checkoutSession?.payment_status === 'paid')
+
+    if (result.data === true && paymentSucceeded && paymentRequestId) {
+      try {
+        await dispatchPaymentNotification(context.supabaseAdmin, {
+          paymentRequestId,
+        })
+      } catch (error) {
+        console.error('Payment notification dispatch failed:', error)
+      }
     }
 
     return Response.json({

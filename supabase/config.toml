@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.download-waiver]
 verify_jwt = true
+
+[functions.dispatch-notification]
+verify_jwt = true

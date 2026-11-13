@@ -91,6 +91,7 @@ do $$
 declare
     request_status text;
     event_count integer;
+    notification_count integer;
 begin
     select status
     into request_status
@@ -106,8 +107,20 @@ begin
     from public.audit_events
     where organization_id = current_setting('test.organization_a_id')::uuid;
 
+    select count(*)
+    into notification_count
+    from public.notification_deliveries
+    where payment_request_id = current_setting('test.payment_request_a_id')::uuid
+      and notification_type = 'payment_request_approved'
+      and status = 'pending';
+
     if event_count <> 6 then
         raise exception 'Expected 6 audit events, received %.', event_count;
+    end if;
+
+    if notification_count <> 1 then
+        raise exception 'Expected one pending approval notification, received %.',
+            notification_count;
     end if;
 end;
 $$;
@@ -193,6 +206,7 @@ declare
     payment_status text;
     event_count integer;
     audit_count integer;
+    notification_count integer;
 begin
     select status
     into request_status
@@ -214,6 +228,11 @@ begin
     from public.audit_events
     where organization_id = current_setting('test.organization_a_id')::uuid;
 
+    select count(*)
+    into notification_count
+    from public.notification_deliveries
+    where payment_request_id = current_setting('test.payment_request_a_id')::uuid;
+
     if request_status <> 'paid' or payment_status <> 'paid' then
         raise exception 'Expected paid request/payment, received %/%',
             request_status,
@@ -227,8 +246,111 @@ begin
     if audit_count <> 8 then
         raise exception 'Expected 8 audit events after checkout, received %.', audit_count;
     end if;
+
+    if notification_count <> 2 then
+        raise exception 'Expected one approval and one paid notification, received %.',
+            notification_count;
+    end if;
 end;
 $$;
+
+do $$
+begin
+    begin
+        perform *
+        from public.claim_notification_delivery(
+            current_setting('test.payment_request_a_id')::uuid,
+            '00000000-0000-4000-8000-000000000002'
+        );
+        raise exception 'An outsider must not be able to claim a notification.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+select delivery_id as approval_delivery_id, worker_token as approval_worker_token
+from public.claim_notification_delivery(
+    :'payment_request_a_id',
+    '00000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select public.complete_notification_delivery(
+    :'approval_delivery_id',
+    :'approval_worker_token',
+    'resend_approval_001'
+) as approval_notification_completed
+\gset
+
+select delivery_id as payment_delivery_id, worker_token as payment_worker_token
+from public.claim_notification_delivery(
+    :'payment_request_a_id',
+    '00000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select set_config('test.payment_delivery_id', :'payment_delivery_id', true);
+
+select public.fail_notification_delivery(
+    :'payment_delivery_id',
+    :'payment_worker_token',
+    'provider_unreachable',
+    'Synthetic provider outage.',
+    true
+) as payment_notification_failure_status
+\gset
+
+do $$
+declare
+    delivery_record public.notification_deliveries%rowtype;
+begin
+    select *
+    into delivery_record
+    from public.notification_deliveries
+    where id = current_setting('test.payment_delivery_id')::uuid;
+
+    if delivery_record.status <> 'retry_scheduled'
+       or delivery_record.attempt_count <> 1
+       or delivery_record.next_attempt_at <= now() then
+        raise exception 'Retry scheduling did not preserve the bounded delivery state.';
+    end if;
+end;
+$$;
+
+do $$
+begin
+    begin
+        perform public.retry_notification_delivery(
+            current_setting('test.payment_delivery_id')::uuid,
+            '00000000-0000-4000-8000-000000000002'
+        );
+        raise exception 'An outsider must not be able to retry a notification.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+select public.retry_notification_delivery(
+    :'payment_delivery_id',
+    '00000000-0000-4000-8000-000000000001'
+) as retried_payment_request_id
+\gset
+
+select delivery_id as retried_delivery_id, worker_token as retried_worker_token
+from public.claim_notification_delivery(
+    :'payment_request_a_id',
+    '00000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select public.complete_notification_delivery(
+    :'retried_delivery_id',
+    :'retried_worker_token',
+    'resend_payment_001'
+) as payment_notification_completed
+\gset
 
 do $$
 begin
@@ -578,6 +700,7 @@ declare
     visible_refunds integer;
     visible_webhook_failures integer;
     visible_waivers integer;
+    visible_notifications integer;
     visible_private_files integer;
 begin
     select count(*) into visible_organizations from public.organizations;
@@ -589,6 +712,7 @@ begin
     select count(*) into visible_refunds from public.payment_refunds;
     select count(*) into visible_webhook_failures from public.stripe_webhook_failures;
     select count(*) into visible_waivers from public.waiver_documents;
+    select count(*) into visible_notifications from public.notification_deliveries;
     select count(*) into visible_private_files
     from storage.objects
     where bucket_id = 'waiver-documents';
@@ -602,6 +726,7 @@ begin
        or visible_refunds <> 0
        or visible_webhook_failures <> 0
        or visible_waivers <> 0
+       or visible_notifications <> 0
        or visible_private_files <> 0 then
         raise exception 'Tenant B could see Tenant A data.';
     end if;

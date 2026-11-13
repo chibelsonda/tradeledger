@@ -12,11 +12,27 @@ export default function App() {
   const checkoutState = search.get('checkout')
   const sessionId = search.get('session_id')
   const isCheckoutDemo = search.get('demo') === 'checkout'
+  const isDashboard = Boolean(
+    isReady &&
+      session &&
+      checkoutState !== 'success' &&
+      checkoutState !== 'canceled' &&
+      !isCheckoutDemo,
+  )
 
   return (
-    <div className="relative isolate min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-96 bg-[radial-gradient(circle_at_top_left,_rgba(217,249,157,0.65),_transparent_48%)]" />
-      <Header session={session} />
+    <div
+      className={
+        'relative isolate min-h-screen ' +
+        (isDashboard ? '' : 'overflow-hidden')
+      }
+    >
+      {!isDashboard && (
+        <>
+          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-96 bg-[radial-gradient(circle_at_top_left,_rgba(217,249,157,0.65),_transparent_48%)]" />
+          <Header session={session} />
+        </>
+      )}
 
       <main>
         {!isReady ? (
@@ -39,10 +55,12 @@ export default function App() {
         )}
       </main>
 
-      <footer className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-6 py-8 text-xs text-ink/50 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-        <p>Tenant boundaries are enforced by PostgreSQL Row-Level Security.</p>
-        <p>React × Supabase × Stripe</p>
-      </footer>
+      {!isDashboard && (
+        <footer className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-6 py-8 text-xs text-ink/50 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+          <p>Tenant boundaries are enforced by PostgreSQL Row-Level Security.</p>
+          <p>React × Supabase × Stripe</p>
+        </footer>
+      )}
     </div>
   )
 }

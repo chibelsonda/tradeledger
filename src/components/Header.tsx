@@ -1,3 +1,4 @@
+import { Button } from '@headlessui/react'
 import type { Session } from '@supabase/supabase-js'
 import { useState } from 'react'
 
@@ -26,14 +27,14 @@ export function Header({ session }: HeaderProps) {
           <span className="hidden max-w-56 truncate text-xs font-semibold text-ink/55 sm:block">
             {session.user.email}
           </span>
-          <button
+          <Button
             type="button"
             onClick={() => void signOut()}
             disabled={isSigningOut}
             className="inline-flex h-10 items-center justify-center border border-ink/10 bg-white/70 px-4 text-xs font-bold text-ink shadow-sm backdrop-blur transition hover:border-ink/20 hover:bg-white disabled:cursor-wait disabled:opacity-60"
           >
             {isSigningOut ? 'Signing out…' : 'Sign out'}
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="inline-flex items-center gap-2 border border-ink/10 bg-white/65 px-3 py-2 text-xs font-semibold text-ink/70 shadow-sm backdrop-blur">

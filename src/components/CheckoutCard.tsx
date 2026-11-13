@@ -1,3 +1,4 @@
+import { Button, Field, Input, Label } from '@headlessui/react'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { useMemo, useState } from 'react'
 
@@ -196,20 +197,20 @@ export function CheckoutCard() {
             )}
 
             <div className="flex items-end justify-between gap-6">
-              <div className="flex flex-col gap-2">
-                <label htmlFor="quantity" className="text-sm font-bold text-ink">
+              <Field className="flex flex-col gap-2">
+                <Label htmlFor="quantity" className="text-sm font-bold text-ink">
                   Quantity
-                </label>
+                </Label>
                 <div className="flex items-center overflow-hidden border border-ink/15 bg-cream/70 focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/10">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => updateQuantity(quantity - 1)}
                     className="grid size-11 place-items-center text-lg font-semibold text-ink/65 transition hover:bg-ink/5 hover:text-ink"
                     aria-label="Decrease quantity"
                   >
                     −
-                  </button>
-                  <input
+                  </Button>
+                  <Input
                     id="quantity"
                     type="number"
                     min="1"
@@ -218,16 +219,16 @@ export function CheckoutCard() {
                     onChange={(event) => updateQuantity(event.target.valueAsNumber)}
                     className="h-11 w-12 border-x border-ink/10 bg-transparent text-center text-sm font-bold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => updateQuantity(quantity + 1)}
                     className="grid size-11 place-items-center text-lg font-semibold text-ink/65 transition hover:bg-ink/5 hover:text-ink"
                     aria-label="Increase quantity"
                   >
                     +
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </Field>
 
               <div className="text-right">
                 <p className="text-xs font-medium text-ink/50">Total</p>
@@ -237,7 +238,7 @@ export function CheckoutCard() {
               </div>
             </div>
 
-            <button
+            <Button
               type="button"
               onClick={() => void startCheckout()}
               disabled={isSubmitting}
@@ -258,7 +259,7 @@ export function CheckoutCard() {
                   clipRule="evenodd"
                 />
               </svg>
-            </button>
+            </Button>
 
             <div className="flex items-center justify-center gap-4 text-[11px] font-semibold text-ink/45">
               <span>Private order history</span>

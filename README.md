@@ -4,7 +4,8 @@ TradeLedger is a multi-tenant subcontractor payment workflow built to
 demonstrate production-minded SaaS engineering. It combines tenant-safe project
 operations, approval controls, database-owned financial calculations, Stripe
 Checkout, refunds, reconciliation, signed webhooks, and an immutable audit
-trail. Paid requests can also produce a private, auditable PDF waiver record.
+trail. Paid requests can also produce a private, auditable PDF waiver record,
+while approval and payment emails use a tenant-visible transactional outbox.
 
 The application is intentionally focused on a credible vertical slice rather
 than broad feature count: create an organization, manage projects and
@@ -31,6 +32,10 @@ full refund without trusting browser-supplied financial data.
 - **Actionable failure visibility.** Failed webhook processing is persisted
   outside the failed transaction with retry counts and tenant-scoped operator
   visibility.
+- **Retry-safe transactional email.** Approval and payment transitions enqueue
+  one database-owned delivery. Atomic claims, bounded backoff, Resend
+  idempotency keys, escaped templates, and an operator retry log prevent silent
+  or duplicate notifications.
 - **Private payment documents.** Paid, non-refunded requests can generate a
   server-rendered PDF in a private Supabase Storage bucket. Downloads use
   short-lived signed URLs, and later refunds automatically void the record.
@@ -48,6 +53,7 @@ full refund without trusting browser-supplied financial data.
 | Database | PostgreSQL, Row-Level Security, constraints, generated columns, RPCs |
 | Authentication | Supabase Auth |
 | Payments | Stripe Checkout and signed webhooks |
+| Transactional email | Resend Email API with deterministic idempotency keys |
 | Verification | Vitest, ESLint, TypeScript, executable PostgreSQL security scenarios |
 
 ## Architecture
@@ -70,6 +76,8 @@ create-checkout / create-refund ----> Stripe Checkout + Refunds
      Payment ledger + failure inbox + audit events
                     |
                     +----> Private waiver PDFs
+                    |
+                    +----> Email outbox ----> Resend
 ```
 
 Secrets stay in Supabase Edge Function configuration. The browser receives only
@@ -87,6 +95,7 @@ the Supabase project URL and publishable key.
 8. Operators can reconcile Stripe state and inspect unresolved webhook failures.
 9. Tenant-scoped audit events provide operational evidence.
 10. A financial approver generates and downloads a private payment waiver PDF.
+11. Operators inspect approval/payment email delivery and safely retry failures.
 
 ## Security and correctness evidence
 
@@ -108,6 +117,10 @@ verifies:
 - Waiver reservation is role-protected and idempotent.
 - Refunding a payment automatically voids its active waiver.
 - Waiver metadata remains invisible across tenant boundaries.
+- Approval and payment transitions enqueue exactly one delivery each.
+- Notification claims reject outsiders, retry with bounded delay, and remain
+  invisible across tenant boundaries.
+- User-controlled email template content is HTML-escaped.
 - Browser roles cannot alter immutable audit events.
 
 ## Local development
@@ -136,6 +149,8 @@ Configure server-only secrets and deploy the Edge Functions:
 npx supabase secrets set \
   STRIPE_SECRET=sk_test_replace_me \
   STRIPE_WEBHOOK_SECRET=whsec_replace_me \
+  RESEND_API_KEY=re_replace_me \
+  RESEND_FROM_EMAIL='TradeLedger <payments@your-verified-domain.example>' \
   SITE_URL=http://localhost:5173
 
 npx supabase functions deploy create-checkout
@@ -144,6 +159,7 @@ npx supabase functions deploy create-refund
 npx supabase functions deploy reconcile-payment
 npx supabase functions deploy generate-waiver
 npx supabase functions deploy download-waiver
+npx supabase functions deploy dispatch-notification
 ```
 
 Register this Stripe test webhook URL:
@@ -166,10 +182,11 @@ npm test
 npm run build
 ```
 
-The current suite includes frontend utility coverage and an isolated PostgreSQL
-17 tenant/payment/refund/document scenario that rolls back after every run.
+The current suite includes frontend utility and email-template security coverage
+plus an isolated PostgreSQL 17 tenant/payment/refund/document/notification
+scenario that rolls back after every run.
 
 ## Current roadmap
 
-- Delivery logs and retry-safe notifications.
+- Provider delivery/bounce webhooks and automated scheduled outbox draining.
 - CI, browser coverage, operational runbooks, and a safe hosted demo.

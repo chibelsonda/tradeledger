@@ -1,3 +1,4 @@
+import { Button } from '@headlessui/react'
 import type { Session } from '@supabase/supabase-js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -116,13 +117,13 @@ export function Workspace({ session }: WorkspaceProps) {
         <div className="border border-red-200 bg-red-50 p-6 text-red-900">
           <p className="font-bold">Workspace could not be loaded</p>
           <p className="mt-2 text-sm leading-6">{error}</p>
-          <button
+          <Button
             type="button"
             onClick={() => void loadOrganizations()}
             className="mt-5 bg-red-900 px-4 py-2.5 text-sm font-bold text-white"
           >
             Try again
-          </button>
+          </Button>
         </div>
       </section>
     )
@@ -140,6 +141,7 @@ export function Workspace({ session }: WorkspaceProps) {
 
   return (
     <OperationsDashboard
+      session={session}
       organization={selectedOrganization}
       organizations={organizations}
       onSelectOrganization={setSelectedOrganizationId}
