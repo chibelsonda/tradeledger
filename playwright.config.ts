@@ -29,7 +29,7 @@ export default defineConfig({
     command:
       'VITE_SUPABASE_URL=https://test-project.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=test-publishable-key npm run dev -- --host 127.0.0.1 --port 4173',
     url: applicationUrl,
-    reuseExistingServer: false,
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === 'true',
     timeout: 120_000,
   },
 })

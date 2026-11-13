@@ -5,6 +5,9 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
+    // Keep fonts as same-origin files so the production CSP does not need to
+    // allow data: URLs. Vite otherwise inlines assets smaller than 4 KiB.
+    assetsInlineLimit: 0,
     rolldownOptions: {
       output: {
         codeSplitting: {
@@ -13,12 +16,6 @@ export default defineConfig({
               name: 'validation',
               test: /node_modules[\\/]zod[\\/]/,
               priority: 10,
-            },
-            {
-              name: 'charts',
-              test: /node_modules[\\/]recharts[\\/]/,
-              priority: 9,
-              includeDependenciesRecursively: false,
             },
           ],
         },
