@@ -145,7 +145,8 @@ reset role;
 -- Reproduce the legacy production schema where Stripe session identifiers were
 -- stored as varchar. The checkout RPC must still honor its text return contract.
 alter table public.payments
-    alter column stripe_checkout_session_id type varchar(255);
+    alter column stripe_checkout_session_id type varchar(255),
+    alter column stripe_payment_intent_id type varchar(255);
 
 set local role service_role;
 
@@ -341,6 +342,36 @@ begin
     if notification_count <> 2 then
         raise exception 'Expected one approval and one paid notification, received %.',
             notification_count;
+    end if;
+end;
+$$;
+
+select
+    stripe_checkout_session_id as reconciliation_session_id,
+    stripe_payment_intent_id as reconciliation_payment_intent_id
+from public.prepare_payment_reconciliation(
+    :'payment_request_a_id',
+    '00000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select set_config(
+    'test.reconciliation_session_id',
+    :'reconciliation_session_id',
+    true
+);
+select set_config(
+    'test.reconciliation_payment_intent_id',
+    :'reconciliation_payment_intent_id',
+    true
+);
+
+do $$
+begin
+    if current_setting('test.reconciliation_session_id') <> 'cs_test_tradeledger_002'
+       or current_setting('test.reconciliation_payment_intent_id')
+            <> 'pi_tradeledger_001' then
+        raise exception 'Reconciliation preparation returned unexpected Stripe identifiers.';
     end if;
 end;
 $$;
