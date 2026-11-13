@@ -35,10 +35,15 @@ import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { formatCurrency, formatStatus } from '../../../lib/format'
 import { projectCode } from '../../../lib/organizations'
 import {
+  trustedStripeCheckoutUrl,
+  trustedSupabaseWaiverUrl,
+} from '../../../lib/navigation-security'
+import { safeDatabaseErrorMessage } from '../../../lib/public-errors'
+import {
   calculateRetainage,
   dollarsToMinorUnits,
 } from '../../../lib/payment-calculations'
-import { supabase } from '../../../lib/supabase'
+import { supabase, supabaseUrl } from '../../../lib/supabase'
 import {
   fieldErrorsFromZod,
   type FieldErrors,
@@ -434,7 +439,12 @@ export function OperationsDashboard({
       demoStatusResult.error
 
     if (firstError) {
-      setError(firstError.message)
+      setError(
+        safeDatabaseErrorMessage(
+          firstError,
+          'The workspace data could not be loaded. Please refresh and try again.',
+        ),
+      )
       setIsLoading(false)
       return
     }
@@ -525,7 +535,12 @@ export function OperationsDashboard({
     setIsRemovingDemoData(false)
 
     if (removalError) {
-      setError(removalError.message)
+      setError(
+        safeDatabaseErrorMessage(
+          removalError,
+          'Demonstration data could not be removed. Refresh and try again.',
+        ),
+      )
       return
     }
 
@@ -605,7 +620,9 @@ export function OperationsDashboard({
     setIsSubmitting(false)
 
     if (createError) {
-      setError(createError.message)
+      setError(
+        safeDatabaseErrorMessage(createError, 'The project could not be created.'),
+      )
       return
     }
 
@@ -645,7 +662,12 @@ export function OperationsDashboard({
     setIsSubmitting(false)
 
     if (createError) {
-      setError(createError.message)
+      setError(
+        safeDatabaseErrorMessage(
+          createError,
+          'The subcontractor could not be created.',
+        ),
+      )
       return
     }
 
@@ -692,7 +714,12 @@ export function OperationsDashboard({
     setIsSubmitting(false)
 
     if (createError) {
-      setError(createError.message)
+      setError(
+        safeDatabaseErrorMessage(
+          createError,
+          'The payment request could not be created.',
+        ),
+      )
       return
     }
 
@@ -723,8 +750,10 @@ export function OperationsDashboard({
 
     if (result.error || result.data !== true) {
       setError(
-        result.error?.message ??
+        safeDatabaseErrorMessage(
+          result.error,
           `The request could not be ${action === 'submit' ? 'submitted' : 'approved'}.`,
+        ),
       )
       return
     }
@@ -770,7 +799,12 @@ export function OperationsDashboard({
     setIsSubmitting(false)
 
     if (memberError) {
-      setError(memberError.message)
+      setError(
+        safeDatabaseErrorMessage(
+          memberError,
+          'Team access could not be updated.',
+        ),
+      )
       return
     }
 
@@ -799,7 +833,12 @@ export function OperationsDashboard({
     setMemberUserId(null)
 
     if (memberError) {
-      setError(memberError.message)
+      setError(
+        safeDatabaseErrorMessage(
+          memberError,
+          'The member status could not be updated.',
+        ),
+      )
       return
     }
 
@@ -830,17 +869,19 @@ export function OperationsDashboard({
       )
 
       setCheckoutRequestId(null)
-      setError(message)
       await loadDashboard()
+      setError(message)
       return
     }
 
-    const url = (data as { url?: unknown } | null)?.url
+    const url = trustedStripeCheckoutUrl(
+      (data as { url?: unknown } | null)?.url,
+    )
 
-    if (typeof url !== 'string' || !url.startsWith('https://')) {
+    if (!url) {
       setCheckoutRequestId(null)
-      setError('The payment provider did not return a valid checkout URL.')
       await loadDashboard()
+      setError('The payment provider did not return a valid checkout URL.')
       return
     }
 
@@ -860,13 +901,12 @@ export function OperationsDashboard({
     setReconcilingRequestId(null)
 
     if (reconciliationError) {
-      setError(
-        await edgeFunctionErrorMessage(
-          reconciliationError,
-          'Payment reconciliation could not be completed.',
-        ),
+      const message = await edgeFunctionErrorMessage(
+        reconciliationError,
+        'Payment reconciliation could not be completed.',
       )
       await loadDashboard()
+      setError(message)
       return
     }
 
@@ -891,13 +931,12 @@ export function OperationsDashboard({
     setRefundConfirmationId(null)
 
     if (refundError) {
-      setError(
-        await edgeFunctionErrorMessage(
-          refundError,
-          'The refund could not be completed.',
-        ),
+      const message = await edgeFunctionErrorMessage(
+        refundError,
+        'The refund could not be completed.',
       )
       await loadDashboard()
+      setError(message)
       return
     }
 
@@ -926,23 +965,25 @@ export function OperationsDashboard({
     setWaiverRequestId(null)
 
     if (waiverError) {
-      setError(
-        await edgeFunctionErrorMessage(
-          waiverError,
-          mode === 'generate'
-            ? 'The waiver document could not be generated.'
-            : 'The waiver download is temporarily unavailable.',
-        ),
+      const message = await edgeFunctionErrorMessage(
+        waiverError,
+        mode === 'generate'
+          ? 'The waiver document could not be generated.'
+          : 'The waiver download is temporarily unavailable.',
       )
       await loadDashboard()
+      setError(message)
       return
     }
 
-    const url = (data as { url?: unknown } | null)?.url
+    const url = trustedSupabaseWaiverUrl(
+      (data as { url?: unknown } | null)?.url,
+      supabaseUrl,
+    )
 
-    if (typeof url !== 'string' || !url.startsWith('https://')) {
-      setError('The document service did not return a secure download URL.')
+    if (!url) {
       await loadDashboard()
+      setError('The document service did not return a secure download URL.')
       return
     }
 

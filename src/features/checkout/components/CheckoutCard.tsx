@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { clampQuantity, formatCurrency } from '../../../lib/format'
 import { supabase } from '../../../lib/supabase'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
+import { trustedStripeCheckoutUrl } from '../../../lib/navigation-security'
 
 const product = {
   name: 'Launch Kit',
@@ -66,13 +67,15 @@ export function CheckoutCard() {
       return
     }
 
-    if (!data?.url) {
+    const checkoutUrl = trustedStripeCheckoutUrl(data?.url)
+
+    if (!checkoutUrl) {
       setError('The payment provider did not return a checkout URL. Please try again.')
       setIsSubmitting(false)
       return
     }
 
-    window.location.assign(data.url)
+    window.location.assign(checkoutUrl)
   }
 
   return (

@@ -26,6 +26,32 @@ async function verifyApp() {
     )
   }
 
+  const contentSecurityPolicy =
+    response.headers.get('content-security-policy') ?? ''
+  const expectedHeaders = {
+    'cross-origin-opener-policy': 'same-origin',
+    'cross-origin-resource-policy': 'same-origin',
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'DENY',
+    'x-permitted-cross-domain-policies': 'none',
+  }
+
+  if (
+    !contentSecurityPolicy.includes("object-src 'none'") ||
+    !contentSecurityPolicy.includes(
+      'https://etbihtfpdqueqzjmbncs.supabase.co',
+    ) ||
+    contentSecurityPolicy.includes('https://*.supabase.co')
+  ) {
+    throw new Error('Frontend security policy is missing required restrictions.')
+  }
+
+  for (const [name, expectedValue] of Object.entries(expectedHeaders)) {
+    if (response.headers.get(name) !== expectedValue) {
+      throw new Error(`Frontend security header ${name} is missing or invalid.`)
+    }
+  }
+
   console.log(`Frontend healthy: ${response.status} ${appUrl}`)
 }
 

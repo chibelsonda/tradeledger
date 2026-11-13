@@ -9,6 +9,7 @@ import type {
 } from '../../../lib/database.types'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { supabase } from '../../../lib/supabase'
+import { safeDatabaseErrorMessage } from '../../../lib/public-errors'
 import { OperationsDashboard } from '../../operations/components/OperationsDashboard'
 import { OrganizationOnboarding } from './OrganizationOnboarding'
 
@@ -47,7 +48,10 @@ export function Workspace({ session }: WorkspaceProps) {
 
       if (organizationResult.error || membershipResult.error) {
         setError(
-          organizationResult.error?.message ?? membershipResult.error?.message ?? null,
+          safeDatabaseErrorMessage(
+            organizationResult.error ?? membershipResult.error,
+            'Your workspaces could not be loaded. Please try again.',
+          ),
         )
         setIsLoading(false)
         return

@@ -52,7 +52,7 @@ export function createSupabaseMockState(
     organizationMembers: [ownerMemberRecord()],
     demoWorkspaceStatus: null,
     paymentResult: null,
-    checkoutUrl: 'https://checkout.stripe.test/session/browser-test',
+    checkoutUrl: 'https://checkout.stripe.com/c/pay/browser-test',
     createdOrganizationPayloads: [],
     approvedRequestIds: [],
     checkoutRequestIds: [],

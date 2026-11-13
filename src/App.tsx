@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import { Header } from './components/layout/Header'
 import { AuthCard } from './features/auth/components/AuthCard'
 import { useAuth } from './features/auth/hooks/useAuth'
+import { trustedStripeCheckoutSessionId } from './lib/navigation-security'
 
 const CheckoutCanceled = lazy(() =>
   import('./features/checkout/components/CheckoutCanceled').then((module) => ({
@@ -40,7 +41,7 @@ export default function App() {
   const { isReady, session } = useAuth()
   const search = new URLSearchParams(window.location.search)
   const checkoutState = search.get('checkout')
-  const sessionId = search.get('session_id')
+  const sessionId = trustedStripeCheckoutSessionId(search.get('session_id'))
   const isCheckoutDemo = search.get('demo') === 'checkout'
   const isPasswordRecovery = search.get('auth') === 'reset-password'
   const isDashboard = Boolean(

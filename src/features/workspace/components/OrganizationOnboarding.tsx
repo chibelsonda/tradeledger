@@ -5,6 +5,7 @@ import { FieldError } from '../../../components/ui/FieldError'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { organizationSlug } from '../../../lib/organizations'
 import { supabase } from '../../../lib/supabase'
+import { safeDatabaseErrorMessage } from '../../../lib/public-errors'
 import {
   fieldErrorsFromZod,
   type FieldErrors,
@@ -74,7 +75,10 @@ export function OrganizationOnboarding({
       setError(
         createError.code === '23505'
           ? 'That workspace URL is already in use.'
-          : createError.message,
+          : safeDatabaseErrorMessage(
+              createError,
+              'The workspace could not be created. Please try again.',
+            ),
       )
       return
     }
