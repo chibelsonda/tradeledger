@@ -5,6 +5,7 @@ export const TEST_ORGANIZATION_ID = '10000000-0000-4000-8000-000000000001'
 export const TEST_PROJECT_ID = '20000000-0000-4000-8000-000000000001'
 export const TEST_SUBCONTRACTOR_ID = '30000000-0000-4000-8000-000000000001'
 export const TEST_PAYMENT_REQUEST_ID = '40000000-0000-4000-8000-000000000001'
+export const TEST_MEMBER_USER_ID = '00000000-0000-4000-8000-000000000002'
 
 const supabaseOrigin = 'https://test-project.supabase.co'
 const now = '2026-11-13T06:00:00.000Z'
@@ -22,11 +23,14 @@ export interface SupabaseMockState {
   webhookFailures: JsonRecord[]
   waiverDocuments: JsonRecord[]
   notificationDeliveries: JsonRecord[]
+  organizationMembers: JsonRecord[]
   paymentResult: JsonRecord | null
   checkoutUrl: string
   createdOrganizationPayloads: JsonRecord[]
   approvedRequestIds: string[]
   checkoutRequestIds: string[]
+  memberUpserts: JsonRecord[]
+  memberStatusChanges: JsonRecord[]
   unexpectedRequests: string[]
 }
 
@@ -43,11 +47,14 @@ export function createSupabaseMockState(
     webhookFailures: [],
     waiverDocuments: [],
     notificationDeliveries: [],
+    organizationMembers: [ownerMemberRecord()],
     paymentResult: null,
     checkoutUrl: 'https://checkout.stripe.test/session/browser-test',
     createdOrganizationPayloads: [],
     approvedRequestIds: [],
     checkoutRequestIds: [],
+    memberUpserts: [],
+    memberStatusChanges: [],
     unexpectedRequests: [],
     ...overrides,
   }
@@ -84,7 +91,10 @@ export async function installSupabaseMock(
       const rpcName = url.pathname.slice('/rest/v1/rpc/'.length)
       const body = request.postDataJSON() as JsonRecord
 
-      if (rpcName === 'create_organization') {
+      if (
+        rpcName === 'create_organization' ||
+        rpcName === 'create_organization_workspace'
+      ) {
         state.createdOrganizationPayloads.push(body)
         state.organizations = [organization(body)]
         state.memberships = [membership()]
@@ -105,6 +115,36 @@ export async function installSupabaseMock(
                 updated_at: now,
               }
             : paymentRequest,
+        )
+        await fulfillJson(route, 200, true)
+        return
+      }
+
+      if (rpcName === 'list_organization_members') {
+        await fulfillJson(route, 200, state.organizationMembers)
+        return
+      }
+
+      if (rpcName === 'upsert_organization_member') {
+        state.memberUpserts.push(body)
+        state.organizationMembers.push({
+          user_id: TEST_MEMBER_USER_ID,
+          email: body.p_email,
+          role: body.p_role,
+          status: 'active',
+          created_at: now,
+          updated_at: now,
+        })
+        await fulfillJson(route, 200, TEST_MEMBER_USER_ID)
+        return
+      }
+
+      if (rpcName === 'set_organization_member_status') {
+        state.memberStatusChanges.push(body)
+        state.organizationMembers = state.organizationMembers.map((member) =>
+          member.user_id === body.p_user_id
+            ? { ...member, status: body.p_status, updated_at: now }
+            : member,
         )
         await fulfillJson(route, 200, true)
         return
@@ -252,6 +292,17 @@ export function paidPaymentRecord(): JsonRecord {
     paid_at: now,
     amount_refunded: 0,
     refunded_at: null,
+    created_at: now,
+    updated_at: now,
+  }
+}
+
+export function ownerMemberRecord(): JsonRecord {
+  return {
+    user_id: TEST_USER_ID,
+    email: 'owner@example.test',
+    role: 'owner',
+    status: 'active',
     created_at: now,
     updated_at: now,
   }

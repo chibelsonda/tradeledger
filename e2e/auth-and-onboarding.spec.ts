@@ -57,6 +57,7 @@ test('organization onboarding creates the owner workspace and opens its dashboar
     {
       p_name: 'North Ridge Contracting',
       p_slug: 'north-ridge-contracting',
+      p_seed_demo: true,
     },
   ])
   expect(state.organizations[0]?.id).toBe(TEST_ORGANIZATION_ID)

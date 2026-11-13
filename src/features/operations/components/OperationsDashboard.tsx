@@ -8,9 +8,12 @@ import {
   Field,
   Input,
   Label,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuItems,
   Radio,
   RadioGroup,
-  Select,
 } from '@headlessui/react'
 import type { Session } from '@supabase/supabase-js'
 import type { FormEvent } from 'react'
@@ -18,27 +21,28 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type {
   AuditEvent,
-  NotificationDelivery,
   Organization,
+  OrganizationMember,
   OrganizationRole,
   PaymentRequest,
   Project,
   StripeWebhookFailure,
   Subcontractor,
   WaiverDocument,
-} from '../lib/database.types'
-import { formatCurrency, formatStatus } from '../lib/format'
-import { projectCode } from '../lib/organizations'
+} from '../../../lib/database.types'
+import { formatCurrency, formatStatus } from '../../../lib/format'
+import { projectCode } from '../../../lib/organizations'
 import {
   calculateRetainage,
   dollarsToMinorUnits,
-} from '../lib/payment-calculations'
-import { supabase } from '../lib/supabase'
+} from '../../../lib/payment-calculations'
+import { supabase } from '../../../lib/supabase'
+import { SelectControl } from '../../../components/ui/SelectControl'
 import {
   DashboardSidebar,
   type DashboardNavigationItem,
 } from './DashboardSidebar'
-import { NotificationDeliveryPanel } from './NotificationDeliveryPanel'
+import { TeamManagementPanel } from './TeamManagementPanel'
 import { WaiverDocumentControl } from './WaiverDocumentControl'
 
 interface WorkspaceOrganization extends Organization {
@@ -53,9 +57,71 @@ interface OperationsDashboardProps {
 }
 
 type CreatePanel = 'project' | 'subcontractor' | 'payment'
+type DashboardPage =
+  | 'overview'
+  | 'directory'
+  | 'payments'
+  | 'team'
+  | 'delivery'
+  | 'audit'
+
+const dashboardPathByPage: Record<DashboardPage, string> = {
+  overview: '/dashboard',
+  directory: '/directory',
+  payments: '/payments',
+  team: '/team',
+  delivery: '/delivery',
+  audit: '/audit',
+}
+
+const dashboardPageDetails: Record<
+  DashboardPage,
+  { eyebrow: string; title: string; description: string }
+> = {
+  overview: {
+    eyebrow: 'Tenant operations workspace',
+    title: 'Operations overview',
+    description: 'Workspace health and financial totals',
+  },
+  directory: {
+    eyebrow: 'Organization records',
+    title: 'Project directory',
+    description: 'Projects, subcontractors, and operational contacts',
+  },
+  payments: {
+    eyebrow: 'Financial workflow',
+    title: 'Payment operations',
+    description: 'Requests, approvals, checkout, waivers, and refunds',
+  },
+  team: {
+    eyebrow: 'Access governance',
+    title: 'Team access',
+    description: 'Active roles and tenant membership',
+  },
+  delivery: {
+    eyebrow: 'Integration health',
+    title: 'Webhook operations',
+    description: 'Stripe event processing and failure recovery',
+  },
+  audit: {
+    eyebrow: 'Security evidence',
+    title: 'Audit trail',
+    description: 'Immutable organization activity recorded by PostgreSQL',
+  },
+}
+
+function dashboardPageFromPath(pathname: string): DashboardPage {
+  const entry = Object.entries(dashboardPathByPage).find(
+    ([, path]) => path === pathname,
+  )
+
+  return (entry?.[0] as DashboardPage | undefined) ?? 'overview'
+}
 
 const fieldClassName =
-  'h-11 border border-ink/15 bg-cream/60 px-3 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10'
+  'h-10 border border-ink/15 bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10'
+const selectFieldClassName =
+  'h-10 border border-ink/15 bg-white pl-3 text-sm text-ink outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10'
 
 function statusClassName(status: string): string {
   switch (status) {
@@ -126,8 +192,8 @@ export function OperationsDashboard({
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
   const [webhookFailures, setWebhookFailures] = useState<StripeWebhookFailure[]>([])
   const [waiverDocuments, setWaiverDocuments] = useState<WaiverDocument[]>([])
-  const [notificationDeliveries, setNotificationDeliveries] = useState<
-    NotificationDelivery[]
+  const [organizationMembers, setOrganizationMembers] = useState<
+    OrganizationMember[]
   >([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -140,14 +206,14 @@ export function OperationsDashboard({
   )
   const [refundRequestId, setRefundRequestId] = useState<string | null>(null)
   const [waiverRequestId, setWaiverRequestId] = useState<string | null>(null)
-  const [notificationDeliveryId, setNotificationDeliveryId] = useState<
-    string | null
-  >(null)
+  const [memberUserId, setMemberUserId] = useState<string | null>(null)
   const [refundConfirmationId, setRefundConfirmationId] = useState<string | null>(
     null,
   )
   const [isNavigationOpen, setIsNavigationOpen] = useState(false)
-  const [activeNavigationId, setActiveNavigationId] = useState('overview')
+  const [activeNavigationId, setActiveNavigationId] = useState<DashboardPage>(
+    () => dashboardPageFromPath(window.location.pathname),
+  )
   const [isSigningOut, setIsSigningOut] = useState(false)
 
   const [projectName, setProjectName] = useState('')
@@ -160,73 +226,87 @@ export function OperationsDashboard({
   const [requestDescription, setRequestDescription] = useState('')
   const [requestGross, setRequestGross] = useState('')
   const [requestRetainage, setRequestRetainage] = useState('10')
+  const [memberEmail, setMemberEmail] = useState('')
+  const [memberRole, setMemberRole] = useState<
+    Exclude<OrganizationRole, 'owner'>
+  >('member')
 
   const canManageProjects = ['owner', 'admin'].includes(organization.role)
+  const canManageTeam = ['owner', 'admin'].includes(organization.role)
   const canManagePayments = ['owner', 'admin', 'accountant'].includes(
     organization.role,
   )
   const canApprovePayments = ['owner', 'accountant'].includes(organization.role)
   const activeCreatePanel =
-    !canManageProjects && canManagePayments ? 'payment' : createPanel
+    activeNavigationId === 'payments'
+      ? 'payment'
+      : !canManageProjects && canManagePayments
+        ? 'payment'
+        : createPanel === 'payment'
+          ? 'project'
+          : createPanel
   const createPanelOptions = (
     [
-      canManageProjects && ['project', 'Project'],
-      canManageProjects && ['subcontractor', 'Subcontractor'],
-      canManagePayments && ['payment', 'Payment'],
+      activeNavigationId === 'directory' &&
+        canManageProjects && ['project', 'Project'],
+      activeNavigationId === 'directory' &&
+        canManageProjects && ['subcontractor', 'Subcontractor'],
+      activeNavigationId === 'payments' &&
+        canManagePayments && ['payment', 'Payment'],
     ].filter(Boolean) as [CreatePanel, string][]
   )
   const navigationItems = useMemo<DashboardNavigationItem[]>(() => {
-    const deliveryAttentionCount = notificationDeliveries.filter((delivery) =>
-      ['failed', 'retry_scheduled'].includes(delivery.status),
-    ).length
-
     return [
       {
         id: 'overview',
+        href: dashboardPathByPage.overview,
         label: 'Overview',
         detail: 'Workspace health and totals',
       },
-      (canManageProjects || canManagePayments) && {
-        id: 'create',
-        label: 'Create',
-        detail: 'Add operational records',
-      },
       {
         id: 'directory',
+        href: dashboardPathByPage.directory,
         label: 'Directory',
         detail: 'Projects and subcontractors',
         badge: String(projects.length + subcontractors.length),
       },
       {
         id: 'payments',
+        href: dashboardPathByPage.payments,
         label: 'Payments',
         detail: 'Requests, checkout, and refunds',
         badge: String(paymentRequests.length),
       },
+      canManageTeam && {
+        id: 'team',
+        href: dashboardPathByPage.team,
+        label: 'Team access',
+        detail: 'Roles and membership',
+        badge: String(
+          organizationMembers.filter((member) => member.status === 'active').length,
+        ),
+      },
       canManagePayments && {
         id: 'delivery',
-        label: 'Email delivery',
-        detail: 'Transactional notification log',
-        badge: deliveryAttentionCount > 0 ? String(deliveryAttentionCount) : undefined,
+        href: dashboardPathByPage.delivery,
+        label: 'Webhooks',
+        detail: 'Stripe event health',
+        badge:
+          webhookFailures.length > 0 ? String(webhookFailures.length) : undefined,
       },
-      canManagePayments && {
-        id: 'webhooks',
-        label: 'Webhook health',
-        detail: 'Stripe processing failures',
-        badge: webhookFailures.length > 0 ? String(webhookFailures.length) : undefined,
-      },
-      auditEvents.length > 0 && {
+      {
         id: 'audit',
+        href: dashboardPathByPage.audit,
         label: 'Audit trail',
         detail: 'Immutable activity evidence',
-        badge: String(auditEvents.length),
+        badge: auditEvents.length > 0 ? String(auditEvents.length) : undefined,
       },
     ].filter(Boolean) as DashboardNavigationItem[]
   }, [
     auditEvents.length,
     canManagePayments,
-    canManageProjects,
-    notificationDeliveries,
+    canManageTeam,
+    organizationMembers,
     paymentRequests.length,
     projects.length,
     subcontractors.length,
@@ -244,7 +324,7 @@ export function OperationsDashboard({
       auditResult,
       failureResult,
       waiverResult,
-      notificationResult,
+      memberResult,
     ] =
       await Promise.all([
         supabase
@@ -280,12 +360,11 @@ export function OperationsDashboard({
           .select('*')
           .eq('organization_id', organization.id)
           .order('created_at', { ascending: false }),
-        supabase
-          .from('notification_deliveries')
-          .select('*')
-          .eq('organization_id', organization.id)
-          .order('created_at', { ascending: false })
-          .limit(8),
+        canManageTeam
+          ? supabase.rpc('list_organization_members', {
+              p_organization_id: organization.id,
+            })
+          : Promise.resolve({ data: [] as OrganizationMember[], error: null }),
       ])
 
     const firstError =
@@ -295,7 +374,7 @@ export function OperationsDashboard({
       auditResult.error ??
       failureResult.error ??
       waiverResult.error ??
-      notificationResult.error
+      memberResult.error
 
     if (firstError) {
       setError(firstError.message)
@@ -312,13 +391,13 @@ export function OperationsDashboard({
     setAuditEvents(auditResult.data ?? [])
     setWebhookFailures(failureResult.data ?? [])
     setWaiverDocuments(waiverResult.data ?? [])
-    setNotificationDeliveries(notificationResult.data ?? [])
+    setOrganizationMembers(memberResult.data ?? [])
     setRequestProjectId((current) => current || nextProjects[0]?.id || '')
     setRequestSubcontractorId(
       (current) => current || nextSubcontractors[0]?.id || '',
     )
     setIsLoading(false)
-  }, [organization.id])
+  }, [canManageTeam, organization.id])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -330,27 +409,31 @@ export function OperationsDashboard({
   }, [loadDashboard])
 
   useEffect(() => {
-    const sections = navigationItems.flatMap((item) => {
-      const element = document.getElementById(item.id)
-      return element ? [element] : []
-    })
+    if (
+      !Object.values(dashboardPathByPage).includes(window.location.pathname)
+    ) {
+      window.history.replaceState(null, '', dashboardPathByPage.overview)
+    }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visibleEntry = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0]
+    const handlePopState = () => {
+      const nextPage = dashboardPageFromPath(window.location.pathname)
+      const isAllowed =
+        (nextPage !== 'delivery' || canManagePayments) &&
+        (nextPage !== 'team' || canManageTeam)
 
-        if (visibleEntry) {
-          setActiveNavigationId(visibleEntry.target.id)
-        }
-      },
-      { rootMargin: '-18% 0px -68% 0px', threshold: [0, 0.2, 0.5] },
-    )
+      if (!isAllowed) {
+        window.history.replaceState(null, '', dashboardPathByPage.overview)
+      }
 
-    sections.forEach((section) => observer.observe(section))
-    return () => observer.disconnect()
-  }, [navigationItems])
+      setActiveNavigationId(isAllowed ? nextPage : 'overview')
+      setIsNavigationOpen(false)
+      window.scrollTo({ top: 0 })
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    handlePopState()
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [canManagePayments, canManageTeam])
 
   async function signOut() {
     setIsSigningOut(true)
@@ -541,61 +624,66 @@ export function OperationsDashboard({
       return
     }
 
-    const { data: dispatchResult, error: dispatchError } =
-      await supabase.functions.invoke('dispatch-notification', {
-        body: { paymentRequestId: requestId },
-      })
-    const deliveryStatus = (dispatchResult as { status?: unknown } | null)?.status
-
-    setNotice(
-      dispatchError || deliveryStatus !== 'sent'
-        ? 'Payment request approved. Its email status is available in the delivery log.'
-        : 'Payment request approved and the subcontractor email was sent.',
-    )
+    setNotice('Payment request approved and ready for secure checkout.')
     await loadDashboard()
   }
 
-  async function retryNotification(delivery: NotificationDelivery) {
+  async function upsertOrganizationMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
     setError(null)
     setNotice(null)
-    setNotificationDeliveryId(delivery.id)
+    setIsSubmitting(true)
 
-    const { data, error: dispatchError } = await supabase.functions.invoke(
-      'dispatch-notification',
+    const { error: memberError } = await supabase.rpc(
+      'upsert_organization_member',
       {
-        body: {
-          paymentRequestId: delivery.payment_request_id,
-          retryDeliveryId: delivery.id,
-        },
+        p_organization_id: organization.id,
+        p_email: memberEmail.trim(),
+        p_role: memberRole,
       },
     )
 
-    setNotificationDeliveryId(null)
+    setIsSubmitting(false)
 
-    if (dispatchError) {
-      setError(
-        await edgeFunctionErrorMessage(
-          dispatchError,
-          'The notification retry could not be completed.',
-        ),
-      )
-      await loadDashboard()
+    if (memberError) {
+      setError(memberError.message)
       return
     }
 
-    const result = data as { status?: unknown; message?: unknown } | null
+    setMemberEmail('')
+    setNotice('Team access updated successfully.')
+    await loadDashboard()
+  }
 
-    if (result?.status !== 'sent') {
-      setError(
-        typeof result?.message === 'string'
-          ? result.message
-          : 'The delivery still needs operator attention.',
-      )
-      await loadDashboard()
+  async function setOrganizationMemberStatus(
+    member: OrganizationMember,
+    status: 'active' | 'suspended',
+  ) {
+    setError(null)
+    setNotice(null)
+    setMemberUserId(member.user_id)
+
+    const { error: memberError } = await supabase.rpc(
+      'set_organization_member_status',
+      {
+        p_organization_id: organization.id,
+        p_user_id: member.user_id,
+        p_status: status,
+      },
+    )
+
+    setMemberUserId(null)
+
+    if (memberError) {
+      setError(memberError.message)
       return
     }
 
-    setNotice('The transactional email was delivered successfully.')
+    setNotice(
+      status === 'active'
+        ? `${member.email} can access this workspace again.`
+        : `${member.email} has been suspended from this workspace.`,
+    )
     await loadDashboard()
   }
 
@@ -745,18 +833,36 @@ export function OperationsDashboard({
     'Unknown subcontractor'
   const refundConfirmation =
     paymentRequests.find((request) => request.id === refundConfirmationId) ?? null
+  const userEmail = session.user.email ?? 'Authenticated user'
+  const userInitial = userEmail.charAt(0).toUpperCase()
 
   function navigateTo(itemId: string) {
-    setActiveNavigationId(itemId)
+    const nextPage = itemId as DashboardPage
+    const path = dashboardPathByPage[nextPage]
+
+    if (
+      !path ||
+      (nextPage === 'delivery' && !canManagePayments) ||
+      (nextPage === 'team' && !canManageTeam)
+    ) {
+      return
+    }
+
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, '', path)
+    }
+
+    setActiveNavigationId(nextPage)
     setIsNavigationOpen(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  const activePageDetails = dashboardPageDetails[activeNavigationId]
 
   return (
     <div className="min-h-screen bg-cream lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       <aside className="sticky top-0 hidden h-screen lg:block">
         <DashboardSidebar
-          organizationName={organization.name}
-          role={organization.role}
           email={session.user.email}
           items={navigationItems}
           activeItemId={activeNavigationId}
@@ -773,7 +879,7 @@ export function OperationsDashboard({
               type="button"
               onClick={() => setIsNavigationOpen(true)}
               aria-label="Open navigation"
-              className="grid size-11 shrink-0 place-items-center border border-ink/15 bg-white text-ink transition hover:bg-cream lg:hidden"
+              className="grid size-10 shrink-0 place-items-center border border-ink/15 bg-white text-ink transition hover:bg-cream lg:hidden"
             >
               <svg viewBox="0 0 20 20" className="size-5" aria-hidden="true">
                 <path
@@ -795,40 +901,118 @@ export function OperationsDashboard({
             </div>
           </div>
 
-          {organizations.length > 1 ? (
-            <Field className="flex items-center gap-3">
-              <Label className="hidden text-[10px] font-bold uppercase tracking-[0.14em] text-ink/40 sm:block">
-                Workspace
-              </Label>
-              <Select
-                value={organization.id}
-                onChange={(event) => onSelectOrganization(event.target.value)}
-                className="h-11 max-w-48 border border-ink/15 bg-white px-3 text-sm font-semibold text-ink outline-none focus:border-forest sm:min-w-56 sm:max-w-none"
+          <div className="flex items-center gap-2">
+            {organizations.length > 1 && (
+              <Field className="flex items-center gap-3">
+                <Label className="sr-only">Workspace</Label>
+                <SelectControl
+                  value={organization.id}
+                  onChange={(event) => onSelectOrganization(event.target.value)}
+                  containerClassName="w-32 sm:w-48 xl:w-56"
+                  className="h-10 border border-ink/15 bg-white pl-3 text-sm font-semibold text-ink outline-none focus:border-forest"
+                >
+                  {organizations.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </SelectControl>
+              </Field>
+            )}
+
+            <Menu as="div" className="relative">
+              <MenuButton className="inline-flex items-center gap-2 py-1 text-left text-ink transition hover:text-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/20">
+                <span className="grid size-7 shrink-0 place-items-center bg-forest text-xs font-black text-mint">
+                  {userInitial}
+                </span>
+                <span className="hidden min-w-0 lg:block">
+                  <span className="block max-w-36 truncate text-xs font-bold">
+                    {userEmail}
+                  </span>
+                  <span className="block text-[10px] font-semibold text-ink/45">
+                    {formatStatus(organization.role)} access
+                  </span>
+                </span>
+                <svg
+                  viewBox="0 0 20 20"
+                  className="size-4 shrink-0 text-ink/45"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="m6 8 4 4 4-4"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </MenuButton>
+
+              <MenuItems
+                transition
+                className="absolute right-0 z-50 mt-2 w-72 origin-top-right border border-ink/12 bg-white p-2 shadow-[0_24px_60px_rgba(16,35,31,0.18)] transition duration-100 ease-out focus:outline-none data-closed:scale-95 data-closed:opacity-0"
               >
-                {organizations.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          ) : (
-            <span className="hidden border border-forest/15 bg-white px-3 py-2 text-xs font-bold text-forest sm:inline-flex">
-              {formatStatus(organization.role)} access
-            </span>
-          )}
+                <div className="border-b border-ink/8 p-3">
+                  <p className="truncate text-sm font-black text-ink">
+                    {userEmail}
+                  </p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/35">
+                    Supabase authenticated
+                  </p>
+                </div>
+
+                <dl className="grid gap-3 border-b border-ink/8 p-3 text-xs">
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-ink/45">Access level</dt>
+                    <dd className="border border-forest/15 bg-mint/15 px-2 py-1 font-bold text-forest">
+                      {formatStatus(organization.role)}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-ink/45">Workspace</dt>
+                    <dd className="max-w-40 truncate font-bold text-ink">
+                      {organization.name}
+                    </dd>
+                  </div>
+                </dl>
+
+                <MenuItem>
+                  <Button
+                    type="button"
+                    onClick={() => void signOut()}
+                    disabled={isSigningOut}
+                    className="mt-1 flex h-10 w-full items-center justify-between px-3 text-sm font-bold text-red-700 transition data-focus:bg-red-50 disabled:cursor-wait disabled:opacity-50"
+                  >
+                    <span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span>
+                    <svg
+                      viewBox="0 0 20 20"
+                      className="size-4"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M8 4H4.75A1.75 1.75 0 0 0 3 5.75v8.5C3 15.22 3.78 16 4.75 16H8m4-3 3-3-3-3m3 3H7"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </Button>
+                </MenuItem>
+              </MenuItems>
+            </Menu>
+          </div>
         </header>
 
         <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8 xl:px-8 xl:py-10">
-          <section
-            id="overview"
-            className="scroll-mt-28 border-b border-ink/10 pb-7"
-          >
+          <section className="border-b border-ink/10 pb-7">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-forest/60">
-              Tenant operations workspace
+              {activePageDetails.eyebrow}
             </p>
             <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] text-ink sm:text-4xl">
-              Operations overview
+              {activePageDetails.title}
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink/55">
               <span className="border border-forest/15 bg-white px-2.5 py-1 text-xs font-bold text-forest">
@@ -836,7 +1020,7 @@ export function OperationsDashboard({
               </span>
               <span>{organization.name}</span>
               <span aria-hidden="true" className="text-ink/20">/</span>
-              <span>Organization-scoped through RLS</span>
+              <span>{activePageDetails.description}</span>
             </div>
           </section>
 
@@ -857,6 +1041,7 @@ export function OperationsDashboard({
         </div>
       )}
 
+      {activeNavigationId === 'overview' && (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
           ['Active projects', projects.filter((project) => project.status === 'active').length],
@@ -878,11 +1063,12 @@ export function OperationsDashboard({
           </div>
         ))}
       </div>
+      )}
 
-      {(canManageProjects || canManagePayments) && (
+      {((activeNavigationId === 'directory' && canManageProjects) ||
+        (activeNavigationId === 'payments' && canManagePayments)) && (
         <section
-          id="create"
-          className="grid scroll-mt-28 gap-6 xl:grid-cols-[1.35fr_0.65fr]"
+          className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]"
         >
           <div className="border border-ink/10 bg-white p-6 shadow-[0_24px_60px_rgba(16,35,31,0.08)] sm:p-8">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -891,25 +1077,29 @@ export function OperationsDashboard({
                   Controlled write path
                 </p>
                 <h2 className="mt-1 text-xl font-black tracking-tight text-ink">
-                  Add operations data
+                  {activeNavigationId === 'payments'
+                    ? 'Create payment request'
+                    : 'Add directory record'}
                 </h2>
               </div>
-              <RadioGroup
-                value={activeCreatePanel}
-                onChange={setCreatePanel}
-                aria-label="Data type to create"
-                className="flex bg-cream p-1"
-              >
-                {createPanelOptions.map(([panel, label]) => (
-                  <Radio
-                    key={panel}
-                    value={panel}
-                    className="cursor-pointer px-3 py-2 text-xs font-bold text-ink/45 transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/30 data-checked:bg-white data-checked:text-ink data-checked:shadow-sm"
-                  >
-                    {label}
-                  </Radio>
-                ))}
-              </RadioGroup>
+              {createPanelOptions.length > 1 && (
+                <RadioGroup
+                  value={activeCreatePanel}
+                  onChange={setCreatePanel}
+                  aria-label="Data type to create"
+                  className="flex bg-cream p-1"
+                >
+                  {createPanelOptions.map(([panel, label]) => (
+                    <Radio
+                      key={panel}
+                      value={panel}
+                      className="cursor-pointer px-3 py-1.5 text-xs font-bold text-ink/45 transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/30 data-checked:bg-white data-checked:text-ink data-checked:shadow-sm"
+                    >
+                      {label}
+                    </Radio>
+                  ))}
+                </RadioGroup>
+              )}
             </div>
 
             {activeCreatePanel === 'project' && canManageProjects && (
@@ -941,7 +1131,7 @@ export function OperationsDashboard({
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="h-11 bg-ink px-5 text-sm font-bold text-white transition hover:bg-forest disabled:opacity-60"
+                  className="h-10 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:opacity-60"
                 >
                   Add project
                 </Button>
@@ -985,7 +1175,7 @@ export function OperationsDashboard({
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="h-11 bg-ink px-5 text-sm font-bold text-white transition hover:bg-forest disabled:opacity-60 sm:col-span-2 sm:justify-self-end"
+                  className="h-10 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:opacity-60 sm:col-span-2 sm:justify-self-end"
                 >
                   Add subcontractor
                 </Button>
@@ -999,11 +1189,11 @@ export function OperationsDashboard({
               >
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Project</Label>
-                  <Select
+                  <SelectControl
                     required
                     value={requestProjectId}
                     onChange={(event) => setRequestProjectId(event.target.value)}
-                    className={fieldClassName}
+                    className={selectFieldClassName}
                   >
                     <option value="">Select a project</option>
                     {projects.map((project) => (
@@ -1011,17 +1201,17 @@ export function OperationsDashboard({
                         {project.name}
                       </option>
                     ))}
-                  </Select>
+                  </SelectControl>
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Subcontractor</Label>
-                  <Select
+                  <SelectControl
                     required
                     value={requestSubcontractorId}
                     onChange={(event) =>
                       setRequestSubcontractorId(event.target.value)
                     }
-                    className={fieldClassName}
+                    className={selectFieldClassName}
                   >
                     <option value="">Select a subcontractor</option>
                     {subcontractors.map((subcontractor) => (
@@ -1029,7 +1219,7 @@ export function OperationsDashboard({
                         {subcontractor.company_name}
                       </option>
                     ))}
-                  </Select>
+                  </SelectControl>
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
                   <Label>Milestone description</Label>
@@ -1098,7 +1288,7 @@ export function OperationsDashboard({
                   disabled={
                     isSubmitting || projects.length === 0 || subcontractors.length === 0
                   }
-                  className="h-11 bg-ink px-5 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:justify-self-end"
+                  className="h-10 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:justify-self-end"
                 >
                   Create draft request
                 </Button>
@@ -1106,7 +1296,7 @@ export function OperationsDashboard({
             )}
           </div>
 
-          <aside className="flex flex-col justify-between gap-6 bg-forest p-6 text-white shadow-[0_24px_60px_rgba(16,35,31,0.16)] sm:p-8">
+          <aside className="flex flex-col gap-8 bg-forest p-6 text-white shadow-[0_24px_60px_rgba(16,35,31,0.16)] sm:p-8">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-mint/70">
                 Security evidence
@@ -1119,7 +1309,7 @@ export function OperationsDashboard({
                 and RPCs enforce the actual financial-data rules.
               </p>
             </div>
-            <ul className="flex flex-col gap-3 text-sm text-white/80">
+            <ul className="flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-white/80">
               {[
                 'Tenant A receives zero Tenant B rows',
                 'Money is stored in integer minor units',
@@ -1138,7 +1328,8 @@ export function OperationsDashboard({
         </section>
       )}
 
-      <section id="directory" className="grid scroll-mt-28 gap-6 xl:grid-cols-2">
+      {activeNavigationId === 'directory' && (
+      <section className="grid gap-6 xl:grid-cols-2">
         <div className="border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -1227,10 +1418,11 @@ export function OperationsDashboard({
           </div>
         </div>
       </section>
+      )}
 
+      {activeNavigationId === 'payments' && (
       <section
-        id="payments"
-        className="scroll-mt-28 overflow-hidden border border-ink/10 bg-white shadow-[0_18px_42px_rgba(16,35,31,0.06)]"
+        className="overflow-hidden border border-ink/10 bg-white shadow-[0_18px_42px_rgba(16,35,31,0.06)]"
       >
         <div className="flex flex-col justify-between gap-3 border-b border-ink/10 p-6 sm:flex-row sm:items-center">
           <div>
@@ -1437,23 +1629,30 @@ export function OperationsDashboard({
           </div>
         )}
       </section>
-
-      {canManagePayments && (
-        <div id="delivery" className="scroll-mt-28">
-          <NotificationDeliveryPanel
-            deliveries={notificationDeliveries}
-            paymentRequests={paymentRequests}
-            busyDeliveryId={notificationDeliveryId}
-            onRetry={(delivery) => void retryNotification(delivery)}
-          />
-        </div>
       )}
 
-      {canManagePayments && (
+      {activeNavigationId === 'team' && canManageTeam && (
+        <TeamManagementPanel
+          members={organizationMembers}
+          currentUserId={session.user.id}
+          currentUserRole={organization.role}
+          email={memberEmail}
+          role={memberRole}
+          busyUserId={memberUserId}
+          isSubmitting={isSubmitting}
+          onEmailChange={setMemberEmail}
+          onRoleChange={setMemberRole}
+          onSubmit={(event) => void upsertOrganizationMember(event)}
+          onStatusChange={(member, status) =>
+            void setOrganizationMemberStatus(member, status)
+          }
+        />
+      )}
+
+      {activeNavigationId === 'delivery' && canManagePayments && (
         <section
-          id="webhooks"
           className={
-            'scroll-mt-28 border p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)] ' +
+            'border p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)] ' +
             (webhookFailures.length > 0
               ? 'border-amber-300 bg-amber-50/60'
               : 'border-emerald-200 bg-emerald-50/50')
@@ -1526,16 +1725,20 @@ export function OperationsDashboard({
         </section>
       )}
 
-      {auditEvents.length > 0 && (
+      {activeNavigationId === 'audit' && (
         <section
-          id="audit"
-          className="scroll-mt-28 border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]"
+          className="border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]"
         >
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/40">
             Immutable audit trail
           </p>
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {auditEvents.map((event) => (
+          {auditEvents.length === 0 ? (
+            <p className="mt-5 bg-cream p-4 text-sm text-ink/50">
+              No audit events have been recorded for this workspace yet.
+            </p>
+          ) : (
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {auditEvents.map((event) => (
               <div
                 key={event.id}
                 className="flex items-start justify-between gap-4 border border-ink/8 p-4"
@@ -1552,8 +1755,9 @@ export function OperationsDashboard({
                   {shortDate(event.created_at)}
                 </time>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
         </main>
@@ -1568,8 +1772,6 @@ export function OperationsDashboard({
         <div className="fixed inset-0 flex">
           <DialogPanel className="h-full w-[min(88vw,18rem)] shadow-[24px_0_64px_rgba(16,35,31,0.28)]">
             <DashboardSidebar
-              organizationName={organization.name}
-              role={organization.role}
               email={session.user.email}
               items={navigationItems}
               activeItemId={activeNavigationId}
@@ -1627,7 +1829,7 @@ export function OperationsDashboard({
                 type="button"
                 disabled={refundRequestId !== null}
                 onClick={() => setRefundConfirmationId(null)}
-                className="h-11 border border-ink/15 bg-white px-5 text-sm font-bold text-ink transition hover:bg-cream disabled:opacity-50"
+                className="h-10 border border-ink/15 bg-white px-4 text-sm font-bold text-ink transition hover:bg-cream disabled:opacity-50"
               >
                 Cancel
               </Button>
@@ -1640,7 +1842,7 @@ export function OperationsDashboard({
                     void refundPayment(refundConfirmation.id)
                   }
                 }}
-                className="h-11 bg-red-700 px-5 text-sm font-bold text-white transition hover:bg-red-800 disabled:cursor-wait disabled:opacity-55"
+                className="h-10 bg-red-700 px-4 text-sm font-bold text-white transition hover:bg-red-800 disabled:cursor-wait disabled:opacity-55"
               >
                 {refundRequestId !== null
                   ? 'Refunding payment…'

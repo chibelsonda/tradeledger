@@ -1,8 +1,8 @@
 import { Button, Field, Input, Label } from '@headlessui/react'
 import { useState } from 'react'
 
-import { organizationSlug } from '../lib/organizations'
-import { supabase } from '../lib/supabase'
+import { organizationSlug } from '../../../lib/organizations'
+import { supabase } from '../../../lib/supabase'
 
 interface OrganizationOnboardingProps {
   onCreated: (organizationId: string) => void
@@ -14,6 +14,7 @@ export function OrganizationOnboarding({
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [isSlugEdited, setIsSlugEdited] = useState(false)
+  const [includeDemoData, setIncludeDemoData] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,10 +41,11 @@ export function OrganizationOnboarding({
     setIsSubmitting(true)
 
     const { data, error: createError } = await supabase.rpc(
-      'create_organization',
+      'create_organization_workspace',
       {
         p_name: normalizedName,
         p_slug: normalizedSlug,
+        p_seed_demo: includeDemoData,
       },
     )
 
@@ -118,13 +120,31 @@ export function OrganizationOnboarding({
             value={name}
             onChange={(event) => updateName(event.target.value)}
             placeholder="North Ridge Contracting"
-            className="h-12 border border-ink/15 bg-cream/60 px-4 font-normal outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10"
+            className="h-10 border border-ink/15 bg-white px-3 font-normal outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10"
           />
         </Field>
 
+        <label className="flex cursor-pointer items-start gap-3 border border-ink/10 bg-cream/70 p-4">
+          <input
+            type="checkbox"
+            checked={includeDemoData}
+            onChange={(event) => setIncludeDemoData(event.target.checked)}
+            className="mt-0.5 size-4 shrink-0 accent-forest"
+          />
+          <span>
+            <span className="block text-sm font-bold text-ink">
+              Add a production-safe sample workspace
+            </span>
+            <span className="mt-1 block text-xs leading-5 text-ink/55">
+              Creates two projects, two subcontractors, and draft, submitted,
+              and approved payment examples inside your tenant only.
+            </span>
+          </span>
+        </label>
+
         <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
           <Label>Workspace URL</Label>
-          <div className="flex h-12 items-center overflow-hidden border border-ink/15 bg-cream/60 focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/10">
+          <div className="flex h-10 items-center overflow-hidden border border-ink/15 bg-white focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/10">
             <span className="border-r border-ink/10 px-3 text-xs font-semibold text-ink/40">
               /workspace/
             </span>
@@ -137,7 +157,7 @@ export function OrganizationOnboarding({
                 setSlug(organizationSlug(event.target.value))
               }}
               placeholder="north-ridge"
-              className="h-full min-w-0 flex-1 bg-transparent px-3 font-mono text-sm font-normal outline-none placeholder:text-ink/30"
+              className="h-full min-w-0 flex-1 bg-white px-3 font-mono text-sm font-normal outline-none placeholder:text-ink/30"
             />
           </div>
         </Field>
@@ -154,7 +174,7 @@ export function OrganizationOnboarding({
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex h-13 items-center justify-center bg-ink px-6 text-sm font-bold text-white shadow-[0_14px_32px_rgba(16,35,31,0.2)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:translate-y-0 disabled:opacity-60"
+          className="inline-flex h-10 items-center justify-center bg-ink px-5 text-sm font-bold text-white shadow-[0_14px_32px_rgba(16,35,31,0.2)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:translate-y-0 disabled:opacity-60"
         >
           {isSubmitting ? 'Creating secure workspace…' : 'Create organization'}
         </Button>

@@ -26,7 +26,7 @@ export function CheckoutCanceled() {
         </div>
         <a
           href="/"
-          className="mt-8 inline-flex h-12 items-center justify-center bg-ink px-6 text-sm font-bold text-white transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+          className="mt-8 inline-flex h-10 items-center justify-center bg-ink px-5 text-sm font-bold text-white transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
         >
           Return to checkout
         </a>

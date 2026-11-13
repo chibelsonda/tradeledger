@@ -2,7 +2,7 @@ import { Button, Field, Input, Label, Radio, RadioGroup } from '@headlessui/reac
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 
-import { supabase } from '../lib/supabase'
+import { supabase } from '../../../lib/supabase'
 
 type AuthMode = 'sign-in' | 'sign-up'
 
@@ -89,7 +89,7 @@ export function AuthCard() {
             <Radio
               key={option}
               value={option}
-              className="flex-1 cursor-pointer px-4 py-2.5 text-center text-sm font-bold text-ink/50 transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/30 data-checked:bg-white data-checked:text-ink data-checked:shadow-sm"
+              className="flex-1 cursor-pointer px-4 py-2 text-center text-sm font-bold text-ink/50 transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/30 data-checked:bg-white data-checked:text-ink data-checked:shadow-sm"
             >
               {option === 'sign-in' ? 'Sign in' : 'Create account'}
             </Radio>
@@ -108,7 +108,7 @@ export function AuthCard() {
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
               required
-              className="h-12 border border-ink/15 bg-cream/60 px-4 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10"
+              className="h-10 border border-ink/15 bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10"
               placeholder="you@example.com"
             />
           </Field>
@@ -125,7 +125,7 @@ export function AuthCard() {
               autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
               minLength={8}
               required
-              className="h-12 border border-ink/15 bg-cream/60 px-4 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10"
+              className="h-10 border border-ink/15 bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10"
               placeholder="At least 8 characters"
             />
           </Field>
@@ -150,7 +150,7 @@ export function AuthCard() {
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex h-13 items-center justify-center bg-ink px-6 text-sm font-bold text-white shadow-[0_14px_32px_rgba(16,35,31,0.2)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:translate-y-0 disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center bg-ink px-5 text-sm font-bold text-white shadow-[0_14px_32px_rgba(16,35,31,0.2)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:translate-y-0 disabled:opacity-60"
           >
             {isSubmitting
               ? 'Please wait…'

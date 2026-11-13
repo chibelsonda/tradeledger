@@ -1,10 +1,40 @@
-import { AuthCard } from './components/AuthCard'
-import { CheckoutCanceled } from './components/CheckoutCanceled'
-import { CheckoutCard } from './components/CheckoutCard'
-import { Header } from './components/Header'
-import { PaymentResult } from './components/PaymentResult'
-import { Workspace } from './components/Workspace'
-import { useAuth } from './hooks/useAuth'
+import { lazy, Suspense } from 'react'
+
+import { Header } from './components/layout/Header'
+import { AuthCard } from './features/auth/components/AuthCard'
+import { useAuth } from './features/auth/hooks/useAuth'
+
+const CheckoutCanceled = lazy(() =>
+  import('./features/checkout/components/CheckoutCanceled').then((module) => ({
+    default: module.CheckoutCanceled,
+  })),
+)
+const CheckoutCard = lazy(() =>
+  import('./features/checkout/components/CheckoutCard').then((module) => ({
+    default: module.CheckoutCard,
+  })),
+)
+const PaymentResult = lazy(() =>
+  import('./features/checkout/components/PaymentResult').then((module) => ({
+    default: module.PaymentResult,
+  })),
+)
+const Workspace = lazy(() =>
+  import('./features/workspace/components/Workspace').then((module) => ({
+    default: module.Workspace,
+  })),
+)
+
+function PageLoader() {
+  return (
+    <div className="grid min-h-[68vh] place-items-center px-6">
+      <div className="flex items-center gap-3 text-sm font-bold text-forest">
+        <span className="size-5 animate-spin rounded-full border-2 border-forest/20 border-t-forest" />
+        Loading secure workspace…
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
   const { isReady, session } = useAuth()
@@ -35,24 +65,21 @@ export default function App() {
       )}
 
       <main>
-        {!isReady ? (
-          <div className="grid min-h-[68vh] place-items-center px-6">
-            <div className="flex items-center gap-3 text-sm font-bold text-forest">
-              <span className="size-5 animate-spin rounded-full border-2 border-forest/20 border-t-forest" />
-              Restoring secure session…
-            </div>
-          </div>
-        ) : !session ? (
-          <AuthCard />
-        ) : checkoutState === 'success' && sessionId ? (
-          <PaymentResult sessionId={sessionId} />
-        ) : checkoutState === 'canceled' ? (
-          <CheckoutCanceled />
-        ) : isCheckoutDemo ? (
-          <CheckoutCard />
-        ) : (
-          <Workspace session={session} />
-        )}
+        <Suspense fallback={<PageLoader />}>
+          {!isReady ? (
+            <PageLoader />
+          ) : !session ? (
+            <AuthCard />
+          ) : checkoutState === 'success' && sessionId ? (
+            <PaymentResult sessionId={sessionId} />
+          ) : checkoutState === 'canceled' ? (
+            <CheckoutCanceled />
+          ) : isCheckoutDemo ? (
+            <CheckoutCard />
+          ) : (
+            <Workspace session={session} />
+          )}
+        </Suspense>
       </main>
 
       {!isDashboard && (

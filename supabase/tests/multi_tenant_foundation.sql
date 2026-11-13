@@ -5,7 +5,11 @@ begin;
 insert into auth.users (id, email)
 values
     ('00000000-0000-4000-8000-000000000001', 'owner-a@example.test'),
-    ('00000000-0000-4000-8000-000000000002', 'outsider-b@example.test');
+    ('00000000-0000-4000-8000-000000000002', 'outsider-b@example.test'),
+    ('00000000-0000-4000-8000-000000000003', 'admin-a@example.test'),
+    ('00000000-0000-4000-8000-000000000004', 'accountant-a@example.test'),
+    ('00000000-0000-4000-8000-000000000005', 'member-a@example.test'),
+    ('00000000-0000-4000-8000-000000000006', 'subcontractor-a@example.test');
 
 set local role authenticated;
 set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
@@ -684,6 +688,196 @@ select public.record_stripe_webhook_failure(
     'Synthetic unresolved failure.'
 ) as unresolved_failure_recorded
 \gset
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+select public.upsert_organization_member(
+    :'organization_a_id',
+    'admin-a@example.test',
+    'admin'
+);
+select public.upsert_organization_member(
+    :'organization_a_id',
+    'accountant-a@example.test',
+    'accountant'
+);
+select public.upsert_organization_member(
+    :'organization_a_id',
+    'member-a@example.test',
+    'member'
+);
+select public.upsert_organization_member(
+    :'organization_a_id',
+    'subcontractor-a@example.test',
+    'subcontractor'
+);
+
+do $$
+declare
+    member_count integer;
+begin
+    select count(*)
+    into member_count
+    from public.list_organization_members(
+        current_setting('test.organization_a_id')::uuid
+    );
+
+    if member_count <> 5 then
+        raise exception 'Expected the complete five-role member roster, received %.',
+            member_count;
+    end if;
+end;
+$$;
+
+do $$
+begin
+    begin
+        perform public.upsert_organization_member(
+            current_setting('test.organization_a_id')::uuid,
+            'missing-user@example.test',
+            'member'
+        );
+        raise exception 'An unregistered user must not be added to an organization.';
+    exception
+        when no_data_found then null;
+    end;
+
+    begin
+        perform public.set_organization_member_status(
+            current_setting('test.organization_a_id')::uuid,
+            '00000000-0000-4000-8000-000000000001',
+            'suspended'
+        );
+        raise exception 'The organization owner must not be suspended.';
+    exception
+        when object_not_in_prerequisite_state then null;
+    end;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000003';
+
+select public.upsert_organization_member(
+    :'organization_a_id',
+    'member-a@example.test',
+    'subcontractor'
+);
+
+do $$
+begin
+    begin
+        perform public.upsert_organization_member(
+            current_setting('test.organization_a_id')::uuid,
+            'accountant-a@example.test',
+            'admin'
+        );
+        raise exception 'An admin must not elevate an accountant to admin.';
+    exception
+        when insufficient_privilege then null;
+    end;
+
+    begin
+        perform public.set_organization_member_status(
+            current_setting('test.organization_a_id')::uuid,
+            '00000000-0000-4000-8000-000000000004',
+            'suspended'
+        );
+        raise exception 'An admin must not suspend an accountant.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000004';
+
+do $$
+begin
+    begin
+        perform *
+        from public.list_organization_members(
+            current_setting('test.organization_a_id')::uuid
+        );
+        raise exception 'An accountant must not see the member administration roster.';
+    exception
+        when insufficient_privilege then null;
+    end;
+
+    begin
+        perform public.upsert_organization_member(
+            current_setting('test.organization_a_id')::uuid,
+            'member-a@example.test',
+            'member'
+        );
+        raise exception 'An accountant must not manage members.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+select public.set_organization_member_status(
+    :'organization_a_id',
+    '00000000-0000-4000-8000-000000000004',
+    'suspended'
+);
+select public.set_organization_member_status(
+    :'organization_a_id',
+    '00000000-0000-4000-8000-000000000004',
+    'active'
+);
+
+select public.create_organization('TradeLedger Demo', 'tradeledger-demo')
+    as demo_organization_id
+\gset
+
+select set_config('test.demo_organization_id', :'demo_organization_id', true);
+
+select public.seed_demo_organization(:'demo_organization_id')
+    as demo_seed_result
+\gset
+
+do $$
+declare
+    project_count integer;
+    subcontractor_count integer;
+    request_count integer;
+    approved_count integer;
+begin
+    select count(*) into project_count
+    from public.projects
+    where organization_id = current_setting('test.demo_organization_id')::uuid;
+
+    select count(*) into subcontractor_count
+    from public.subcontractors
+    where organization_id = current_setting('test.demo_organization_id')::uuid;
+
+    select count(*), count(*) filter (where status = 'approved')
+    into request_count, approved_count
+    from public.payment_requests
+    where organization_id = current_setting('test.demo_organization_id')::uuid;
+
+    if project_count <> 2
+       or subcontractor_count <> 2
+       or request_count <> 3
+       or approved_count <> 1 then
+        raise exception 'The safe demo seed produced unexpected record counts.';
+    end if;
+
+    begin
+        perform public.seed_demo_organization(
+            current_setting('test.demo_organization_id')::uuid
+        );
+        raise exception 'Demo seeding must reject a non-empty organization.';
+    exception
+        when object_not_in_prerequisite_state then null;
+    end;
+end;
+$$;
 
 reset role;
 set local role authenticated;

@@ -12,6 +12,7 @@
     "test:database": "bash scripts/run-database-tests.sh",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:production": "node scripts/verify-production-smoke.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

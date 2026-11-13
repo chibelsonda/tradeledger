@@ -15,6 +15,7 @@ test-results/
 .zed/
 .supabase/
 supabase/.temp/
+.vercel/
 .agents/
 .claude/
 .codex/

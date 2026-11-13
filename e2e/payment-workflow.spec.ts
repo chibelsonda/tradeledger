@@ -39,7 +39,7 @@ test('owner approves a request and starts server-priced Stripe checkout', async 
 
   await expect(page.getByText('Approved', { exact: true })).toBeVisible()
   await expect(page.getByRole('status')).toContainText(
-    'email status is available in the delivery log',
+    'ready for secure checkout',
   )
   expect(state.approvedRequestIds).toEqual([TEST_PAYMENT_REQUEST_ID])
 

@@ -3,7 +3,7 @@ import { Button } from '@headlessui/react'
 import type {
   PaymentRequestStatus,
   WaiverDocument,
-} from '../lib/database.types'
+} from '../../../lib/database.types'
 
 interface WaiverDocumentControlProps {
   requestStatus: PaymentRequestStatus

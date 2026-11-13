@@ -6,9 +6,9 @@ import type {
   Organization,
   OrganizationMembership,
   OrganizationRole,
-} from '../lib/database.types'
-import { supabase } from '../lib/supabase'
-import { OperationsDashboard } from './OperationsDashboard'
+} from '../../../lib/database.types'
+import { supabase } from '../../../lib/supabase'
+import { OperationsDashboard } from '../../operations/components/OperationsDashboard'
 import { OrganizationOnboarding } from './OrganizationOnboarding'
 
 interface WorkspaceProps {

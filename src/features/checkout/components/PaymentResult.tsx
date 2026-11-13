@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import type { Payment } from '../lib/database.types'
-import { formatCurrency, formatStatus } from '../lib/format'
-import { supabase } from '../lib/supabase'
+import type { Payment } from '../../../lib/database.types'
+import { formatCurrency, formatStatus } from '../../../lib/format'
+import { supabase } from '../../../lib/supabase'
 
 interface PaymentResultProps {
   sessionId: string
@@ -217,7 +217,7 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
 
             <a
               href="/"
-              className="inline-flex h-12 items-center justify-center bg-ink px-5 text-sm font-bold text-white transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+              className="inline-flex h-10 items-center justify-center bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
             >
               Back to home
             </a>
@@ -235,7 +235,7 @@ function ResultShell({ children }: { children: React.ReactNode }) {
         {children}
         <a
           href="/"
-          className="inline-flex h-12 items-center justify-center bg-mint px-6 text-sm font-bold text-ink transition hover:bg-white"
+          className="inline-flex h-10 items-center justify-center bg-mint px-5 text-sm font-bold text-ink transition hover:bg-white"
         >
           Return home
         </a>

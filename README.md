@@ -7,7 +7,7 @@ demonstrate production-minded SaaS engineering. It combines tenant-safe project
 operations, approval controls, database-owned financial calculations, Stripe
 Checkout, refunds, reconciliation, signed webhooks, and an immutable audit
 trail. Paid requests can also produce a private, auditable PDF waiver record,
-while approval and payment emails use a tenant-visible transactional outbox.
+while owners and admins govern tenant membership through database-enforced roles.
 
 The application is intentionally focused on a credible vertical slice rather
 than broad feature count: create an organization, manage projects and
@@ -37,10 +37,9 @@ full refund without trusting browser-supplied financial data.
 - **Correlated production diagnostics.** Every Edge Function response carries a
   request ID, failures use a stable error envelope, and redaction-safe JSON logs
   connect user-visible errors to Supabase invocations without recording secrets.
-- **Retry-safe transactional email.** Approval and payment transitions enqueue
-  one database-owned delivery. Atomic claims, bounded backoff, Resend
-  idempotency keys, escaped templates, and an operator retry log prevent silent
-  or duplicate notifications.
+- **Governed tenant access.** Owners and admins manage registered users through
+  role-aware RPCs. Owner access is protected, privileged roles require an owner,
+  and suspension takes effect at the RLS boundary.
 - **Private payment documents.** Paid, non-refunded requests can generate a
   server-rendered PDF in a private Supabase Storage bucket. Downloads use
   short-lived signed URLs, and later refunds automatically void the record.
@@ -58,7 +57,7 @@ full refund without trusting browser-supplied financial data.
 | Database | PostgreSQL, Row-Level Security, constraints, generated columns, RPCs |
 | Authentication | Supabase Auth |
 | Payments | Stripe Checkout and signed webhooks |
-| Transactional email | Resend Email API with deterministic idempotency keys |
+| Transactional email | Deferred; outbox foundation retained but not invoked |
 | Verification | Vitest, ESLint, TypeScript, executable PostgreSQL security scenarios |
 
 ## Architecture
@@ -81,8 +80,6 @@ create-checkout / create-refund ----> Stripe Checkout + Refunds
      Payment ledger + failure inbox + audit events
                     |
                     +----> Private waiver PDFs
-                    |
-                    +----> Email outbox ----> Resend
 ```
 
 Secrets stay in Supabase Edge Function configuration. The browser receives only
@@ -100,7 +97,7 @@ the Supabase project URL and publishable key.
 8. Operators can reconcile Stripe state and inspect unresolved webhook failures.
 9. Tenant-scoped audit events provide operational evidence.
 10. A financial approver generates and downloads a private payment waiver PDF.
-11. Operators inspect approval/payment email delivery and safely retry failures.
+11. Owners/admins grant, change, suspend, and restore tenant access.
 
 ## Security and correctness evidence
 
@@ -126,6 +123,8 @@ verifies:
 - Notification claims reject outsiders, retry with bounded delay, and remain
   invisible across tenant boundaries.
 - User-controlled email template content is HTML-escaped.
+- Membership management protects the owner, restricts privileged role changes,
+  and rejects unregistered users.
 - Browser roles cannot alter immutable audit events.
 
 ## Local development
@@ -154,8 +153,6 @@ Configure server-only secrets and deploy the Edge Functions:
 npx supabase secrets set \
   STRIPE_SECRET=sk_test_replace_me \
   STRIPE_WEBHOOK_SECRET=whsec_replace_me \
-  RESEND_API_KEY=re_replace_me \
-  RESEND_FROM_EMAIL='TradeLedger <payments@your-verified-domain.example>' \
   SITE_URL=http://localhost:5173
 
 npx supabase functions deploy create-checkout
@@ -164,8 +161,11 @@ npx supabase functions deploy create-refund
 npx supabase functions deploy reconcile-payment
 npx supabase functions deploy generate-waiver
 npx supabase functions deploy download-waiver
-npx supabase functions deploy dispatch-notification
 ```
+
+Resend is intentionally deferred. The isolated outbox and dispatch function are
+kept as future-facing infrastructure, but active payment workflows do not call
+the provider.
 
 Register this Stripe test webhook URL:
 
@@ -189,7 +189,7 @@ npm run test:e2e
 ```
 
 The current suite includes frontend utility and email-template security coverage
-plus an isolated PostgreSQL 17 tenant/payment/refund/document/notification
+plus an isolated PostgreSQL 17 tenant/payment/refund/document/membership
 scenario that rolls back after every run.
 
 The database suite requires a fresh PostgreSQL database whose name ends in
@@ -205,8 +205,8 @@ GitHub Actions runs the same frontend checks and database scenario on every
 pull request and every push to `main`, using an ephemeral PostgreSQL 17 service
 without application secrets.
 
-Playwright also exercises authentication, tenant onboarding, payment approval,
-the Stripe handoff, and checkout result screens in Chromium. Exact Supabase and
+Playwright also exercises authentication, seeded tenant onboarding, membership
+governance, payment approval, the Stripe handoff, and checkout result screens in Chromium. Exact Supabase and
 Stripe HTTP contracts are intercepted in the browser suite, so tests cannot
 create production users, records, emails, or charges.
 
@@ -220,5 +220,7 @@ payloads, or customer data into incident records.
 
 ## Current roadmap
 
-- Provider delivery/bounce webhooks and automated scheduled outbox draining.
-- A safe hosted demo with production alert delivery and documented ownership.
+- Claim and promote the prepared Vercel deployment under the project owner's
+  account, then set the GitHub `APP_URL` repository variable.
+- Resume Resend only when a verified sender domain and delivery ownership are
+  available.

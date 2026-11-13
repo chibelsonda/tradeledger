@@ -68,6 +68,15 @@ export type OrganizationMembership = {
   updated_at: string
 }
 
+export type OrganizationMember = {
+  user_id: string
+  email: string
+  role: OrganizationRole
+  status: 'invited' | 'active' | 'suspended'
+  created_at: string
+  updated_at: string
+}
+
 export type Project = {
   id: string
   organization_id: string
@@ -385,6 +394,34 @@ export interface Database {
       create_organization: {
         Args: { p_name: string; p_slug: string }
         Returns: string
+      }
+      create_organization_workspace: {
+        Args: { p_name: string; p_slug: string; p_seed_demo?: boolean }
+        Returns: string
+      }
+      seed_demo_organization: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      list_organization_members: {
+        Args: { p_organization_id: string }
+        Returns: OrganizationMember[]
+      }
+      upsert_organization_member: {
+        Args: {
+          p_organization_id: string
+          p_email: string
+          p_role: Exclude<OrganizationRole, 'owner'>
+        }
+        Returns: string
+      }
+      set_organization_member_status: {
+        Args: {
+          p_organization_id: string
+          p_user_id: string
+          p_status: 'active' | 'suspended'
+        }
+        Returns: boolean
       }
       create_payment_request: {
         Args: {

@@ -2,8 +2,8 @@ import { Button, Field, Input, Label } from '@headlessui/react'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { useMemo, useState } from 'react'
 
-import { clampQuantity, formatCurrency } from '../lib/format'
-import { supabase } from '../lib/supabase'
+import { clampQuantity, formatCurrency } from '../../../lib/format'
+import { supabase } from '../../../lib/supabase'
 
 const product = {
   name: 'Launch Kit',
@@ -201,11 +201,11 @@ export function CheckoutCard() {
                 <Label htmlFor="quantity" className="text-sm font-bold text-ink">
                   Quantity
                 </Label>
-                <div className="flex items-center overflow-hidden border border-ink/15 bg-cream/70 focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/10">
+                <div className="flex items-center overflow-hidden border border-ink/15 bg-white focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/10">
                   <Button
                     type="button"
                     onClick={() => updateQuantity(quantity - 1)}
-                    className="grid size-11 place-items-center text-lg font-semibold text-ink/65 transition hover:bg-ink/5 hover:text-ink"
+                    className="grid size-10 place-items-center text-lg font-semibold text-ink/65 transition hover:bg-ink/5 hover:text-ink"
                     aria-label="Decrease quantity"
                   >
                     −
@@ -217,12 +217,12 @@ export function CheckoutCard() {
                     max={product.maximumQuantity}
                     value={quantity}
                     onChange={(event) => updateQuantity(event.target.valueAsNumber)}
-                    className="h-11 w-12 border-x border-ink/10 bg-transparent text-center text-sm font-bold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="h-10 w-11 border-x border-ink/10 bg-white text-center text-sm font-bold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
                   <Button
                     type="button"
                     onClick={() => updateQuantity(quantity + 1)}
-                    className="grid size-11 place-items-center text-lg font-semibold text-ink/65 transition hover:bg-ink/5 hover:text-ink"
+                    className="grid size-10 place-items-center text-lg font-semibold text-ink/65 transition hover:bg-ink/5 hover:text-ink"
                     aria-label="Increase quantity"
                   >
                     +
@@ -242,7 +242,7 @@ export function CheckoutCard() {
               type="button"
               onClick={() => void startCheckout()}
               disabled={isSubmitting}
-              className="group inline-flex h-14 items-center justify-center gap-3 bg-ink px-6 text-sm font-bold text-white shadow-[0_14px_32px_rgba(16,35,31,0.24)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:translate-y-0 disabled:opacity-70"
+              className="group inline-flex h-11 items-center justify-center gap-3 bg-ink px-5 text-sm font-bold text-white shadow-[0_14px_32px_rgba(16,35,31,0.24)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:translate-y-0 disabled:opacity-70"
             >
               <span>
                 {isSubmitting ? 'Opening Stripe…' : 'Continue to secure checkout'}
