@@ -24,6 +24,7 @@ export interface SupabaseMockState {
   waiverDocuments: JsonRecord[]
   notificationDeliveries: JsonRecord[]
   organizationMembers: JsonRecord[]
+  demoWorkspaceStatus: JsonRecord | null
   paymentResult: JsonRecord | null
   checkoutUrl: string
   createdOrganizationPayloads: JsonRecord[]
@@ -31,6 +32,7 @@ export interface SupabaseMockState {
   checkoutRequestIds: string[]
   memberUpserts: JsonRecord[]
   memberStatusChanges: JsonRecord[]
+  demoRemovalPayloads: JsonRecord[]
   unexpectedRequests: string[]
 }
 
@@ -48,6 +50,7 @@ export function createSupabaseMockState(
     waiverDocuments: [],
     notificationDeliveries: [],
     organizationMembers: [ownerMemberRecord()],
+    demoWorkspaceStatus: null,
     paymentResult: null,
     checkoutUrl: 'https://checkout.stripe.test/session/browser-test',
     createdOrganizationPayloads: [],
@@ -55,6 +58,7 @@ export function createSupabaseMockState(
     checkoutRequestIds: [],
     memberUpserts: [],
     memberStatusChanges: [],
+    demoRemovalPayloads: [],
     unexpectedRequests: [],
     ...overrides,
   }
@@ -122,6 +126,30 @@ export async function installSupabaseMock(
 
       if (rpcName === 'list_organization_members') {
         await fulfillJson(route, 200, state.organizationMembers)
+        return
+      }
+
+      if (rpcName === 'get_demo_workspace_status') {
+        await fulfillJson(
+          route,
+          200,
+          state.demoWorkspaceStatus ? [state.demoWorkspaceStatus] : [],
+        )
+        return
+      }
+
+      if (rpcName === 'remove_demo_workspace_data') {
+        state.demoRemovalPayloads.push(body)
+        state.projects = []
+        state.subcontractors = []
+        state.paymentRequests = []
+        state.notificationDeliveries = []
+        state.demoWorkspaceStatus = null
+        await fulfillJson(route, 200, {
+          projects: 2,
+          subcontractors: 2,
+          paymentRequests: 3,
+        })
         return
       }
 

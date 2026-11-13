@@ -1035,6 +1035,97 @@ begin
 end;
 $$;
 
+do $$
+declare
+    demo_status record;
+begin
+    select * into demo_status
+    from public.get_demo_workspace_status(
+        current_setting('test.demo_organization_id')::uuid
+    );
+
+    if demo_status.status <> 'active'
+       or demo_status.can_remove is not true
+       or demo_status.reason is not null then
+        raise exception 'The registered demonstration dataset should be removable.';
+    end if;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000002';
+
+do $$
+begin
+    begin
+        perform public.remove_demo_workspace_data(
+            current_setting('test.demo_organization_id')::uuid
+        );
+        raise exception 'A non-owner removed another organization demonstration dataset.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+select public.remove_demo_workspace_data(:'demo_organization_id');
+
+do $$
+declare
+    project_count integer;
+    subcontractor_count integer;
+    request_count integer;
+    notification_count integer;
+    membership_count integer;
+    removal_event_count integer;
+begin
+    select count(*) into project_count
+    from public.projects
+    where organization_id = current_setting('test.demo_organization_id')::uuid;
+
+    select count(*) into subcontractor_count
+    from public.subcontractors
+    where organization_id = current_setting('test.demo_organization_id')::uuid;
+
+    select count(*) into request_count
+    from public.payment_requests
+    where organization_id = current_setting('test.demo_organization_id')::uuid;
+
+    select count(*) into notification_count
+    from public.notification_deliveries
+    where organization_id = current_setting('test.demo_organization_id')::uuid;
+
+    select count(*) into membership_count
+    from public.organization_memberships
+    where organization_id = current_setting('test.demo_organization_id')::uuid
+      and user_id = '00000000-0000-4000-8000-000000000001';
+
+    select count(*) into removal_event_count
+    from public.audit_events
+    where organization_id = current_setting('test.demo_organization_id')::uuid
+      and action = 'organization.demo_data_removed';
+
+    if project_count <> 0
+       or subcontractor_count <> 0
+       or request_count <> 0
+       or notification_count <> 0
+       or membership_count <> 1
+       or removal_event_count <> 1 then
+        raise exception 'Demonstration cleanup did not preserve the workspace boundary correctly.';
+    end if;
+
+    if exists (
+        select 1
+        from public.get_demo_workspace_status(
+            current_setting('test.demo_organization_id')::uuid
+        )
+    ) then
+        raise exception 'Removed demonstration data must not remain active.';
+    end if;
+end;
+$$;
+
 reset role;
 set local role authenticated;
 set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000002';

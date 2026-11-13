@@ -405,6 +405,18 @@ export interface Database {
         Args: { p_organization_id: string }
         Returns: Json
       }
+      get_demo_workspace_status: {
+        Args: { p_organization_id: string }
+        Returns: {
+          status: 'active'
+          can_remove: boolean
+          reason: string | null
+        }[]
+      }
+      remove_demo_workspace_data: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       list_organization_members: {
         Args: { p_organization_id: string }
         Returns: OrganizationMember[]

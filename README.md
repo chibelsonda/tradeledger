@@ -2,22 +2,36 @@
 
 [![CI](https://github.com/chibelsonda/tradeledger/actions/workflows/ci.yml/badge.svg)](https://github.com/chibelsonda/tradeledger/actions/workflows/ci.yml)
 
-TradeLedger is a multi-tenant subcontractor payment workflow built to
-demonstrate production-minded SaaS engineering. It combines tenant-safe project
-operations, approval controls, database-owned financial calculations, Stripe
-Checkout, refunds, reconciliation, signed webhooks, and an immutable audit
-trail. Paid requests can also produce a private, auditable PDF waiver record,
-while owners and admins govern tenant membership through database-enforced roles.
+TradeLedger is a production-deployed reference implementation of a secure,
+multi-tenant subcontractor payment operations platform. It coordinates project
+directories, retainage-aware payment requests, role-based approvals, Stripe
+Checkout, webhook reconciliation, refunds, private waiver documents, and an
+immutable operational audit trail.
 
-The application is intentionally focused on a credible vertical slice rather
-than broad feature count: create an organization, manage projects and
-subcontractors, request and approve payment, launch a server-priced checkout,
-reconcile the result from an idempotent Stripe webhook, and issue an authorized
-full refund without trusting browser-supplied financial data.
+The project demonstrates an end-to-end SaaS architecture in which authorization
+and financial correctness are enforced below the presentation layer. PostgreSQL
+owns tenant boundaries, role checks, state transitions, and monetary
+calculations; Supabase Edge Functions protect provider credentials and external
+integrations; and the React application delivers a responsive operational
+workspace without treating browser-supplied data as authoritative.
 
 **Live demo:** [tradeledger-sepia.vercel.app](https://tradeledger-sepia.vercel.app)
 
-## Why this project stands out
+## Product capabilities
+
+| Area | Implemented capabilities |
+| --- | --- |
+| Identity and tenancy | Supabase Auth with email verification, organization onboarding, isolated workspaces, role-aware membership, account suspension and restoration |
+| Operations directory | Project and subcontractor records, organization switching, opt-in demonstration data and guarded owner-controlled cleanup |
+| Payment requests | Draft, submission, approval, retainage calculation, net-payable preview, controlled lifecycle transitions |
+| Stripe payments | Server-priced Checkout Sessions, success and cancellation handling, signed webhooks, reconciliation and retry-safe processing |
+| Refunds | Authorized full-remaining refunds, durable refund records, idempotency protection and terminal-state enforcement |
+| Documents | Server-generated PDF payment waivers, private Supabase Storage, short-lived signed downloads and automatic refund voiding |
+| Operational controls | Webhook failure queue, request correlation, structured errors, audit events and payment-state recovery |
+| Dashboard experience | Financial summaries, workflow charts, role-aware navigation, responsive tables, loading, empty and failure states |
+| Quality assurance | Unit tests, browser workflows, executable PostgreSQL security scenarios, static analysis and continuous integration |
+
+## Production engineering highlights
 
 - **Tenant isolation at the data boundary.** PostgreSQL Row-Level Security
   prevents one organization from discovering or mutating another tenant's
@@ -42,6 +56,9 @@ full refund without trusting browser-supplied financial data.
 - **Governed tenant access.** Owners and admins manage registered users through
   role-aware RPCs. Owner access is protected, privileged roles require an owner,
   and suspension takes effect at the RLS boundary.
+- **Traceable demonstration data.** Sample records are opt-in, registered by
+  immutable identifiers, and removable only by the organization owner. Cleanup
+  is blocked after checkout or when real records depend on the sample dataset.
 - **Private payment documents.** Paid, non-refunded requests can generate a
   server-rendered PDF in a private Supabase Storage bucket. Downloads use
   short-lived signed URLs, and later refunds automatically void the record.
@@ -49,18 +66,26 @@ full refund without trusting browser-supplied financial data.
   audit events.
 - **Production-oriented UX.** Every authenticated state includes deliberate
   loading, error, empty, authorization, and financial-status feedback.
+- **Concurrency and abuse controls.** Advisory locking, durable operation
+  records, bounded retries, idempotency keys, and database-backed rate limits
+  protect payment and document workflows from duplicate execution.
+- **Deployment hardening.** The Vercel deployment includes SPA routing,
+  restrictive security headers, same-origin font assets, and production smoke
+  checks for the frontend and webhook boundary.
 
 ## Technology
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | React 19, strict TypeScript, Tailwind CSS v4, Vite |
+| Frontend | React 19, strict TypeScript, Tailwind CSS v4, Headless UI, Recharts, Zod, Vite |
 | Backend | Supabase Edge Functions and PostgREST |
-| Database | PostgreSQL, Row-Level Security, constraints, generated columns, RPCs |
-| Authentication | Supabase Auth |
+| Database | PostgreSQL, Row-Level Security, constraints, generated columns, transactional RPCs |
+| Authentication | Supabase Auth with email verification and password recovery |
 | Payments | Stripe Checkout and signed webhooks |
-| Transactional email | Deferred; outbox foundation retained but not invoked |
-| Verification | Vitest, ESLint, TypeScript, executable PostgreSQL security scenarios |
+| Documents | Server-rendered PDF waivers and private Supabase Storage |
+| Hosting | Vercel frontend and Supabase managed services |
+| Transactional notifications | Tenant-safe outbox and delivery tracking; external email delivery intentionally deferred |
+| Verification | Vitest, Playwright, ESLint, TypeScript, Deno checks, executable PostgreSQL security scenarios |
 
 ## Architecture
 
@@ -87,19 +112,44 @@ create-checkout / create-refund ----> Stripe Checkout + Refunds
 Secrets stay in Supabase Edge Function configuration. The browser receives only
 the Supabase project URL and publishable key.
 
-## Demonstrated workflow
+## End-to-end workflow
 
-1. An authenticated user creates an organization and becomes its owner.
-2. An owner or admin creates projects and subcontractors.
-3. A financial role creates a payment request with exact retainage.
-4. An owner or accountant approves it.
-5. An authorized role starts Stripe Checkout from the database-owned net amount.
-6. A signed, idempotent webhook advances the ledger and request state.
-7. An owner or accountant can refund the remaining settled amount.
-8. Operators can reconcile Stripe state and inspect unresolved webhook failures.
-9. Tenant-scoped audit events provide operational evidence.
-10. A financial approver generates and downloads a private payment waiver PDF.
-11. Owners/admins grant, change, suspend, and restore tenant access.
+1. A user authenticates with Supabase and creates an isolated organization.
+2. The owner can explicitly opt in to a demonstration workspace containing
+   projects, subcontractors, and payment requests in several lifecycle states.
+   Before external side effects begin, the owner can remove only those
+   registered sample records while preserving the workspace and audit trail.
+3. An owner or admin manages the project and subcontractor directory.
+4. A financial role creates a payment request with a gross amount and retainage.
+5. PostgreSQL calculates the retainage and persisted net payable in integer
+   minor units.
+6. The request moves through draft, submitted, and approved states using
+   authorized transactional RPCs.
+7. An authorized user launches Stripe Checkout using only the approved request
+   identifier; the browser cannot override the trusted price or currency.
+8. A signed, idempotent webhook records the payment and advances the ledger.
+9. Operators can reconcile delayed Stripe state and inspect unresolved webhook
+   failures without manufacturing payment outcomes in the browser.
+10. A paid request can generate a private PDF waiver with a short-lived signed
+    download URL.
+11. An owner or accountant can refund the remaining settled amount, which
+    updates the ledger and voids the active waiver where applicable.
+12. Immutable audit events preserve evidence of sensitive tenant, payment,
+    document, and membership operations.
+
+## Authorization model
+
+- **Owner:** organization governance, directory management, financial
+  approvals, refunds, documents, and team access.
+- **Admin:** directory and membership administration plus operational payment
+  management, without owner-only governance privileges.
+- **Accountant:** payment-request operations, approvals, reconciliation,
+  refunds, and financial documents.
+- **Member and subcontractor:** tenant-scoped access constrained by PostgreSQL
+  policies and the permissions assigned to their role.
+
+The interface hides unavailable actions for clarity, but PostgreSQL RLS and
+role-aware RPCs remain the authoritative enforcement boundary.
 
 ## Security and correctness evidence
 
@@ -163,6 +213,7 @@ npx supabase functions deploy create-refund
 npx supabase functions deploy reconcile-payment
 npx supabase functions deploy generate-waiver
 npx supabase functions deploy download-waiver
+npx supabase functions deploy dispatch-notification
 ```
 
 Resend is intentionally deferred. The isolated outbox and dispatch function are
@@ -187,6 +238,7 @@ npm run typecheck
 npm run lint
 npm test
 npm run build
+npm run check:edge
 npm run test:e2e
 ```
 
@@ -208,9 +260,18 @@ pull request and every push to `main`, using an ephemeral PostgreSQL 17 service
 without application secrets.
 
 Playwright also exercises authentication, seeded tenant onboarding, membership
-governance, payment approval, the Stripe handoff, and checkout result screens in Chromium. Exact Supabase and
-Stripe HTTP contracts are intercepted in the browser suite, so tests cannot
-create production users, records, emails, or charges.
+governance, payment approval, the Stripe handoff, and checkout result screens in
+Chromium. Exact Supabase and Stripe HTTP contracts are intercepted in the
+browser suite, so tests cannot create production users, records, emails, or
+charges. The same scenarios can run against an optimized production preview to
+catch bundling failures that do not appear during development.
+
+The deployed frontend and public webhook boundary can be checked without
+creating data or payments:
+
+```bash
+APP_URL=https://tradeledger-sepia.vercel.app npm run test:production
+```
 
 ## Operations
 
@@ -220,9 +281,16 @@ reconciliation, and safe completion evidence. Production errors should be
 investigated with durable IDs and correlated logs; never paste secrets, provider
 payloads, or customer data into incident records.
 
-## Current roadmap
+## Current scope
 
-- Claim and promote the prepared Vercel deployment under the project owner's
-  account, then set the GitHub `APP_URL` repository variable.
-- Resume Resend only when a verified sender domain and delivery ownership are
-  available.
+- The public deployment uses Stripe test mode and is intended for portfolio,
+  evaluation, and engineering demonstration purposes.
+- Supabase Auth verification emails are operational through Supabase's built-in
+  provider. A custom SMTP sender is still required for commercial delivery
+  control, branding, and service-level ownership.
+- Application-generated payment notification delivery remains deliberately
+  disabled until a verified sender domain is available. The isolated outbox,
+  claim, retry, and delivery-tracking foundation remains implemented and tested.
+- Production activation would require live Stripe credentials, a production
+  webhook endpoint, verified email delivery, operational ownership, and the
+  final business-specific compliance review.

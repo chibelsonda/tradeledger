@@ -48,6 +48,9 @@ test('organization onboarding creates the owner workspace and opens its dashboar
   await expect(page.getByLabel('Workspace URL')).toHaveValue(
     'north-ridge-contracting',
   )
+  await expect(
+    page.getByRole('checkbox', { name: 'Populate with demonstration data' }),
+  ).not.toBeChecked()
   await page.getByRole('button', { name: 'Create organization' }).click()
 
   await expect(
@@ -57,9 +60,32 @@ test('organization onboarding creates the owner workspace and opens its dashboar
     {
       p_name: 'North Ridge Contracting',
       p_slug: 'north-ridge-contracting',
-      p_seed_demo: true,
+      p_seed_demo: false,
     },
   ])
   expect(state.organizations[0]?.id).toBe(TEST_ORGANIZATION_ID)
+  expect(state.unexpectedRequests).toEqual([])
+})
+
+test('organization onboarding only adds demonstration data after explicit opt-in', async ({
+  page,
+}) => {
+  const state = createSupabaseMockState()
+  await installSupabaseMock(page, state)
+  await signInAsOwner(page)
+
+  await page.getByLabel('Organization name').fill('North Ridge Contracting')
+  await page
+    .getByRole('checkbox', { name: 'Populate with demonstration data' })
+    .check()
+  await page.getByRole('button', { name: 'Create organization' }).click()
+
+  expect(state.createdOrganizationPayloads).toEqual([
+    {
+      p_name: 'North Ridge Contracting',
+      p_slug: 'north-ridge-contracting',
+      p_seed_demo: true,
+    },
+  ])
   expect(state.unexpectedRequests).toEqual([])
 })

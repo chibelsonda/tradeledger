@@ -26,7 +26,7 @@ export function OrganizationOnboarding({
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [isSlugEdited, setIsSlugEdited] = useState(false)
-  const [includeDemoData, setIncludeDemoData] = useState(true)
+  const [includeDemoData, setIncludeDemoData] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<
@@ -164,11 +164,12 @@ export function OrganizationOnboarding({
           />
           <span>
             <span className="block text-sm font-bold text-ink">
-              Add a production-safe sample workspace
+              Populate with demonstration data
             </span>
             <span className="mt-1 block text-xs leading-5 font-medium text-ink/80">
-              Creates two projects, two subcontractors, and draft, submitted,
-              and approved payment examples inside your tenant only.
+              Optional. Adds clearly identified project, subcontractor, and
+              payment examples to this workspace. The owner can remove them
+              before checkout activity begins.
             </span>
           </span>
         </label>

@@ -78,6 +78,11 @@ type PaymentTransition = {
   requestId: string
   action: 'submit' | 'approve'
 }
+type DemoWorkspaceStatus = {
+  status: 'active'
+  can_remove: boolean
+  reason: string | null
+}
 type OperationsFormField =
   | keyof ProjectFormValues
   | keyof SubcontractorFormValues
@@ -243,6 +248,10 @@ export function OperationsDashboard({
     () => dashboardPageFromPath(window.location.pathname),
   )
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [demoWorkspaceStatus, setDemoWorkspaceStatus] =
+    useState<DemoWorkspaceStatus | null>(null)
+  const [isDemoRemovalOpen, setIsDemoRemovalOpen] = useState(false)
+  const [isRemovingDemoData, setIsRemovingDemoData] = useState(false)
   const dashboardLoadSequence = useRef(0)
 
   const [projectName, setProjectName] = useState('')
@@ -362,6 +371,7 @@ export function OperationsDashboard({
       failureResult,
       waiverResult,
       memberResult,
+      demoStatusResult,
     ] =
       await Promise.all([
         supabase
@@ -402,6 +412,13 @@ export function OperationsDashboard({
               p_organization_id: organization.id,
             })
           : Promise.resolve({ data: [] as OrganizationMember[], error: null }),
+        organization.role === 'owner'
+          ? supabase
+              .rpc('get_demo_workspace_status', {
+                p_organization_id: organization.id,
+              })
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
       ])
 
     if (loadSequence !== dashboardLoadSequence.current) return
@@ -413,7 +430,8 @@ export function OperationsDashboard({
       auditResult.error ??
       failureResult.error ??
       waiverResult.error ??
-      memberResult.error
+      memberResult.error ??
+      demoStatusResult.error
 
     if (firstError) {
       setError(firstError.message)
@@ -431,6 +449,7 @@ export function OperationsDashboard({
     setWebhookFailures(failureResult.data ?? [])
     setWaiverDocuments(waiverResult.data ?? [])
     setOrganizationMembers(memberResult.data ?? [])
+    setDemoWorkspaceStatus(demoStatusResult.data)
     setRequestProjectId((current) =>
       nextProjects.some((project) => project.id === current)
         ? current
@@ -445,7 +464,7 @@ export function OperationsDashboard({
           : nextSubcontractors[0]?.id ?? '',
     )
     setIsLoading(false)
-  }, [canManageTeam, organization.id])
+  }, [canManageTeam, organization.id, organization.role])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -491,6 +510,30 @@ export function OperationsDashboard({
     setIsSigningOut(true)
     await supabase.auth.signOut()
     setIsSigningOut(false)
+  }
+
+  async function removeDemoWorkspaceData() {
+    setError(null)
+    setNotice(null)
+    setIsRemovingDemoData(true)
+
+    const { error: removalError } = await supabase.rpc(
+      'remove_demo_workspace_data',
+      { p_organization_id: organization.id },
+    )
+
+    setIsRemovingDemoData(false)
+
+    if (removalError) {
+      setError(removalError.message)
+      return
+    }
+
+    setIsDemoRemovalOpen(false)
+    setNotice(
+      'Demonstration records were removed. Your workspace and independent records were preserved.',
+    )
+    await loadDashboard()
   }
 
   const approvedNetAmount = useMemo(
@@ -1154,6 +1197,37 @@ export function OperationsDashboard({
           </div>
 
           <OverviewCharts paymentRequests={paymentRequests} />
+
+          {demoWorkspaceStatus && (
+            <section className="grid gap-5 border border-amber-300 bg-amber-50/70 p-6 shadow-[0_14px_36px_rgba(19,37,31,0.05)] lg:grid-cols-[1fr_auto] lg:items-center">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-800">
+                  Demonstration workspace
+                </p>
+                <h2 className="mt-2 text-xl font-extrabold tracking-[-0.03em] text-ink">
+                  Sample operational data is active
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 font-medium text-ink/80">
+                  This workspace contains the optional onboarding dataset. Remove
+                  it before entering live records. The immutable audit trail will
+                  retain evidence that the sample data was created and removed.
+                </p>
+                {!demoWorkspaceStatus.can_remove && demoWorkspaceStatus.reason && (
+                  <p className="mt-3 border-l-2 border-amber-500 pl-3 text-sm font-semibold text-amber-900">
+                    {demoWorkspaceStatus.reason}
+                  </p>
+                )}
+              </div>
+              <Button
+                type="button"
+                disabled={!demoWorkspaceStatus.can_remove}
+                onClick={() => setIsDemoRemovalOpen(true)}
+                className="h-10 border border-red-700 bg-white px-4 text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:border-ink/15 disabled:text-ink/45"
+              >
+                Remove demonstration data
+              </Button>
+            </section>
+          )}
         </>
       )}
 
@@ -2064,6 +2138,61 @@ export function OperationsDashboard({
               onNavigate={navigateTo}
               onClose={() => setIsNavigationOpen(false)}
             />
+          </DialogPanel>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={isDemoRemovalOpen}
+        onClose={() => {
+          if (!isRemovingDemoData) {
+            setIsDemoRemovalOpen(false)
+          }
+        }}
+        className="relative z-50"
+      >
+        <DialogBackdrop className="fixed inset-0 bg-ink/55 backdrop-blur-sm" />
+        <div className="fixed inset-0 grid place-items-center overflow-y-auto p-6">
+          <DialogPanel className="w-full max-w-lg border border-red-200 bg-white p-6 shadow-[0_24px_64px_rgba(19,37,31,0.22)] sm:p-8">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-red-700/70">
+              Owner-only workspace action
+            </p>
+            <DialogTitle className="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-ink">
+              Remove demonstration data?
+            </DialogTitle>
+            <Description className="mt-3 text-sm leading-6 text-ink/85">
+              This permanently removes only the registered sample projects,
+              subcontractors, payment requests, and pending sample notifications.
+              Your organization, members, independent records, and immutable audit
+              evidence remain intact.
+            </Description>
+            <div className="mt-5 border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950">
+              Cleanup is blocked automatically if a Stripe checkout, payment,
+              waiver, delivered notification, or real record depends on the sample
+              data.
+            </div>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                disabled={isRemovingDemoData}
+                onClick={() => setIsDemoRemovalOpen(false)}
+                className="h-10 border border-ink/15 bg-white px-4 text-sm font-bold text-ink transition hover:bg-cream disabled:opacity-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={isRemovingDemoData}
+                aria-busy={isRemovingDemoData}
+                onClick={() => void removeDemoWorkspaceData()}
+                className="inline-flex h-10 items-center justify-center gap-2 bg-red-700 px-4 text-sm font-bold text-white transition hover:bg-red-800 disabled:cursor-wait disabled:opacity-55"
+              >
+                {isRemovingDemoData && <ButtonSpinner tone="light" />}
+                {isRemovingDemoData
+                  ? 'Removing demonstration data…'
+                  : 'Remove demonstration data'}
+              </Button>
+            </div>
           </DialogPanel>
         </div>
       </Dialog>
