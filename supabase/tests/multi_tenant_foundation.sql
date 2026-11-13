@@ -146,7 +146,9 @@ reset role;
 -- stored as varchar. The checkout RPC must still honor its text return contract.
 alter table public.payments
     alter column stripe_checkout_session_id type varchar(255),
-    alter column stripe_payment_intent_id type varchar(255);
+    alter column stripe_payment_intent_id type varchar(255),
+    alter column paid_at type timestamp(0) without time zone
+        using paid_at at time zone 'UTC';
 
 set local role service_role;
 
