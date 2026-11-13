@@ -182,6 +182,7 @@ npm run typecheck
 npm run lint
 npm test
 npm run build
+npm run test:e2e
 ```
 
 The current suite includes frontend utility and email-template security coverage
@@ -201,7 +202,12 @@ GitHub Actions runs the same frontend checks and database scenario on every
 pull request and every push to `main`, using an ephemeral PostgreSQL 17 service
 without application secrets.
 
+Playwright also exercises authentication, tenant onboarding, payment approval,
+the Stripe handoff, and checkout result screens in Chromium. Exact Supabase and
+Stripe HTTP contracts are intercepted in the browser suite, so tests cannot
+create production users, records, emails, or charges.
+
 ## Current roadmap
 
 - Provider delivery/bounce webhooks and automated scheduled outbox draining.
-- Browser coverage, operational runbooks, and a safe hosted demo.
+- Operational runbooks and structured monitoring, followed by a safe hosted demo.
