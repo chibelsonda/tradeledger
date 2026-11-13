@@ -1,5 +1,7 @@
 # TradeLedger
 
+[![CI](https://github.com/chibelsonda/tradeledger/actions/workflows/ci.yml/badge.svg)](https://github.com/chibelsonda/tradeledger/actions/workflows/ci.yml)
+
 TradeLedger is a multi-tenant subcontractor payment workflow built to
 demonstrate production-minded SaaS engineering. It combines tenant-safe project
 operations, approval controls, database-owned financial calculations, Stripe
@@ -186,7 +188,20 @@ The current suite includes frontend utility and email-template security coverage
 plus an isolated PostgreSQL 17 tenant/payment/refund/document/notification
 scenario that rolls back after every run.
 
+The database suite requires a fresh PostgreSQL database whose name ends in
+`_test`. The guard prevents accidental execution against a development or
+production database:
+
+```bash
+createdb tradeledger_test
+DATABASE_URL=postgresql://localhost/tradeledger_test npm run test:database
+```
+
+GitHub Actions runs the same frontend checks and database scenario on every
+pull request and every push to `main`, using an ephemeral PostgreSQL 17 service
+without application secrets.
+
 ## Current roadmap
 
 - Provider delivery/bounce webhooks and automated scheduled outbox draining.
-- CI, browser coverage, operational runbooks, and a safe hosted demo.
+- Browser coverage, operational runbooks, and a safe hosted demo.
