@@ -3,12 +3,14 @@
 TradeLedger is a multi-tenant subcontractor payment workflow built to
 demonstrate production-minded SaaS engineering. It combines tenant-safe project
 operations, approval controls, database-owned financial calculations, Stripe
-Checkout, signed webhooks, and an immutable audit trail.
+Checkout, refunds, reconciliation, signed webhooks, and an immutable audit
+trail.
 
 The application is intentionally focused on a credible vertical slice rather
 than broad feature count: create an organization, manage projects and
 subcontractors, request and approve payment, launch a server-priced checkout,
-and reconcile the result from an idempotent Stripe webhook.
+reconcile the result from an idempotent Stripe webhook, and issue an authorized
+full refund without trusting browser-supplied financial data.
 
 ## Why this project stands out
 
@@ -21,7 +23,14 @@ and reconcile the result from an idempotent Stripe webhook.
 - **Explicit payment lifecycle.** Controlled transitions cover draft,
   submission, approval, checkout, processing, payment, and failure states.
 - **Reliable Stripe integration.** Checkout sessions are idempotent, webhook
-  signatures are verified, and duplicate Stripe events are processed once.
+  signatures are verified, duplicate Stripe events are processed once, and
+  operators can reconcile missed or delayed outcomes directly with Stripe.
+- **Controlled refund operations.** Owner/accountant authorization, durable
+  refund records, idempotency keys, terminal-state protection, and Stripe
+  refund events keep the ledger consistent.
+- **Actionable failure visibility.** Failed webhook processing is persisted
+  outside the failed transaction with retry counts and tenant-scoped operator
+  visibility.
 - **Auditable operations.** Sensitive workflow changes append immutable tenant
   audit events.
 - **Production-oriented UX.** Every authenticated state includes deliberate
@@ -49,13 +58,13 @@ Supabase Auth / PostgREST / PostgreSQL RLS
         |
         | approved payment-request ID only
         v
-create-checkout Edge Function -----> Stripe Checkout
+create-checkout / create-refund ----> Stripe Checkout + Refunds
         ^                                  |
         |                                  | signed events
         +------ stripe-webhook <-----------+
                     |
                     v
-       Payment ledger + audit events
+     Payment ledger + failure inbox + audit events
 ```
 
 Secrets stay in Supabase Edge Function configuration. The browser receives only
@@ -69,7 +78,9 @@ the Supabase project URL and publishable key.
 4. An owner or accountant approves it.
 5. An authorized role starts Stripe Checkout from the database-owned net amount.
 6. A signed, idempotent webhook advances the ledger and request state.
-7. Tenant-scoped audit events provide operational evidence.
+7. An owner or accountant can refund the remaining settled amount.
+8. Operators can reconcile Stripe state and inspect unresolved webhook failures.
+9. Tenant-scoped audit events provide operational evidence.
 
 ## Security and correctness evidence
 
@@ -84,6 +95,10 @@ verifies:
 - Checkout uses the persisted approved net amount.
 - Invalid backward payment transitions fail.
 - Replayed Stripe event IDs do not process twice.
+- Refund preparation enforces role authorization and database-owned amounts.
+- Repeated refund application and reconciliation do not duplicate ledger rows.
+- Webhook failures persist retry counts and resolve explicitly.
+- Refund and failure records remain invisible across tenant boundaries.
 - Browser roles cannot alter immutable audit events.
 
 ## Local development
@@ -116,6 +131,8 @@ npx supabase secrets set \
 
 npx supabase functions deploy create-checkout
 npx supabase functions deploy stripe-webhook --no-verify-jwt
+npx supabase functions deploy create-refund
+npx supabase functions deploy reconcile-payment
 ```
 
 Register this Stripe test webhook URL:
@@ -126,7 +143,8 @@ https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook
 
 Subscribe it to `checkout.session.completed`,
 `checkout.session.async_payment_succeeded`,
-`checkout.session.async_payment_failed`, and `checkout.session.expired`.
+`checkout.session.async_payment_failed`, `checkout.session.expired`,
+`refund.created`, `refund.updated`, and `refund.failed`.
 
 ## Quality checks
 
@@ -138,12 +156,10 @@ npm run build
 ```
 
 The current suite includes frontend utility coverage and an isolated PostgreSQL
-17 tenant/payment scenario.
+17 tenant/payment/refund scenario that rolls back after every run.
 
 ## Current roadmap
 
-- Refund and reconciliation workflows.
-- Operator-visible webhook failure handling.
 - Private waiver documents for settled requests.
 - Delivery logs and retry-safe notifications.
 - CI, browser coverage, operational runbooks, and a safe hosted demo.

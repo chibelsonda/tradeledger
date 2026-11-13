@@ -7,6 +7,7 @@ import type {
   OrganizationRole,
   PaymentRequest,
   Project,
+  StripeWebhookFailure,
   Subcontractor,
 } from '../lib/database.types'
 import { formatCurrency, formatStatus } from '../lib/format'
@@ -38,6 +39,10 @@ function statusClassName(status: string): string {
     case 'paid':
     case 'active':
       return 'border-emerald-200 bg-emerald-50 text-emerald-800'
+    case 'partially_refunded':
+      return 'border-blue-200 bg-blue-50 text-blue-800'
+    case 'refunded':
+      return 'border-slate-300 bg-slate-100 text-slate-700'
     case 'submitted':
     case 'checkout_created':
     case 'processing':
@@ -58,6 +63,29 @@ function shortDate(value: string): string {
   }).format(new Date(value))
 }
 
+async function edgeFunctionErrorMessage(
+  functionError: unknown,
+  fallback: string,
+): Promise<string> {
+  const candidate = functionError as
+    | { message?: unknown; context?: unknown }
+    | null
+    | undefined
+  let message = typeof candidate?.message === 'string' ? candidate.message : fallback
+
+  if (candidate?.context instanceof Response) {
+    const payload = (await candidate.context.json().catch(() => null)) as
+      | { error?: unknown }
+      | null
+
+    if (typeof payload?.error === 'string') {
+      message = payload.error
+    }
+  }
+
+  return message
+}
+
 export function OperationsDashboard({
   organization,
   organizations,
@@ -67,12 +95,20 @@ export function OperationsDashboard({
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([])
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
+  const [webhookFailures, setWebhookFailures] = useState<StripeWebhookFailure[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [createPanel, setCreatePanel] = useState<CreatePanel>('project')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null)
+  const [reconcilingRequestId, setReconcilingRequestId] = useState<string | null>(
+    null,
+  )
+  const [refundRequestId, setRefundRequestId] = useState<string | null>(null)
+  const [refundConfirmationId, setRefundConfirmationId] = useState<string | null>(
+    null,
+  )
 
   const [projectName, setProjectName] = useState('')
   const [projectReference, setProjectReference] = useState('')
@@ -97,7 +133,13 @@ export function OperationsDashboard({
     setIsLoading(true)
     setError(null)
 
-    const [projectResult, subcontractorResult, requestResult, auditResult] =
+    const [
+      projectResult,
+      subcontractorResult,
+      requestResult,
+      auditResult,
+      failureResult,
+    ] =
       await Promise.all([
         supabase
           .from('projects')
@@ -120,13 +162,21 @@ export function OperationsDashboard({
           .eq('organization_id', organization.id)
           .order('created_at', { ascending: false })
           .limit(8),
+        supabase
+          .from('stripe_webhook_failures')
+          .select('*')
+          .eq('organization_id', organization.id)
+          .is('resolved_at', null)
+          .order('last_failed_at', { ascending: false })
+          .limit(6),
       ])
 
     const firstError =
       projectResult.error ??
       subcontractorResult.error ??
       requestResult.error ??
-      auditResult.error
+      auditResult.error ??
+      failureResult.error
 
     if (firstError) {
       setError(firstError.message)
@@ -141,6 +191,7 @@ export function OperationsDashboard({
     setSubcontractors(nextSubcontractors)
     setPaymentRequests(requestResult.data ?? [])
     setAuditEvents(auditResult.data ?? [])
+    setWebhookFailures(failureResult.data ?? [])
     setRequestProjectId((current) => current || nextProjects[0]?.id || '')
     setRequestSubcontractorId(
       (current) => current || nextSubcontractors[0]?.id || '',
@@ -162,6 +213,15 @@ export function OperationsDashboard({
       paymentRequests
         .filter((request) => request.status === 'approved')
         .reduce((total, request) => total + request.net_amount, 0),
+    [paymentRequests],
+  )
+
+  const refundedAmount = useMemo(
+    () =>
+      paymentRequests.reduce(
+        (total, request) => total + request.refunded_amount,
+        0,
+      ),
     [paymentRequests],
   )
 
@@ -338,21 +398,13 @@ export function OperationsDashboard({
     )
 
     if (checkoutError) {
-      let message = checkoutError.message
-      const context = 'context' in checkoutError ? checkoutError.context : null
-
-      if (context instanceof Response) {
-        const payload = (await context.json().catch(() => null)) as
-          | { error?: unknown }
-          | null
-
-        if (typeof payload?.error === 'string') {
-          message = payload.error
-        }
-      }
+      const message = await edgeFunctionErrorMessage(
+        checkoutError,
+        'Secure checkout could not be started. Please try again.',
+      )
 
       setCheckoutRequestId(null)
-      setError(message || 'Secure checkout could not be started. Please try again.')
+      setError(message)
       await loadDashboard()
       return
     }
@@ -367,6 +419,69 @@ export function OperationsDashboard({
     }
 
     window.location.assign(url)
+  }
+
+  async function reconcilePayment(requestId: string) {
+    setError(null)
+    setNotice(null)
+    setReconcilingRequestId(requestId)
+
+    const { data, error: reconciliationError } = await supabase.functions.invoke(
+      'reconcile-payment',
+      { body: { paymentRequestId: requestId } },
+    )
+
+    setReconcilingRequestId(null)
+
+    if (reconciliationError) {
+      setError(
+        await edgeFunctionErrorMessage(
+          reconciliationError,
+          'Stripe reconciliation could not be completed.',
+        ),
+      )
+      await loadDashboard()
+      return
+    }
+
+    const status = (data as { status?: unknown } | null)?.status
+    setNotice(
+      `Stripe reconciliation completed${typeof status === 'string' ? ` with ${formatStatus(status)} status` : ''}.`,
+    )
+    await loadDashboard()
+  }
+
+  async function refundPayment(requestId: string) {
+    setError(null)
+    setNotice(null)
+    setRefundRequestId(requestId)
+
+    const { data, error: refundError } = await supabase.functions.invoke(
+      'create-refund',
+      { body: { paymentRequestId: requestId } },
+    )
+
+    setRefundRequestId(null)
+    setRefundConfirmationId(null)
+
+    if (refundError) {
+      setError(
+        await edgeFunctionErrorMessage(
+          refundError,
+          'The refund could not be completed.',
+        ),
+      )
+      await loadDashboard()
+      return
+    }
+
+    const status = (data as { status?: unknown } | null)?.status
+    setNotice(
+      typeof status === 'string' && status !== 'succeeded'
+        ? `Stripe accepted the refund with ${formatStatus(status)} status. Reconciliation will keep the ledger current.`
+        : 'The Stripe refund succeeded and the payment ledger was updated.',
+    )
+    await loadDashboard()
   }
 
   const selectedProject = (projectId: string) =>
@@ -428,12 +543,13 @@ export function OperationsDashboard({
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
           ['Active projects', projects.filter((project) => project.status === 'active').length],
           ['Subcontractors', subcontractors.length],
           ['Payment requests', paymentRequests.length],
           ['Approved net', formatCurrency(approvedNetAmount, 'usd')],
+          ['Refunded', formatCurrency(refundedAmount, 'usd')],
         ].map(([label, value]) => (
           <div
             key={label}
@@ -863,8 +979,15 @@ export function OperationsDashboard({
                     <td className="px-4 py-4 text-right text-ink/60">
                       {formatCurrency(request.retainage_amount, request.currency)}
                     </td>
-                    <td className="px-4 py-4 text-right font-black text-forest">
-                      {formatCurrency(request.net_amount, request.currency)}
+                    <td className="px-4 py-4 text-right">
+                      <p className="font-black text-forest">
+                        {formatCurrency(request.net_amount, request.currency)}
+                      </p>
+                      {request.refunded_amount > 0 && (
+                        <p className="mt-1 text-[11px] font-semibold text-blue-700">
+                          {formatCurrency(request.refunded_amount, request.currency)} refunded
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-4">
                       <span
@@ -876,7 +999,8 @@ export function OperationsDashboard({
                         {formatStatus(request.status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                       {request.status === 'draft' && canManagePayments && (
                         <button
                           type="button"
@@ -929,11 +1053,74 @@ export function OperationsDashboard({
                           Confirming with Stripe
                         </span>
                       )}
-                      {request.status === 'paid' && (
+                      {['checkout_created', 'processing', 'failed'].includes(
+                        request.status,
+                      ) &&
+                        canManagePayments && (
+                          <button
+                            type="button"
+                            disabled={reconcilingRequestId !== null}
+                            aria-busy={reconcilingRequestId === request.id}
+                            onClick={() => void reconcilePayment(request.id)}
+                            className="inline-flex items-center justify-center gap-2 border border-ink/15 px-3 py-2 text-xs font-bold text-ink transition hover:bg-cream disabled:cursor-wait disabled:opacity-50"
+                          >
+                            {reconcilingRequestId === request.id && (
+                              <span className="size-3 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
+                            )}
+                            {reconcilingRequestId === request.id
+                              ? 'Checking…'
+                              : 'Reconcile'}
+                          </button>
+                        )}
+                      {['paid', 'partially_refunded'].includes(request.status) &&
+                        canApprovePayments &&
+                        (refundConfirmationId === request.id ? (
+                          <div className="flex items-center gap-2 border border-red-200 bg-red-50 p-2">
+                            <span className="max-w-32 text-left text-[11px] font-semibold leading-4 text-red-800">
+                              Refund the remaining Stripe payment?
+                            </span>
+                            <button
+                              type="button"
+                              disabled={refundRequestId !== null}
+                              aria-busy={refundRequestId === request.id}
+                              onClick={() => void refundPayment(request.id)}
+                              className="bg-red-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-red-800 disabled:cursor-wait disabled:opacity-55"
+                            >
+                              {refundRequestId === request.id
+                                ? 'Refunding…'
+                                : 'Confirm'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={refundRequestId !== null}
+                              onClick={() => setRefundConfirmationId(null)}
+                              className="border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-800 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setRefundConfirmationId(request.id)}
+                            className="border border-red-200 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-50"
+                          >
+                            {request.status === 'partially_refunded'
+                              ? 'Refund remaining'
+                              : 'Refund payment'}
+                          </button>
+                        ))}
+                      {request.status === 'paid' && !canApprovePayments && (
                         <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
                           <span aria-hidden="true">✓</span> Settled
                         </span>
                       )}
+                      {request.status === 'refunded' && (
+                        <span className="text-xs font-bold text-slate-600">
+                          Fully refunded
+                        </span>
+                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -942,6 +1129,82 @@ export function OperationsDashboard({
           </div>
         )}
       </div>
+
+      {canManagePayments && (
+        <section
+          className={
+            'border p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)] ' +
+            (webhookFailures.length > 0
+              ? 'border-amber-300 bg-amber-50/60'
+              : 'border-emerald-200 bg-emerald-50/50')
+          }
+        >
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <p
+                className={
+                  'text-xs font-bold uppercase tracking-[0.14em] ' +
+                  (webhookFailures.length > 0
+                    ? 'text-amber-800/70'
+                    : 'text-emerald-800/65')
+                }
+              >
+                Payment operations
+              </p>
+              <h2 className="mt-1 text-lg font-black text-ink">
+                {webhookFailures.length > 0
+                  ? 'Webhook attention queue'
+                  : 'Webhook delivery healthy'}
+              </h2>
+            </div>
+            <span
+              className={
+                'border px-3 py-1.5 text-xs font-black ' +
+                (webhookFailures.length > 0
+                  ? 'border-amber-300 bg-white text-amber-900'
+                  : 'border-emerald-200 bg-white text-emerald-800')
+              }
+            >
+              {webhookFailures.length > 0
+                ? `${webhookFailures.length} unresolved`
+                : '0 unresolved'}
+            </span>
+          </div>
+
+          {webhookFailures.length === 0 ? (
+            <p className="mt-4 text-sm leading-6 text-emerald-950/65">
+              Signed Stripe events are processing without unresolved ledger errors.
+            </p>
+          ) : (
+            <div className="mt-5 grid gap-3 lg:grid-cols-2">
+              {webhookFailures.map((failure) => (
+                <article key={failure.id} className="border border-amber-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="truncate font-mono text-xs font-bold text-amber-900">
+                        {failure.event_type}
+                      </p>
+                      <p className="mt-1 font-mono text-[10px] text-ink/40">
+                        {failure.event_id}
+                      </p>
+                    </div>
+                    <span className="shrink-0 border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">
+                      {failure.attempts} {failure.attempts === 1 ? 'attempt' : 'attempts'}
+                    </span>
+                  </div>
+                  <p className="mt-3 break-words text-sm leading-5 text-red-800">
+                    {failure.error_message}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-ink/8 pt-3 text-[11px] text-ink/45">
+                    <span>{failure.error_code ?? 'processing_error'}</span>
+                    <time>{shortDate(failure.last_failed_at)}</time>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {auditEvents.length > 0 && (
         <div className="border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]">

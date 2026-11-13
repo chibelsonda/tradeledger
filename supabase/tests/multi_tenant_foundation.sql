@@ -246,6 +246,181 @@ begin
 end;
 $$;
 
+do $$
+begin
+    begin
+        perform *
+        from public.prepare_payment_refund(
+            current_setting('test.payment_request_a_id')::uuid,
+            '00000000-0000-4000-8000-000000000002',
+            '20000000-0000-4000-8000-000000000001'
+        );
+        raise exception 'An outsider must not be able to prepare a refund.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+select
+    refund_reference as prepared_refund_reference,
+    amount as prepared_refund_amount
+from public.prepare_payment_refund(
+    :'payment_request_a_id',
+    '00000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select set_config('test.prepared_refund_amount', :'prepared_refund_amount', true);
+
+do $$
+begin
+    if current_setting('test.prepared_refund_amount')::bigint <> 9450 then
+        raise exception 'Expected database-owned refund amount 9450, received %.',
+            current_setting('test.prepared_refund_amount');
+    end if;
+end;
+$$;
+
+select public.apply_payment_refund_status(
+    :'prepared_refund_reference',
+    're_tradeledger_001',
+    'succeeded',
+    null,
+    '00000000-0000-4000-8000-000000000001'
+) as refund_applied
+\gset
+
+select public.apply_payment_refund_status(
+    :'prepared_refund_reference',
+    're_tradeledger_001',
+    'succeeded',
+    null,
+    '00000000-0000-4000-8000-000000000001'
+) as duplicate_refund_applied
+\gset
+
+do $$
+declare
+    request_record public.payment_requests%rowtype;
+    payment_record public.payments%rowtype;
+    succeeded_refunds integer;
+begin
+    select * into request_record
+    from public.payment_requests
+    where id = current_setting('test.payment_request_a_id')::uuid;
+
+    select * into payment_record
+    from public.payments
+    where payment_request_id = current_setting('test.payment_request_a_id')::uuid;
+
+    select count(*) into succeeded_refunds
+    from public.payment_refunds
+    where payment_request_id = current_setting('test.payment_request_a_id')::uuid
+      and status = 'succeeded';
+
+    if request_record.status <> 'refunded'
+       or payment_record.status <> 'refunded'
+       or request_record.refunded_amount <> 9450
+       or payment_record.amount_refunded <> 9450 then
+        raise exception 'Expected fully refunded request/payment ledger.';
+    end if;
+
+    if succeeded_refunds <> 1 then
+        raise exception 'Expected one idempotent succeeded refund, received %.',
+            succeeded_refunds;
+    end if;
+end;
+$$;
+
+select public.reconcile_stripe_payment(
+    :'payment_request_a_id',
+    '00000000-0000-4000-8000-000000000001',
+    'complete',
+    'paid',
+    'pi_tradeledger_001',
+    '[{
+        "id": "re_tradeledger_001",
+        "amount": 9450,
+        "currency": "usd",
+        "status": "succeeded",
+        "reason": "requested_by_customer",
+        "failure_reason": null
+    }]'::jsonb
+) as reconciled_status
+\gset
+
+select set_config('test.reconciled_status', :'reconciled_status', true);
+
+do $$
+declare
+    refund_count integer;
+begin
+    if current_setting('test.reconciled_status') <> 'refunded' then
+        raise exception 'Expected refunded reconciliation status, received %.',
+            current_setting('test.reconciled_status');
+    end if;
+
+    select count(*) into refund_count
+    from public.payment_refunds
+    where stripe_refund_id = 're_tradeledger_001';
+
+    if refund_count <> 1 then
+        raise exception 'Reconciliation duplicated the Stripe refund.';
+    end if;
+end;
+$$;
+
+select public.record_stripe_webhook_failure(
+    'evt_tradeledger_failure_001',
+    'refund.updated',
+    're_tradeledger_001',
+    'ledger_write_failed',
+    'Synthetic processing failure.'
+) as first_failure_recorded
+\gset
+
+select public.record_stripe_webhook_failure(
+    'evt_tradeledger_failure_001',
+    'refund.updated',
+    're_tradeledger_001',
+    'ledger_write_failed',
+    'Synthetic processing failure on retry.'
+) as retry_failure_recorded
+\gset
+
+do $$
+declare
+    failure_record public.stripe_webhook_failures%rowtype;
+begin
+    select * into failure_record
+    from public.stripe_webhook_failures
+    where event_id = 'evt_tradeledger_failure_001';
+
+    if failure_record.organization_id <> current_setting('test.organization_a_id')::uuid
+       or failure_record.attempts <> 2
+       or failure_record.resolved_at is not null then
+        raise exception 'Webhook failure retry tracking is incorrect.';
+    end if;
+end;
+$$;
+
+select public.resolve_stripe_webhook_failure(
+    'evt_tradeledger_failure_001',
+    'verified_by_contract_test'
+) as failure_resolved
+\gset
+
+select public.record_stripe_webhook_failure(
+    'evt_tradeledger_failure_unresolved_001',
+    'refund.updated',
+    're_tradeledger_001',
+    'operator_attention_required',
+    'Synthetic unresolved failure.'
+) as unresolved_failure_recorded
+\gset
+
 reset role;
 set local role authenticated;
 set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000002';
@@ -258,6 +433,8 @@ declare
     visible_requests integer;
     visible_events integer;
     visible_payments integer;
+    visible_refunds integer;
+    visible_webhook_failures integer;
 begin
     select count(*) into visible_organizations from public.organizations;
     select count(*) into visible_projects from public.projects;
@@ -265,13 +442,17 @@ begin
     select count(*) into visible_requests from public.payment_requests;
     select count(*) into visible_events from public.audit_events;
     select count(*) into visible_payments from public.payments;
+    select count(*) into visible_refunds from public.payment_refunds;
+    select count(*) into visible_webhook_failures from public.stripe_webhook_failures;
 
     if visible_organizations <> 0
        or visible_projects <> 0
        or visible_subcontractors <> 0
        or visible_requests <> 0
        or visible_events <> 0
-       or visible_payments <> 0 then
+       or visible_payments <> 0
+       or visible_refunds <> 0
+       or visible_webhook_failures <> 0 then
         raise exception 'Tenant B could see Tenant A data.';
     end if;
 end;

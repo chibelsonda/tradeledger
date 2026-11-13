@@ -23,6 +23,8 @@ export type PaymentRequestStatus =
   | 'processing'
   | 'paid'
   | 'failed'
+  | 'partially_refunded'
+  | 'refunded'
   | 'canceled'
 export type PaymentStatus =
   | 'pending'
@@ -30,6 +32,15 @@ export type PaymentStatus =
   | 'paid'
   | 'failed'
   | 'expired'
+  | 'partially_refunded'
+  | 'refunded'
+
+export type RefundStatus =
+  | 'pending'
+  | 'requires_action'
+  | 'succeeded'
+  | 'failed'
+  | 'canceled'
 
 export type Organization = {
   id: string
@@ -100,6 +111,8 @@ export type PaymentRequest = {
   checkout_started_at: string | null
   paid_at: string | null
   failed_at: string | null
+  refunded_amount: number
+  refunded_at: string | null
   created_at: string
   updated_at: string
 }
@@ -131,8 +144,43 @@ export type Payment = {
   stripe_payment_intent_id: string | null
   customer_email: string | null
   paid_at: string | null
+  amount_refunded: number
+  refunded_at: string | null
   created_at: string
   updated_at: string
+}
+
+export type PaymentRefund = {
+  id: number
+  organization_id: string
+  payment_id: number
+  payment_request_id: string
+  reference: string
+  stripe_refund_id: string | null
+  amount: number
+  currency: string
+  status: RefundStatus
+  reason: string
+  requested_by: string | null
+  failure_reason: string | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type StripeWebhookFailure = {
+  id: number
+  organization_id: string | null
+  event_id: string
+  event_type: string
+  object_id: string | null
+  error_code: string | null
+  error_message: string
+  attempts: number
+  first_failed_at: string
+  last_failed_at: string
+  resolved_at: string | null
+  resolution: string | null
 }
 
 export interface Database {
@@ -243,6 +291,18 @@ export interface Database {
         Update: Record<string, never>
         Relationships: []
       }
+      payment_refunds: {
+        Row: PaymentRefund
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
+      stripe_webhook_failures: {
+        Row: StripeWebhookFailure
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -329,6 +389,83 @@ export interface Database {
           p_customer_email: string | null
         }
         Returns: boolean
+      }
+      prepare_payment_refund: {
+        Args: {
+          p_payment_request_id: string
+          p_user_id: string
+          p_reference: string
+        }
+        Returns: {
+          refund_reference: string
+          organization_id: string
+          payment_request_id: string
+          payment_reference: string
+          stripe_payment_intent_id: string
+          stripe_refund_id: string | null
+          amount: number
+          currency: string
+          refund_status: RefundStatus
+        }[]
+      }
+      apply_payment_refund_status: {
+        Args: {
+          p_refund_reference: string
+          p_stripe_refund_id: string | null
+          p_status: RefundStatus
+          p_failure_reason?: string | null
+          p_actor_user_id?: string | null
+        }
+        Returns: boolean
+      }
+      record_stripe_webhook_failure: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_object_id: string | null
+          p_error_code: string | null
+          p_error_message: string
+        }
+        Returns: boolean
+      }
+      resolve_stripe_webhook_failure: {
+        Args: { p_event_id: string; p_resolution?: string }
+        Returns: boolean
+      }
+      process_stripe_refund_webhook: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_stripe_refund_id: string
+          p_refund_reference: string | null
+          p_payment_intent_id: string | null
+          p_amount: number
+          p_currency: string
+          p_status: RefundStatus
+          p_failure_reason: string | null
+        }
+        Returns: boolean
+      }
+      prepare_payment_reconciliation: {
+        Args: { p_payment_request_id: string; p_user_id: string }
+        Returns: {
+          payment_reference: string
+          organization_id: string
+          payment_request_id: string
+          stripe_checkout_session_id: string
+          stripe_payment_intent_id: string | null
+        }[]
+      }
+      reconcile_stripe_payment: {
+        Args: {
+          p_payment_request_id: string
+          p_user_id: string
+          p_session_status: string
+          p_payment_status: string
+          p_payment_intent_id: string | null
+          p_refunds?: Json
+        }
+        Returns: PaymentStatus
       }
     }
     Enums: Record<string, never>

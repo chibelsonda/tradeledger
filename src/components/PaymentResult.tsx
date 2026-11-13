@@ -8,7 +8,13 @@ interface PaymentResultProps {
   sessionId: string
 }
 
-const finalStatuses = new Set(['paid', 'failed', 'expired'])
+const finalStatuses = new Set([
+  'paid',
+  'failed',
+  'expired',
+  'partially_refunded',
+  'refunded',
+])
 
 export function PaymentResult({ sessionId }: PaymentResultProps) {
   const [payment, setPayment] = useState<Payment | null>(null)
@@ -109,8 +115,11 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
   }
 
   const isPaid = payment.status === 'paid'
+  const isRefunded = payment.status === 'refunded'
+  const isPartiallyRefunded = payment.status === 'partially_refunded'
   const isProcessing =
     payment.status === 'pending' || payment.status === 'processing'
+  const isConfirmed = isPaid || isRefunded || isPartiallyRefunded
 
   return (
     <section className="mx-auto flex min-h-[68vh] w-full max-w-4xl items-center justify-center px-6 py-12 lg:px-8">
@@ -119,14 +128,20 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
           <div className="relative grid min-h-72 place-items-center overflow-hidden bg-forest p-10 text-white">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_rgba(217,249,157,0.18),_transparent_42%)]" />
             <div className="relative flex flex-col items-center gap-5 text-center">
-              <ResultIcon tone={isPaid ? 'success' : isProcessing ? 'loading' : 'warning'} />
+              <ResultIcon
+                tone={isConfirmed ? 'success' : isProcessing ? 'loading' : 'warning'}
+              />
               <p
                 className={
                   'text-sm font-bold uppercase tracking-[0.2em] ' +
-                  (isPaid || isProcessing ? 'text-mint' : 'text-amber-200')
+                  (isConfirmed || isProcessing ? 'text-mint' : 'text-amber-200')
                 }
               >
-                {isPaid
+                {isRefunded
+                  ? 'Payment refunded'
+                  : isPartiallyRefunded
+                    ? 'Partial refund issued'
+                    : isPaid
                   ? 'Payment confirmed'
                   : isProcessing
                     ? 'Confirmation pending'
@@ -139,14 +154,22 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
             <ResultContent
               eyebrow={'Order ' + payment.reference.slice(0, 8).toUpperCase()}
               title={
-                isPaid
+                isRefunded
+                  ? 'Your refund is complete.'
+                  : isPartiallyRefunded
+                    ? 'Your payment was partially refunded.'
+                    : isPaid
                   ? "You're all set."
                   : isProcessing
                     ? "We're confirming your payment."
                     : "This payment wasn't completed."
               }
               description={
-                isPaid
+                isRefunded
+                  ? 'Stripe completed the refund and the payment ledger has been updated.'
+                  : isPartiallyRefunded
+                    ? 'Stripe returned part of this payment. The refunded amount is shown below.'
+                    : isPaid
                   ? 'Thanks for your purchase. Your payment was confirmed and your order is ready.'
                   : isProcessing
                     ? 'Stripe is finalizing the payment. This page refreshes the status recorded by the signed webhook.'
@@ -166,7 +189,7 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
                 <dd
                   className={
                     'px-2.5 py-1 text-xs font-bold ' +
-                    (isPaid
+                    (isConfirmed
                       ? 'bg-lime-100 text-lime-800'
                       : isProcessing
                         ? 'bg-amber-100 text-amber-800'
@@ -182,6 +205,14 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
                   {formatCurrency(payment.amount_total, payment.currency)}
                 </dd>
               </div>
+              {payment.amount_refunded > 0 && (
+                <div className="flex items-center justify-between gap-4 py-4 text-sm">
+                  <dt className="text-ink/55">Refunded</dt>
+                  <dd className="text-lg font-black text-blue-700">
+                    {formatCurrency(payment.amount_refunded, payment.currency)}
+                  </dd>
+                </div>
+              )}
             </dl>
 
             <a
