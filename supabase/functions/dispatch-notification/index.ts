@@ -1,6 +1,7 @@
 import { withSupabase } from 'npm:@supabase/server@^1'
 
 import { dispatchPaymentNotification } from '../_shared/notification-delivery.ts'
+import { withObservability } from '../_shared/observability.ts'
 
 interface DispatchRequest {
   paymentRequestId?: unknown
@@ -24,7 +25,9 @@ function errorStatus(code?: string): number {
 }
 
 export default {
-  fetch: withSupabase({ auth: 'user' }, async (request, context) => {
+  fetch: withObservability(
+    'dispatch-notification',
+    withSupabase({ auth: 'user' }, async (request, context) => {
     if (request.method !== 'POST') {
       return Response.json({ error: 'Method not allowed.' }, { status: 405 })
     }
@@ -74,5 +77,6 @@ export default {
         { status: errorStatus(candidate.code) },
       )
     }
-  }),
+    }),
+  ),
 }

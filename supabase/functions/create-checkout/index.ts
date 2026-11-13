@@ -1,6 +1,8 @@
 import { withSupabase } from 'npm:@supabase/server@^1'
 import Stripe from 'npm:stripe@^22'
 
+import { withObservability } from '../_shared/observability.ts'
+
 interface CheckoutRequest {
   paymentRequestId?: unknown
   quantity?: unknown
@@ -66,7 +68,9 @@ function checkoutErrorStatus(code?: string): number {
 }
 
 export default {
-  fetch: withSupabase({ auth: 'user' }, async (request, context) => {
+  fetch: withObservability(
+    'create-checkout',
+    withSupabase({ auth: 'user' }, async (request, context) => {
     if (request.method !== 'POST') {
       return Response.json({ error: 'Method not allowed.' }, { status: 405 })
     }
@@ -337,5 +341,6 @@ export default {
         { status: 502 },
       )
     }
-  }),
+    }),
+  ),
 }

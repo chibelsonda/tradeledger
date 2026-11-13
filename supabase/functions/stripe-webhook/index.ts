@@ -2,6 +2,7 @@ import { withSupabase } from 'npm:@supabase/server@^1'
 import Stripe from 'npm:stripe@^22'
 
 import { dispatchPaymentNotification } from '../_shared/notification-delivery.ts'
+import { withObservability } from '../_shared/observability.ts'
 
 function requiredEnvironment(name: string): string {
   const value = Deno.env.get(name)
@@ -25,7 +26,9 @@ function uuidOrNull(value: string | undefined): string | null {
 const cryptoProvider = Stripe.createSubtleCryptoProvider()
 
 export default {
-  fetch: withSupabase({ auth: 'none' }, async (request, context) => {
+  fetch: withObservability(
+    'stripe-webhook',
+    withSupabase({ auth: 'none' }, async (request, context) => {
     if (request.method !== 'POST') {
       return Response.json({ error: 'Method not allowed.' }, { status: 405 })
     }
@@ -131,5 +134,6 @@ export default {
       received: true,
       duplicate: result.data === false,
     })
-  }),
+    }),
+  ),
 }

@@ -1,5 +1,6 @@
 import { withSupabase } from 'npm:@supabase/server@^1'
 
+import { withObservability } from '../_shared/observability.ts'
 import {
   databaseErrorStatus,
   isUuid,
@@ -18,7 +19,9 @@ interface DownloadableWaiver {
 }
 
 export default {
-  fetch: withSupabase({ auth: 'user' }, async (request, context) => {
+  fetch: withObservability(
+    'download-waiver',
+    withSupabase({ auth: 'user' }, async (request, context) => {
     if (request.method !== 'POST') {
       return Response.json({ error: 'Method not allowed.' }, { status: 405 })
     }
@@ -87,5 +90,6 @@ export default {
       url: signed.signedUrl,
       expiresIn: WAIVER_URL_TTL_SECONDS,
     })
-  }),
+    }),
+  ),
 }

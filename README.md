@@ -34,6 +34,9 @@ full refund without trusting browser-supplied financial data.
 - **Actionable failure visibility.** Failed webhook processing is persisted
   outside the failed transaction with retry counts and tenant-scoped operator
   visibility.
+- **Correlated production diagnostics.** Every Edge Function response carries a
+  request ID, failures use a stable error envelope, and redaction-safe JSON logs
+  connect user-visible errors to Supabase invocations without recording secrets.
 - **Retry-safe transactional email.** Approval and payment transitions enqueue
   one database-owned delivery. Atomic claims, bounded backoff, Resend
   idempotency keys, escaped templates, and an operator retry log prevent silent
@@ -207,7 +210,15 @@ the Stripe handoff, and checkout result screens in Chromium. Exact Supabase and
 Stripe HTTP contracts are intercepted in the browser suite, so tests cannot
 create production users, records, emails, or charges.
 
+## Operations
+
+[`docs/OPERATIONS_RUNBOOK.md`](docs/OPERATIONS_RUNBOOK.md) defines incident
+priorities, request-ID diagnosis, Stripe webhook recovery, payment
+reconciliation, and safe completion evidence. Production errors should be
+investigated with durable IDs and correlated logs; never paste secrets, provider
+payloads, or customer data into incident records.
+
 ## Current roadmap
 
 - Provider delivery/bounce webhooks and automated scheduled outbox draining.
-- Operational runbooks and structured monitoring, followed by a safe hosted demo.
+- A safe hosted demo with production alert delivery and documented ownership.
