@@ -112,6 +112,19 @@ create-checkout / create-refund ----> Stripe Checkout + Refunds
 Secrets stay in Supabase Edge Function configuration. The browser receives only
 the Supabase project URL and publishable key.
 
+### Trust boundaries
+
+| Boundary | Responsibility |
+| --- | --- |
+| React client | Collects user intent, renders role-aware controls, and sends identifiers rather than authoritative financial values |
+| PostgreSQL | Enforces tenant isolation, roles, state transitions, retainage calculations, idempotency, and audit evidence |
+| Supabase Edge Functions | Authenticate requests, apply rate limits, retrieve trusted database state, protect provider secrets, and coordinate Stripe or Storage operations |
+| Stripe | Hosts payment collection and reports payment/refund outcomes through signed events and reconciliation APIs |
+| Private Storage | Holds generated waiver PDFs; access is granted only through short-lived, authorized signed URLs |
+
+This separation is deliberate: hiding a button is a usability decision, while
+authorization and financial integrity remain server-owned invariants.
+
 ## End-to-end workflow
 
 1. A user authenticates with Supabase and creates an isolated organization.
@@ -136,6 +149,31 @@ the Supabase project URL and publishable key.
     updates the ledger and voids the active waiver where applicable.
 12. Immutable audit events preserve evidence of sensitive tenant, payment,
     document, and membership operations.
+
+## Product evaluation walkthrough
+
+The public deployment uses Stripe test mode. A reviewer can exercise the main
+vertical slice without production credentials:
+
+1. Create an account and verify the email address through Supabase Auth.
+2. Create a workspace. Leave demonstration data disabled for a clean tenant, or
+   explicitly enable it to review pre-populated lifecycle states.
+3. Add a project and subcontractor from **Directory**.
+4. Create a draft payment request from **Payments**. Confirm that retainage and
+   net payable are calculated by the database-backed workflow.
+5. Submit and approve the request with an authorized role.
+6. Open Stripe Checkout and complete payment with a Stripe test payment method.
+7. Return to TradeLedger and verify the payment result, dashboard totals, audit
+   history, and notification delivery record.
+8. Generate and download the private PDF waiver for the paid request.
+9. Issue the remaining authorized refund and verify that the ledger updates and
+   the active waiver is voided.
+10. If demonstration data was enabled but not used for checkout, remove it from
+    **Overview**. The organization and independent records remain intact.
+
+Payment result pages are safe to refresh. The application resolves the durable
+Checkout Session state instead of treating a redirect query string as proof of
+payment.
 
 ## Authorization model
 
@@ -177,12 +215,37 @@ verifies:
 - User-controlled email template content is HTML-escaped.
 - Membership management protects the owner, restricts privileged role changes,
   and rejects unregistered users.
+- Demonstration data is disabled by default, registered by exact identifiers,
+  removable only by the owner, and preserved once external or real-record
+  dependencies exist.
+- Database-backed Edge Function limits reject excessive operations without
+  relying on browser state.
 - Browser roles cannot alter immutable audit events.
+
+## Repository structure
+
+```text
+src/
+  components/                 Shared layout and form controls
+  features/
+    auth/                      Supabase authentication flows
+    checkout/                  Checkout, success, and cancellation experiences
+    operations/                Directory, payments, team, delivery, and audit UI
+    workspace/                 Tenant selection and organization onboarding
+  lib/                        Supabase client, types, calculations, and validation
+supabase/
+  functions/                  Stripe, waiver, reconciliation, and notification APIs
+  migrations/                 Ordered PostgreSQL schema and security changes
+  tests/                      Executable tenant and payment lifecycle scenarios
+e2e/                          Playwright browser workflows and HTTP contract mocks
+scripts/                      Database and production smoke-test entry points
+docs/                         Public operations guidance
+```
 
 ## Local development
 
-Requirements: Node.js 22+, a Supabase project, the Supabase CLI, and a Stripe
-test-mode account.
+Requirements: Node.js 22+, Deno 2 for Edge Function checks, a Supabase project,
+the Supabase CLI, and a Stripe test-mode account.
 
 ```bash
 npm install
@@ -190,16 +253,33 @@ cp .env.example .env
 npm run dev
 ```
 
-Add the Supabase URL and publishable key to `.env`, then link and migrate the
-database:
+The browser environment contains only public Supabase configuration:
+
+| Variable | Purpose |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Supabase project API URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Browser-safe publishable key; never use the service-role key |
+
+Link the Supabase project and apply migrations:
 
 ```bash
 npx supabase login
 npx supabase link --project-ref YOUR_PROJECT_REF
-npx supabase db push
+npx supabase db push --remote
 ```
 
-Configure server-only secrets and deploy the Edge Functions:
+Configure server-only secrets. These values belong in Supabase secrets, never
+in Vite variables or source control:
+
+| Variable | Purpose |
+| --- | --- |
+| `STRIPE_SECRET` | Stripe test or live secret key used by payment functions |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret for this exact Stripe webhook destination |
+| `SITE_URL` | Canonical frontend origin used for Checkout return URLs |
+| `RESEND_API_KEY` | Optional future payment-notification provider credential |
+| `RESEND_FROM_EMAIL` | Optional verified sender identity |
+
+Deploy the Edge Functions after migrations and secrets are in place:
 
 ```bash
 npx supabase secrets set \
@@ -231,6 +311,27 @@ Subscribe it to `checkout.session.completed`,
 `checkout.session.async_payment_failed`, `checkout.session.expired`,
 `refund.created`, `refund.updated`, and `refund.failed`.
 
+## Production deployment
+
+The production topology uses Vercel for the static React application and
+Supabase for Auth, PostgreSQL, Storage, and Edge Functions.
+
+1. Apply database migrations to the linked Supabase project.
+2. Upload server secrets and deploy authenticated Edge Functions.
+3. Deploy `stripe-webhook` with JWT verification disabled; the function still
+   requires and verifies Stripe's raw-body signature.
+4. Register the deployed webhook URL in the matching Stripe mode and copy that
+   destination's signing secret to Supabase.
+5. Import the GitHub repository into Vercel using the Vite preset.
+6. Add only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to Vercel.
+7. Configure the production Vercel URL in Supabase Auth redirect settings and
+   as the Edge Function `SITE_URL`.
+8. Deploy, then run the read-only production smoke check.
+
+`vercel.json` provides SPA rewrites and security headers, including a restrictive
+Content Security Policy, clickjacking protection, HSTS, and a minimal browser
+permissions policy.
+
 ## Quality checks
 
 ```bash
@@ -259,12 +360,13 @@ GitHub Actions runs the same frontend checks and database scenario on every
 pull request and every push to `main`, using an ephemeral PostgreSQL 17 service
 without application secrets.
 
-Playwright also exercises authentication, seeded tenant onboarding, membership
-governance, payment approval, the Stripe handoff, and checkout result screens in
-Chromium. Exact Supabase and Stripe HTTP contracts are intercepted in the
-browser suite, so tests cannot create production users, records, emails, or
-charges. The same scenarios can run against an optimized production preview to
-catch bundling failures that do not appear during development.
+Playwright also exercises authentication, explicit demonstration-data opt-in,
+owner-controlled sample cleanup, membership governance, payment approval, the
+Stripe handoff, and checkout result screens in Chromium. Exact Supabase and
+Stripe HTTP contracts are intercepted in the browser suite, so tests cannot
+create production users, records, emails, or charges. The same scenarios can
+run against an optimized production preview to catch bundling failures that do
+not appear during development.
 
 The deployed frontend and public webhook boundary can be checked without
 creating data or payments:
