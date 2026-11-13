@@ -51,6 +51,17 @@
     border-radius: 0;
   }
 
+  [data-validation-error="true"] {
+    border-color: var(--color-red-600) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-red-600) 20%, transparent) !important;
+  }
+
+  [data-validation-error="true"]:focus,
+  [data-validation-error="true"]:focus-within {
+    border-color: var(--color-red-700) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-red-600) 20%, transparent) !important;
+  }
+
   button,
   a {
     -webkit-tap-highlight-color: transparent;

@@ -156,9 +156,9 @@ function dashboardPageFromPath(pathname: string): DashboardPage {
 }
 
 const fieldClassName =
-  'h-10 border border-ink/15 bg-white px-3.5 text-sm font-medium text-ink outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:border-red-500 aria-invalid:focus:border-red-600 aria-invalid:focus:ring-red-500/10'
+  'h-10 border border-ink/15 bg-white px-3.5 text-sm font-medium text-ink outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:!border-red-600 aria-invalid:!ring-1 aria-invalid:!ring-red-600/20 aria-invalid:focus:!border-red-700 aria-invalid:focus:!ring-2 aria-invalid:focus:!ring-red-600/20'
 const selectFieldClassName =
-  'h-10 border border-ink/15 bg-white pl-3.5 text-sm font-medium text-ink outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:border-red-500 aria-invalid:focus:border-red-600 aria-invalid:focus:ring-red-500/10'
+  'h-10 border border-ink/15 bg-white pl-3.5 text-sm font-medium text-ink outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:!border-red-600 aria-invalid:!ring-1 aria-invalid:!ring-red-600/20 aria-invalid:focus:!border-red-700 aria-invalid:focus:!ring-2 aria-invalid:focus:!ring-red-600/20'
 
 function statusClassName(status: string): string {
   switch (status) {
@@ -1306,12 +1306,14 @@ export function OperationsDashboard({
             {activeCreatePanel === 'project' && canManageProjects && (
               <form
                 noValidate
+                autoComplete="off"
                 onSubmit={(event) => void createProject(event)}
                 className="mt-6 grid gap-4 sm:grid-cols-[1fr_0.7fr_auto] sm:items-end"
               >
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Project name</Label>
                   <Input
+                    autoComplete="off"
                     required
                     maxLength={160}
                     value={projectName}
@@ -1323,6 +1325,7 @@ export function OperationsDashboard({
                       }))
                     }}
                     aria-invalid={Boolean(formErrors.name)}
+                    data-validation-error={Boolean(formErrors.name) || undefined}
                     aria-describedby={
                       formErrors.name ? 'project-name-error' : undefined
                     }
@@ -1337,6 +1340,7 @@ export function OperationsDashboard({
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Project code</Label>
                   <Input
+                    autoComplete="off"
                     maxLength={32}
                     value={projectReference}
                     onChange={(event) => {
@@ -1347,6 +1351,7 @@ export function OperationsDashboard({
                       }))
                     }}
                     aria-invalid={Boolean(formErrors.code)}
+                    data-validation-error={Boolean(formErrors.code) || undefined}
                     aria-describedby={
                       formErrors.code ? 'project-code-error' : undefined
                     }
@@ -1373,12 +1378,14 @@ export function OperationsDashboard({
             {activeCreatePanel === 'subcontractor' && canManageProjects && (
               <form
                 noValidate
+                autoComplete="off"
                 onSubmit={(event) => void createSubcontractor(event)}
                 className="mt-6 grid gap-4 sm:grid-cols-2"
               >
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Company name</Label>
                   <Input
+                    autoComplete="off"
                     required
                     maxLength={160}
                     value={subcontractorCompany}
@@ -1390,6 +1397,9 @@ export function OperationsDashboard({
                       }))
                     }}
                     aria-invalid={Boolean(formErrors.companyName)}
+                    data-validation-error={
+                      Boolean(formErrors.companyName) || undefined
+                    }
                     aria-describedby={
                       formErrors.companyName
                         ? 'subcontractor-company-error'
@@ -1406,6 +1416,7 @@ export function OperationsDashboard({
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Contact name</Label>
                   <Input
+                    autoComplete="off"
                     maxLength={160}
                     value={subcontractorContact}
                     onChange={(event) => {
@@ -1416,6 +1427,9 @@ export function OperationsDashboard({
                       }))
                     }}
                     aria-invalid={Boolean(formErrors.contactName)}
+                    data-validation-error={
+                      Boolean(formErrors.contactName) || undefined
+                    }
                     aria-describedby={
                       formErrors.contactName
                         ? 'subcontractor-contact-error'
@@ -1432,6 +1446,7 @@ export function OperationsDashboard({
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
                   <Label>Email</Label>
                   <Input
+                    autoComplete="off"
                     type="email"
                     maxLength={320}
                     value={subcontractorEmail}
@@ -1443,6 +1458,7 @@ export function OperationsDashboard({
                       }))
                     }}
                     aria-invalid={Boolean(formErrors.email)}
+                    data-validation-error={Boolean(formErrors.email) || undefined}
                     aria-describedby={
                       formErrors.email ? 'subcontractor-email-error' : undefined
                     }
@@ -1469,6 +1485,7 @@ export function OperationsDashboard({
             {activeCreatePanel === 'payment' && canManagePayments && (
               <form
                 noValidate
+                autoComplete="off"
                 onSubmit={(event) => void createPaymentRequest(event)}
                 className="mt-6 grid gap-4 sm:grid-cols-2"
               >
@@ -1537,6 +1554,7 @@ export function OperationsDashboard({
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
                   <Label>Milestone description</Label>
                   <Input
+                    autoComplete="off"
                     required
                     maxLength={500}
                     value={requestDescription}
@@ -1548,6 +1566,9 @@ export function OperationsDashboard({
                       }))
                     }}
                     aria-invalid={Boolean(formErrors.description)}
+                    data-validation-error={
+                      Boolean(formErrors.description) || undefined
+                    }
                     aria-describedby={
                       formErrors.description
                         ? 'payment-description-error'
@@ -1564,6 +1585,7 @@ export function OperationsDashboard({
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Gross amount (USD)</Label>
                   <Input
+                    autoComplete="off"
                     required
                     inputMode="decimal"
                     value={requestGross}
@@ -1575,6 +1597,9 @@ export function OperationsDashboard({
                       }))
                     }}
                     aria-invalid={Boolean(formErrors.grossAmount)}
+                    data-validation-error={
+                      Boolean(formErrors.grossAmount) || undefined
+                    }
                     aria-describedby={
                       formErrors.grossAmount
                         ? 'payment-gross-error'
@@ -1591,6 +1616,7 @@ export function OperationsDashboard({
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Retainage percentage</Label>
                   <Input
+                    autoComplete="off"
                     required
                     type="number"
                     min="0"
@@ -1605,6 +1631,9 @@ export function OperationsDashboard({
                       }))
                     }}
                     aria-invalid={Boolean(formErrors.retainagePercentage)}
+                    data-validation-error={
+                      Boolean(formErrors.retainagePercentage) || undefined
+                    }
                     aria-describedby={
                       formErrors.retainagePercentage
                         ? 'payment-retainage-error'

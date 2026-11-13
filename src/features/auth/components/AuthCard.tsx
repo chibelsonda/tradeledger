@@ -142,10 +142,11 @@ function PasswordField({
         {aside}
       </div>
       <div
+        data-validation-error={Boolean(error) || undefined}
         className={
           'flex h-10 items-center border bg-white transition focus-within:ring-2 ' +
           (error
-            ? 'border-red-500 focus-within:border-red-600 focus-within:ring-red-500/10'
+            ? '!border-red-600 !ring-1 !ring-red-600/20 focus-within:!border-red-700 focus-within:!ring-2 focus-within:!ring-red-600/20'
             : 'border-ink/18 focus-within:border-forest focus-within:ring-forest/10')
         }
       >
@@ -442,10 +443,11 @@ export function AuthCard() {
                   Email address
                 </Label>
                 <div
+                  data-validation-error={Boolean(fieldErrors.email) || undefined}
                   className={
                     'flex h-10 items-center border bg-white transition focus-within:ring-2 ' +
                     (fieldErrors.email
-                      ? 'border-red-500 focus-within:border-red-600 focus-within:ring-red-500/10'
+                      ? '!border-red-600 !ring-1 !ring-red-600/20 focus-within:!border-red-700 focus-within:!ring-2 focus-within:!ring-red-600/20'
                       : 'border-ink/18 focus-within:border-forest focus-within:ring-forest/10')
                   }
                 >

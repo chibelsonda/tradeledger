@@ -120,6 +120,7 @@ export function OrganizationOnboarding({
 
       <form
         noValidate
+        autoComplete="off"
         onSubmit={(event) => void createOrganization(event)}
         className="flex flex-col gap-6 border border-ink/10 bg-white p-7 shadow-[0_24px_64px_rgba(19,37,31,0.12)] sm:p-9"
       >
@@ -139,6 +140,7 @@ export function OrganizationOnboarding({
         <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
           <Label>Organization name</Label>
           <Input
+            autoComplete="off"
             required
             minLength={2}
             maxLength={120}
@@ -148,11 +150,12 @@ export function OrganizationOnboarding({
               setFieldErrors((current) => ({ ...current, name: undefined }))
             }}
             aria-invalid={Boolean(fieldErrors.name)}
+            data-validation-error={Boolean(fieldErrors.name) || undefined}
             aria-describedby={
               fieldErrors.name ? 'organization-name-error' : undefined
             }
             placeholder="North Ridge Contracting"
-            className="h-10 border border-ink/15 bg-white px-3.5 font-medium outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:border-red-500 aria-invalid:focus:border-red-600 aria-invalid:focus:ring-red-500/10"
+            className="h-10 border border-ink/15 bg-white px-3.5 font-medium outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:!border-red-600 aria-invalid:!ring-1 aria-invalid:!ring-red-600/20 aria-invalid:focus:!border-red-700 aria-invalid:focus:!ring-2 aria-invalid:focus:!ring-red-600/20"
           />
           <FieldError
             id="organization-name-error"
@@ -182,10 +185,11 @@ export function OrganizationOnboarding({
         <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
           <Label>Workspace URL</Label>
           <div
+            data-validation-error={Boolean(fieldErrors.slug) || undefined}
             className={
               'flex h-10 items-center overflow-hidden border bg-white focus-within:ring-2 ' +
               (fieldErrors.slug
-                ? 'border-red-500 focus-within:border-red-600 focus-within:ring-red-500/10'
+                ? '!border-red-600 !ring-1 !ring-red-600/20 focus-within:!border-red-700 focus-within:!ring-2 focus-within:!ring-red-600/20'
                 : 'border-ink/15 focus-within:border-forest focus-within:ring-forest/10')
             }
           >
@@ -193,6 +197,7 @@ export function OrganizationOnboarding({
               /workspace/
             </span>
             <Input
+              autoComplete="off"
               required
               minLength={2}
               maxLength={63}

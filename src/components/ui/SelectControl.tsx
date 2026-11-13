@@ -45,7 +45,8 @@ export function SelectControl({
           aria-label={ariaLabel}
           aria-describedby={ariaDescribedBy}
           aria-invalid={invalid || undefined}
-          className={`${className} relative w-full cursor-default rounded-none pr-10 text-left disabled:cursor-not-allowed disabled:opacity-50`}
+          data-validation-error={invalid || undefined}
+          className={`${className} relative w-full cursor-default rounded-none pr-10 text-left aria-invalid:!border-red-600 aria-invalid:!ring-1 aria-invalid:!ring-red-600/20 aria-invalid:focus:!border-red-700 aria-invalid:focus:!ring-2 aria-invalid:focus:!ring-red-600/20 disabled:cursor-not-allowed disabled:opacity-50`}
         >
           <span className="block truncate">{selectedOption?.label ?? ''}</span>
           <span

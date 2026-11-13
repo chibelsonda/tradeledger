@@ -29,7 +29,7 @@ interface TeamManagementPanelProps {
 }
 
 const inputClassName =
-  'h-10 border border-ink/15 bg-white px-3.5 text-sm font-medium text-ink outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:border-red-500 aria-invalid:focus:border-red-600 aria-invalid:focus:ring-red-500/10'
+  'h-10 border border-ink/15 bg-white px-3.5 text-sm font-medium text-ink outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:!border-red-600 aria-invalid:!ring-1 aria-invalid:!ring-red-600/20 aria-invalid:focus:!border-red-700 aria-invalid:focus:!ring-2 aria-invalid:focus:!ring-red-600/20'
 
 function canManageMember(
   actorRole: OrganizationRole,
@@ -161,6 +161,7 @@ export function TeamManagementPanel({
 
       <form
         noValidate
+        autoComplete="off"
         onSubmit={onSubmit}
         className="h-fit border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
       >
@@ -177,12 +178,14 @@ export function TeamManagementPanel({
           <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
             <Label>Email</Label>
             <Input
+              autoComplete="off"
               required
               type="email"
               maxLength={320}
               value={email}
               onChange={(event) => onEmailChange(event.target.value)}
               aria-invalid={Boolean(fieldErrors.email)}
+              data-validation-error={Boolean(fieldErrors.email) || undefined}
               aria-describedby={
                 fieldErrors.email ? 'member-email-error' : undefined
               }
