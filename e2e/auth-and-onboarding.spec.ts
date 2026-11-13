@@ -30,7 +30,7 @@ test('authenticated user without a tenant sees organization onboarding', async (
   await expect(
     page.getByRole('heading', { name: 'Create your contractor workspace.' }),
   ).toBeVisible()
-  await expect(page.getByText('PostgreSQL Row-Level Security')).toBeVisible()
+  await expect(page.getByLabel('Organization name')).toBeVisible()
   expect(state.unexpectedRequests).toEqual([])
 })
 
