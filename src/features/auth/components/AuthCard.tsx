@@ -506,7 +506,7 @@ export function AuthCard() {
                       onClick={(event) =>
                         followAuthLink(event, 'forgot-password')
                       }
-                      className="text-[11px] font-bold text-forest underline decoration-forest/30 underline-offset-4 transition hover:decoration-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/25"
+                      className="text-[11px] font-bold text-forest transition-colors hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/25"
                     >
                       Forgot password?
                     </a>
@@ -608,7 +608,7 @@ export function AuthCard() {
             <a
               href={authModeHref(alternateMode)}
               onClick={(event) => followAuthLink(event, alternateMode)}
-              className="font-extrabold text-forest underline decoration-forest/30 underline-offset-4 transition hover:decoration-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/25"
+              className="font-extrabold text-forest transition-colors hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/25"
             >
               {alternateMode === 'sign-up' ? 'Create account' : 'Sign in'}
             </a>
