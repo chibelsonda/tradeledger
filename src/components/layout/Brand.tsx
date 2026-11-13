@@ -22,7 +22,7 @@ export function Brand({ compact = false }: BrandProps) {
       </span>
       {!compact && (
         <span className="text-lg font-extrabold tracking-[-0.035em] text-ink">
-          tradeledger
+          TradeLedger
         </span>
       )}
     </a>

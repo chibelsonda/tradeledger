@@ -69,7 +69,7 @@ export function DashboardSidebar({
           </span>
           <span>
             <span className="block text-[15px] font-extrabold tracking-[-0.035em]">
-              tradeledger
+              TradeLedger
             </span>
             <span className="mt-0.5 block text-[9px] font-bold uppercase tracking-[0.18em] text-white/70">
               Operations admin
@@ -135,7 +135,7 @@ export function DashboardSidebar({
                 {item.badge && (
                   <span
                     className={
-                      'grid size-5 shrink-0 place-items-center rounded-full border font-mono text-[9px] font-bold ' +
+                      'inline-flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] leading-none font-semibold tabular-nums ' +
                       (isActive
                         ? 'border-forest/20 bg-white text-forest'
                         : 'border-ink/15 text-ink/70')
