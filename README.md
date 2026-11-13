@@ -4,7 +4,7 @@ TradeLedger is a multi-tenant subcontractor payment workflow built to
 demonstrate production-minded SaaS engineering. It combines tenant-safe project
 operations, approval controls, database-owned financial calculations, Stripe
 Checkout, refunds, reconciliation, signed webhooks, and an immutable audit
-trail.
+trail. Paid requests can also produce a private, auditable PDF waiver record.
 
 The application is intentionally focused on a credible vertical slice rather
 than broad feature count: create an organization, manage projects and
@@ -31,6 +31,9 @@ full refund without trusting browser-supplied financial data.
 - **Actionable failure visibility.** Failed webhook processing is persisted
   outside the failed transaction with retry counts and tenant-scoped operator
   visibility.
+- **Private payment documents.** Paid, non-refunded requests can generate a
+  server-rendered PDF in a private Supabase Storage bucket. Downloads use
+  short-lived signed URLs, and later refunds automatically void the record.
 - **Auditable operations.** Sensitive workflow changes append immutable tenant
   audit events.
 - **Production-oriented UX.** Every authenticated state includes deliberate
@@ -65,6 +68,8 @@ create-checkout / create-refund ----> Stripe Checkout + Refunds
                     |
                     v
      Payment ledger + failure inbox + audit events
+                    |
+                    +----> Private waiver PDFs
 ```
 
 Secrets stay in Supabase Edge Function configuration. The browser receives only
@@ -81,6 +86,7 @@ the Supabase project URL and publishable key.
 7. An owner or accountant can refund the remaining settled amount.
 8. Operators can reconcile Stripe state and inspect unresolved webhook failures.
 9. Tenant-scoped audit events provide operational evidence.
+10. A financial approver generates and downloads a private payment waiver PDF.
 
 ## Security and correctness evidence
 
@@ -99,6 +105,9 @@ verifies:
 - Repeated refund application and reconciliation do not duplicate ledger rows.
 - Webhook failures persist retry counts and resolve explicitly.
 - Refund and failure records remain invisible across tenant boundaries.
+- Waiver reservation is role-protected and idempotent.
+- Refunding a payment automatically voids its active waiver.
+- Waiver metadata remains invisible across tenant boundaries.
 - Browser roles cannot alter immutable audit events.
 
 ## Local development
@@ -133,6 +142,8 @@ npx supabase functions deploy create-checkout
 npx supabase functions deploy stripe-webhook --no-verify-jwt
 npx supabase functions deploy create-refund
 npx supabase functions deploy reconcile-payment
+npx supabase functions deploy generate-waiver
+npx supabase functions deploy download-waiver
 ```
 
 Register this Stripe test webhook URL:
@@ -156,10 +167,9 @@ npm run build
 ```
 
 The current suite includes frontend utility coverage and an isolated PostgreSQL
-17 tenant/payment/refund scenario that rolls back after every run.
+17 tenant/payment/refund/document scenario that rolls back after every run.
 
 ## Current roadmap
 
-- Private waiver documents for settled requests.
 - Delivery logs and retry-safe notifications.
 - CI, browser coverage, operational runbooks, and a safe hosted demo.

@@ -9,6 +9,7 @@ import type {
   Project,
   StripeWebhookFailure,
   Subcontractor,
+  WaiverDocument,
 } from '../lib/database.types'
 import { formatCurrency, formatStatus } from '../lib/format'
 import { projectCode } from '../lib/organizations'
@@ -17,6 +18,7 @@ import {
   dollarsToMinorUnits,
 } from '../lib/payment-calculations'
 import { supabase } from '../lib/supabase'
+import { WaiverDocumentControl } from './WaiverDocumentControl'
 
 interface WorkspaceOrganization extends Organization {
   role: OrganizationRole
@@ -38,6 +40,7 @@ function statusClassName(status: string): string {
     case 'approved':
     case 'paid':
     case 'active':
+    case 'ready':
       return 'border-emerald-200 bg-emerald-50 text-emerald-800'
     case 'partially_refunded':
       return 'border-blue-200 bg-blue-50 text-blue-800'
@@ -46,10 +49,13 @@ function statusClassName(status: string): string {
     case 'submitted':
     case 'checkout_created':
     case 'processing':
+    case 'generating':
       return 'border-amber-200 bg-amber-50 text-amber-800'
     case 'failed':
     case 'blocked':
       return 'border-red-200 bg-red-50 text-red-800'
+    case 'voided':
+      return 'border-slate-300 bg-slate-100 text-slate-700'
     default:
       return 'border-ink/10 bg-cream text-ink/65'
   }
@@ -96,6 +102,7 @@ export function OperationsDashboard({
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
   const [webhookFailures, setWebhookFailures] = useState<StripeWebhookFailure[]>([])
+  const [waiverDocuments, setWaiverDocuments] = useState<WaiverDocument[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -106,6 +113,7 @@ export function OperationsDashboard({
     null,
   )
   const [refundRequestId, setRefundRequestId] = useState<string | null>(null)
+  const [waiverRequestId, setWaiverRequestId] = useState<string | null>(null)
   const [refundConfirmationId, setRefundConfirmationId] = useState<string | null>(
     null,
   )
@@ -139,6 +147,7 @@ export function OperationsDashboard({
       requestResult,
       auditResult,
       failureResult,
+      waiverResult,
     ] =
       await Promise.all([
         supabase
@@ -169,6 +178,11 @@ export function OperationsDashboard({
           .is('resolved_at', null)
           .order('last_failed_at', { ascending: false })
           .limit(6),
+        supabase
+          .from('waiver_documents')
+          .select('*')
+          .eq('organization_id', organization.id)
+          .order('created_at', { ascending: false }),
       ])
 
     const firstError =
@@ -176,7 +190,8 @@ export function OperationsDashboard({
       subcontractorResult.error ??
       requestResult.error ??
       auditResult.error ??
-      failureResult.error
+      failureResult.error ??
+      waiverResult.error
 
     if (firstError) {
       setError(firstError.message)
@@ -192,6 +207,7 @@ export function OperationsDashboard({
     setPaymentRequests(requestResult.data ?? [])
     setAuditEvents(auditResult.data ?? [])
     setWebhookFailures(failureResult.data ?? [])
+    setWaiverDocuments(waiverResult.data ?? [])
     setRequestProjectId((current) => current || nextProjects[0]?.id || '')
     setRequestSubcontractorId(
       (current) => current || nextSubcontractors[0]?.id || '',
@@ -223,6 +239,14 @@ export function OperationsDashboard({
         0,
       ),
     [paymentRequests],
+  )
+
+  const waiverByRequestId = useMemo(
+    () =>
+      new Map(
+        waiverDocuments.map((document) => [document.payment_request_id, document]),
+      ),
+    [waiverDocuments],
   )
 
   const requestPreview = useMemo(() => {
@@ -482,6 +506,46 @@ export function OperationsDashboard({
         : 'The Stripe refund succeeded and the payment ledger was updated.',
     )
     await loadDashboard()
+  }
+
+  async function openWaiverDocument(
+    requestId: string,
+    mode: 'generate' | 'download',
+  ) {
+    setError(null)
+    setNotice(null)
+    setWaiverRequestId(requestId)
+
+    const { data, error: waiverError } = await supabase.functions.invoke(
+      mode === 'generate' ? 'generate-waiver' : 'download-waiver',
+      { body: { paymentRequestId: requestId } },
+    )
+
+    setWaiverRequestId(null)
+
+    if (waiverError) {
+      setError(
+        await edgeFunctionErrorMessage(
+          waiverError,
+          mode === 'generate'
+            ? 'The waiver document could not be generated.'
+            : 'The waiver download is temporarily unavailable.',
+        ),
+      )
+      await loadDashboard()
+      return
+    }
+
+    const url = (data as { url?: unknown } | null)?.url
+
+    if (typeof url !== 'string' || !url.startsWith('https://')) {
+      setError('The document service did not return a secure download URL.')
+      await loadDashboard()
+      return
+    }
+
+    await loadDashboard()
+    window.location.assign(url)
   }
 
   const selectedProject = (projectId: string) =>
@@ -942,7 +1006,7 @@ export function OperationsDashboard({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
               <thead className="bg-cream/75 text-[11px] font-bold uppercase tracking-[0.12em] text-ink/45">
                 <tr>
                   <th className="px-6 py-3">Request</th>
@@ -951,12 +1015,16 @@ export function OperationsDashboard({
                   <th className="px-4 py-3 text-right">Retainage</th>
                   <th className="px-4 py-3 text-right">Net</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Document</th>
                   <th className="px-6 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink/8">
-                {paymentRequests.map((request) => (
-                  <tr key={request.id} className="align-middle">
+                {paymentRequests.map((request) => {
+                  const waiver = waiverByRequestId.get(request.id)
+
+                  return (
+                    <tr key={request.id} className="align-middle">
                     <td className="px-6 py-4">
                       <p className="max-w-56 truncate font-bold text-ink">
                         {request.description}
@@ -998,6 +1066,22 @@ export function OperationsDashboard({
                       >
                         {formatStatus(request.status)}
                       </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <WaiverDocumentControl
+                        requestStatus={request.status}
+                        waiver={waiver}
+                        canGenerate={canApprovePayments}
+                        canDownload={canManagePayments}
+                        isBusy={waiverRequestId === request.id}
+                        isDisabled={waiverRequestId !== null}
+                        onGenerate={() =>
+                          void openWaiverDocument(request.id, 'generate')
+                        }
+                        onDownload={() =>
+                          void openWaiverDocument(request.id, 'download')
+                        }
+                      />
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1122,8 +1206,9 @@ export function OperationsDashboard({
                       )}
                       </div>
                     </td>
-                  </tr>
-                ))}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

@@ -11,3 +11,9 @@ verify_jwt = true
 
 [functions.reconcile-payment]
 verify_jwt = true
+
+[functions.generate-waiver]
+verify_jwt = true
+
+[functions.download-waiver]
+verify_jwt = true

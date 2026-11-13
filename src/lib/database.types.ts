@@ -42,6 +42,8 @@ export type RefundStatus =
   | 'failed'
   | 'canceled'
 
+export type WaiverDocumentStatus = 'generating' | 'ready' | 'failed' | 'voided'
+
 export type Organization = {
   id: string
   name: string
@@ -183,6 +185,26 @@ export type StripeWebhookFailure = {
   resolution: string | null
 }
 
+export type WaiverDocument = {
+  id: string
+  organization_id: string
+  payment_request_id: string
+  payment_id: number
+  storage_path: string
+  file_name: string
+  mime_type: 'application/pdf'
+  status: WaiverDocumentStatus
+  generated_by: string | null
+  generated_at: string | null
+  voided_at: string | null
+  void_reason: string | null
+  sha256: string | null
+  file_size: number | null
+  failure_reason: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -299,6 +321,12 @@ export interface Database {
       }
       stripe_webhook_failures: {
         Row: StripeWebhookFailure
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
+      waiver_documents: {
+        Row: WaiverDocument
         Insert: Record<string, never>
         Update: Record<string, never>
         Relationships: []
@@ -466,6 +494,50 @@ export interface Database {
           p_refunds?: Json
         }
         Returns: PaymentStatus
+      }
+      reserve_waiver_document: {
+        Args: { p_payment_request_id: string; p_user_id: string }
+        Returns: {
+          document_id: string
+          document_status: WaiverDocumentStatus
+          storage_path: string
+          file_name: string
+          organization_id: string
+          organization_name: string
+          payment_request_id: string
+          payment_reference: string
+          project_name: string
+          project_code: string
+          subcontractor_name: string
+          subcontractor_contact: string | null
+          description: string
+          gross_amount: number
+          retainage_amount: number
+          net_amount: number
+          currency: string
+          paid_at: string
+        }[]
+      }
+      finalize_waiver_document: {
+        Args: {
+          p_document_id: string
+          p_user_id: string
+          p_sha256: string
+          p_file_size: number
+        }
+        Returns: boolean
+      }
+      fail_waiver_document: {
+        Args: { p_document_id: string; p_failure_reason: string }
+        Returns: boolean
+      }
+      prepare_waiver_download: {
+        Args: { p_payment_request_id: string; p_user_id: string }
+        Returns: {
+          document_id: string
+          storage_path: string
+          file_name: string
+        }[]
       }
     }
     Enums: Record<string, never>

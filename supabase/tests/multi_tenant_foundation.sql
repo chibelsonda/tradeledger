@@ -233,6 +233,127 @@ $$;
 do $$
 begin
     begin
+        perform *
+        from public.reserve_waiver_document(
+            current_setting('test.payment_request_a_id')::uuid,
+            '00000000-0000-4000-8000-000000000002'
+        );
+        raise exception 'An outsider must not be able to reserve a waiver.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+select
+    document_id as waiver_document_id,
+    document_status as waiver_document_status,
+    storage_path as waiver_storage_path
+from public.reserve_waiver_document(
+    :'payment_request_a_id',
+    '00000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select set_config('test.waiver_document_id', :'waiver_document_id', true);
+select set_config('test.waiver_storage_path', :'waiver_storage_path', true);
+
+select document_id as repeated_waiver_document_id
+from public.reserve_waiver_document(
+    :'payment_request_a_id',
+    '00000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select set_config(
+    'test.repeated_waiver_document_id',
+    :'repeated_waiver_document_id',
+    true
+);
+
+do $$
+begin
+    if current_setting('test.waiver_document_id')
+       <> current_setting('test.repeated_waiver_document_id') then
+        raise exception 'Waiver reservation must be idempotent.';
+    end if;
+
+    if current_setting('test.waiver_storage_path') not like
+       current_setting('test.organization_a_id') || '/%' then
+        raise exception 'Waiver storage path must begin with the tenant ID.';
+    end if;
+end;
+$$;
+
+select public.finalize_waiver_document(
+    :'waiver_document_id',
+    '00000000-0000-4000-8000-000000000001',
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    1024
+) as waiver_finalized
+\gset
+
+select document_id as downloadable_waiver_document_id
+from public.prepare_waiver_download(
+    :'payment_request_a_id',
+    '00000000-0000-4000-8000-000000000001'
+)
+\gset
+
+do $$
+declare
+    document_record public.waiver_documents%rowtype;
+begin
+    select * into document_record
+    from public.waiver_documents
+    where id = current_setting('test.waiver_document_id')::uuid;
+
+    if document_record.status <> 'ready'
+       or document_record.file_size <> 1024
+       or document_record.generated_at is null then
+        raise exception 'Expected a finalized private waiver document.';
+    end if;
+
+    begin
+        perform *
+        from public.prepare_waiver_download(
+            current_setting('test.payment_request_a_id')::uuid,
+            '00000000-0000-4000-8000-000000000002'
+        );
+        raise exception 'An outsider must not receive a waiver download.';
+    exception
+        when no_data_found then null;
+    end;
+end;
+$$;
+
+insert into storage.objects (bucket_id, name)
+values ('waiver-documents', :'waiver_storage_path');
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+do $$
+declare
+    visible_private_files integer;
+begin
+    select count(*) into visible_private_files
+    from storage.objects
+    where bucket_id = 'waiver-documents';
+
+    if visible_private_files <> 1 then
+        raise exception 'The owning financial role could not read its private waiver file.';
+    end if;
+end;
+$$;
+
+reset role;
+set local role service_role;
+
+do $$
+begin
+    begin
         perform public.transition_payment_request_status(
             current_setting('test.payment_request_a_id')::uuid,
             'processing',
@@ -305,6 +426,7 @@ do $$
 declare
     request_record public.payment_requests%rowtype;
     payment_record public.payments%rowtype;
+    waiver_status text;
     succeeded_refunds integer;
 begin
     select * into request_record
@@ -320,10 +442,15 @@ begin
     where payment_request_id = current_setting('test.payment_request_a_id')::uuid
       and status = 'succeeded';
 
+    select status into waiver_status
+    from public.waiver_documents
+    where payment_request_id = current_setting('test.payment_request_a_id')::uuid;
+
     if request_record.status <> 'refunded'
        or payment_record.status <> 'refunded'
        or request_record.refunded_amount <> 9450
-       or payment_record.amount_refunded <> 9450 then
+       or payment_record.amount_refunded <> 9450
+       or waiver_status <> 'voided' then
         raise exception 'Expected fully refunded request/payment ledger.';
     end if;
 
@@ -331,6 +458,21 @@ begin
         raise exception 'Expected one idempotent succeeded refund, received %.',
             succeeded_refunds;
     end if;
+end;
+$$;
+
+do $$
+begin
+    begin
+        perform *
+        from public.reserve_waiver_document(
+            current_setting('test.payment_request_a_id')::uuid,
+            '00000000-0000-4000-8000-000000000001'
+        );
+        raise exception 'A refunded request must not generate another waiver.';
+    exception
+        when object_not_in_prerequisite_state then null;
+    end;
 end;
 $$;
 
@@ -435,6 +577,8 @@ declare
     visible_payments integer;
     visible_refunds integer;
     visible_webhook_failures integer;
+    visible_waivers integer;
+    visible_private_files integer;
 begin
     select count(*) into visible_organizations from public.organizations;
     select count(*) into visible_projects from public.projects;
@@ -444,6 +588,10 @@ begin
     select count(*) into visible_payments from public.payments;
     select count(*) into visible_refunds from public.payment_refunds;
     select count(*) into visible_webhook_failures from public.stripe_webhook_failures;
+    select count(*) into visible_waivers from public.waiver_documents;
+    select count(*) into visible_private_files
+    from storage.objects
+    where bucket_id = 'waiver-documents';
 
     if visible_organizations <> 0
        or visible_projects <> 0
@@ -452,7 +600,9 @@ begin
        or visible_events <> 0
        or visible_payments <> 0
        or visible_refunds <> 0
-       or visible_webhook_failures <> 0 then
+       or visible_webhook_failures <> 0
+       or visible_waivers <> 0
+       or visible_private_files <> 0 then
         raise exception 'Tenant B could see Tenant A data.';
     end if;
 end;
