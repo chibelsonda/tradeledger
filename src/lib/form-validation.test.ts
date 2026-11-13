@@ -68,6 +68,15 @@ describe('form validation schemas', () => {
     ).toBe(false)
   })
 
+  it('normalizes editable project values', () => {
+    expect(
+      projectFormSchema.parse({
+        name: '  Cedar Kitchen Remodel  ',
+        code: 'CEDAR-01',
+      }),
+    ).toEqual({ name: 'Cedar Kitchen Remodel', code: 'CEDAR-01' })
+  })
+
   it('accepts an optional subcontractor email', () => {
     expect(
       subcontractorFormSchema.parse({
@@ -76,6 +85,20 @@ describe('form validation schemas', () => {
         email: '',
       }).email,
     ).toBe('')
+  })
+
+  it('normalizes editable subcontractor contact details', () => {
+    expect(
+      subcontractorFormSchema.parse({
+        companyName: '  Fine Finish Carpentry  ',
+        contactName: '  Hector Ramirez  ',
+        email: '  HECTOR@EXAMPLE.COM  ',
+      }),
+    ).toEqual({
+      companyName: 'Fine Finish Carpentry',
+      contactName: 'Hector Ramirez',
+      email: 'hector@example.com',
+    })
   })
 
   it('converts validated payment values for database submission', () => {

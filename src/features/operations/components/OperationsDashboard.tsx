@@ -64,6 +64,10 @@ import {
   DashboardSidebar,
   type DashboardNavigationItem,
 } from './DashboardSidebar'
+import {
+  DirectoryEditDialog,
+  type DirectoryEditTarget,
+} from './DirectoryEditDialog'
 import { OverviewCharts } from './OverviewCharts'
 import { TeamManagementPanel } from './TeamManagementPanel'
 import { WaiverDocumentControl } from './WaiverDocumentControl'
@@ -258,6 +262,12 @@ export function OperationsDashboard({
     useState<DemoWorkspaceStatus | null>(null)
   const [isDemoRemovalOpen, setIsDemoRemovalOpen] = useState(false)
   const [isRemovingDemoData, setIsRemovingDemoData] = useState(false)
+  const [directoryEditTarget, setDirectoryEditTarget] =
+    useState<DirectoryEditTarget | null>(null)
+  const [directoryEditError, setDirectoryEditError] = useState<string | null>(
+    null,
+  )
+  const [isSavingDirectoryRecord, setIsSavingDirectoryRecord] = useState(false)
   const dashboardLoadSequence = useRef(0)
 
   const [projectName, setProjectName] = useState('')
@@ -676,6 +686,80 @@ export function OperationsDashboard({
     setSubcontractorContact('')
     setSubcontractorEmail('')
     setNotice('Subcontractor added to this organization only.')
+    await loadDashboard()
+  }
+
+  async function updateProject(
+    projectId: string,
+    values: ProjectFormValues,
+  ) {
+    setDirectoryEditError(null)
+    setNotice(null)
+    setIsSavingDirectoryRecord(true)
+
+    const { data, error: updateError } = await supabase
+      .from('projects')
+      .update({ name: values.name, code: values.code })
+      .eq('id', projectId)
+      .eq('organization_id', organization.id)
+      .select('id')
+      .maybeSingle()
+
+    setIsSavingDirectoryRecord(false)
+
+    if (updateError || !data) {
+      setDirectoryEditError(
+        updateError
+          ? safeDatabaseErrorMessage(
+              updateError,
+              'The project could not be updated.',
+            )
+          : 'The project is no longer available in this workspace.',
+      )
+      return
+    }
+
+    setDirectoryEditTarget(null)
+    setNotice('Project details updated successfully.')
+    await loadDashboard()
+  }
+
+  async function updateSubcontractor(
+    subcontractorId: string,
+    values: SubcontractorFormValues,
+  ) {
+    setDirectoryEditError(null)
+    setNotice(null)
+    setIsSavingDirectoryRecord(true)
+
+    const { data, error: updateError } = await supabase
+      .from('subcontractors')
+      .update({
+        company_name: values.companyName,
+        contact_name: values.contactName || null,
+        email: values.email || null,
+      })
+      .eq('id', subcontractorId)
+      .eq('organization_id', organization.id)
+      .select('id')
+      .maybeSingle()
+
+    setIsSavingDirectoryRecord(false)
+
+    if (updateError || !data) {
+      setDirectoryEditError(
+        updateError
+          ? safeDatabaseErrorMessage(
+              updateError,
+              'The subcontractor could not be updated.',
+            )
+          : 'The subcontractor is no longer available in this workspace.',
+      )
+      return
+    }
+
+    setDirectoryEditTarget(null)
+    setNotice('Subcontractor details updated successfully.')
     await loadDashboard()
   }
 
@@ -1741,7 +1825,7 @@ export function OperationsDashboard({
                 No projects yet. Add the first project above.
               </p>
             ) : (
-              projects.slice(0, 5).map((project) => (
+              projects.map((project) => (
                 <div
                   key={project.id}
                   className="flex items-center justify-between gap-4 border border-ink/8 px-4 py-3 transition-colors hover:bg-cream/45"
@@ -1752,14 +1836,32 @@ export function OperationsDashboard({
                       {project.code}
                     </p>
                   </div>
-                  <span
-                    className={
-                      'border px-2.5 py-1 text-[11px] font-bold ' +
-                      statusClassName(project.status)
-                    }
-                  >
-                    {formatStatus(project.status)}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={
+                        'border px-2.5 py-1 text-[11px] font-bold ' +
+                        statusClassName(project.status)
+                      }
+                    >
+                      {formatStatus(project.status)}
+                    </span>
+                    {canManageProjects && (
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setDirectoryEditError(null)
+                          setDirectoryEditTarget({
+                            kind: 'project',
+                            record: project,
+                          })
+                        }}
+                        aria-label={`Edit ${project.name}`}
+                        className="h-8 border border-ink/15 bg-white px-3 text-xs font-bold text-ink transition hover:border-forest/35 hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+                      >
+                        Edit
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -1784,7 +1886,7 @@ export function OperationsDashboard({
                 No subcontractors yet. Add one before creating a payment request.
               </p>
             ) : (
-              subcontractors.slice(0, 5).map((subcontractor) => (
+              subcontractors.map((subcontractor) => (
                 <div
                   key={subcontractor.id}
                   className="flex items-center justify-between gap-4 border border-ink/8 px-4 py-3 transition-colors hover:bg-cream/45"
@@ -1797,14 +1899,32 @@ export function OperationsDashboard({
                       {subcontractor.contact_name ?? subcontractor.email ?? 'No contact added'}
                     </p>
                   </div>
-                  <span
-                    className={
-                      'border px-2.5 py-1 text-[11px] font-bold ' +
-                      statusClassName(subcontractor.status)
-                    }
-                  >
-                    {formatStatus(subcontractor.status)}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={
+                        'border px-2.5 py-1 text-[11px] font-bold ' +
+                        statusClassName(subcontractor.status)
+                      }
+                    >
+                      {formatStatus(subcontractor.status)}
+                    </span>
+                    {canManageProjects && (
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setDirectoryEditError(null)
+                          setDirectoryEditTarget({
+                            kind: 'subcontractor',
+                            record: subcontractor,
+                          })
+                        }}
+                        aria-label={`Edit ${subcontractor.company_name}`}
+                        className="h-8 border border-ink/15 bg-white px-3 text-xs font-bold text-ink transition hover:border-forest/35 hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+                      >
+                        Edit
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -2202,6 +2322,21 @@ export function OperationsDashboard({
           </DialogPanel>
         </div>
       </Dialog>
+
+      <DirectoryEditDialog
+        target={directoryEditTarget}
+        isSaving={isSavingDirectoryRecord}
+        serverError={directoryEditError}
+        onClose={() => {
+          if (!isSavingDirectoryRecord) {
+            setDirectoryEditTarget(null)
+            setDirectoryEditError(null)
+          }
+        }}
+        onClearError={() => setDirectoryEditError(null)}
+        onSaveProject={updateProject}
+        onSaveSubcontractor={updateSubcontractor}
+      />
 
       <Dialog
         open={isDemoRemovalOpen}
