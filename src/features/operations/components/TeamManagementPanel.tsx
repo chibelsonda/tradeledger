@@ -1,4 +1,11 @@
-import { Button, Field, Input, Label } from '@headlessui/react'
+import {
+  Button,
+  Description,
+  DialogTitle,
+  Field,
+  Input,
+  Label,
+} from '@headlessui/react'
 import type { FormEvent } from 'react'
 
 import type {
@@ -9,6 +16,11 @@ import { FieldError } from '../../../components/ui/FieldError'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { formatStatus } from '../../../lib/format'
 import { SelectControl } from '../../../components/ui/SelectControl'
+import { NotificationBanner } from '../../../components/ui/NotificationBanner'
+import {
+  SidePanel,
+  SidePanelCloseButton,
+} from '../../../components/ui/SidePanel'
 
 interface TeamManagementPanelProps {
   members: OrganizationMember[]
@@ -18,7 +30,11 @@ interface TeamManagementPanelProps {
   role: Exclude<OrganizationRole, 'owner'>
   busyUserId: string | null
   isSubmitting: boolean
+  isFormOpen: boolean
+  serverError: string | null
   fieldErrors: { email?: string; role?: string }
+  onOpenForm: () => void
+  onCloseForm: () => void
   onEmailChange: (value: string) => void
   onRoleChange: (value: Exclude<OrganizationRole, 'owner'>) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -49,7 +65,11 @@ export function TeamManagementPanel({
   role,
   busyUserId,
   isSubmitting,
+  isFormOpen,
+  serverError,
   fieldErrors,
+  onOpenForm,
+  onCloseForm,
   onEmailChange,
   onRoleChange,
   onSubmit,
@@ -61,7 +81,7 @@ export function TeamManagementPanel({
       : ['member', 'subcontractor']
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <div>
       <section className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
@@ -74,9 +94,18 @@ export function TeamManagementPanel({
               controls. Suspended members immediately lose tenant access.
             </p>
           </div>
-          <span className="w-fit border border-ink/10 bg-cream px-3 py-1.5 font-mono text-xs font-bold text-ink/80">
-            {members.filter((member) => member.status === 'active').length} active
-          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="w-fit border border-ink/10 bg-cream px-3 py-1.5 font-mono text-xs font-bold text-ink/80">
+              {members.filter((member) => member.status === 'active').length} active
+            </span>
+            <Button
+              type="button"
+              onClick={onOpenForm}
+              className="inline-flex h-10 items-center justify-center bg-ink px-4 text-sm font-bold text-white transition-colors hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+            >
+              Grant access
+            </Button>
+          </div>
         </div>
 
         <div className="mt-6 overflow-x-auto border border-ink/10">
@@ -159,22 +188,33 @@ export function TeamManagementPanel({
         </div>
       </section>
 
-      <form
-        noValidate
-        autoComplete="off"
-        onSubmit={onSubmit}
-        className="h-fit border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
-      >
-        <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-forest/80">
-          Add existing user
-        </p>
-        <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">Grant workspace access</h2>
-        <p className="mt-2 text-sm leading-6 font-medium text-ink/80">
-          The user must already have a TradeLedger account. Re-adding a suspended
-          user restores their access with the selected role.
-        </p>
+      <SidePanel open={isFormOpen} busy={isSubmitting} onClose={onCloseForm}>
+        <form
+          noValidate
+          autoComplete="off"
+          onSubmit={onSubmit}
+          className="flex min-h-full flex-col"
+        >
+          <SidePanelCloseButton disabled={isSubmitting} onClick={onCloseForm} />
+          <div className="flex flex-1 flex-col gap-6 p-6 pt-16 sm:p-8 sm:pt-20">
+            <div className="pr-10">
+              <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-forest/80">
+                Add existing user
+              </p>
+              <DialogTitle className="mt-1 text-2xl font-extrabold tracking-[-0.03em] text-ink">
+                Grant workspace access
+              </DialogTitle>
+              <Description className="mt-2 text-sm leading-6 font-medium text-ink/80">
+                The user must already have a TradeLedger account. Re-adding a
+                suspended user restores access with the selected role.
+              </Description>
+            </div>
 
-        <div className="mt-5 flex flex-col gap-4">
+            {serverError && (
+              <NotificationBanner tone="error">{serverError}</NotificationBanner>
+            )}
+
+        <div className="flex flex-col gap-4">
           <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
             <Label>Email</Label>
             <Input
@@ -216,17 +256,29 @@ export function TeamManagementPanel({
             <FieldError id="member-role-error" message={fieldErrors.role} />
           </Field>
         </div>
+          </div>
 
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          aria-busy={isSubmitting}
-          className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-wait disabled:opacity-50"
-        >
-          {isSubmitting && <ButtonSpinner tone="light" />}
-          {isSubmitting ? 'Granting access…' : 'Add or update member'}
-        </Button>
-      </form>
+          <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-3 border-t border-ink/10 bg-white p-4 sm:flex-row sm:justify-end sm:p-6">
+            <Button
+              type="button"
+              disabled={isSubmitting}
+              onClick={onCloseForm}
+              className="h-10 border border-ink/15 bg-white px-4 text-sm font-bold text-ink transition-colors hover:bg-cream disabled:opacity-50"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              aria-busy={isSubmitting}
+              className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-4 text-sm font-bold text-white transition-colors hover:bg-forest disabled:cursor-wait disabled:opacity-50"
+            >
+              {isSubmitting && <ButtonSpinner tone="light" />}
+              {isSubmitting ? 'Granting access…' : 'Grant access'}
+            </Button>
+          </div>
+        </form>
+      </SidePanel>
     </div>
   )
 }

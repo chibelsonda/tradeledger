@@ -27,10 +27,14 @@ test('owner grants and suspends tenant access from the team workspace', async ({
   ).toBeVisible()
   await expect(page.getByText('Protected owner')).toBeVisible()
 
+  await page.getByRole('button', { name: 'Grant access' }).click()
   await page.getByLabel('Email').fill('accountant@example.test')
   await page.getByLabel('Role').click()
   await page.getByRole('option', { name: 'Accountant' }).click()
-  await page.getByRole('button', { name: 'Add or update member' }).click()
+  await page
+    .getByRole('dialog', { name: 'Grant workspace access' })
+    .getByRole('button', { name: 'Grant access' })
+    .click()
 
   await expect(page.getByText('accountant@example.test')).toBeVisible()
   await expect(page.getByRole('status')).toContainText('Team access updated')

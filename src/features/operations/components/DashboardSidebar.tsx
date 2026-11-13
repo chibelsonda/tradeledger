@@ -26,12 +26,12 @@ function NavigationIcon({ itemId }: { itemId: string }) {
   }
 
   return (
-    <svg viewBox="0 0 20 20" className="size-4" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 20 20" className="size-5" fill="none" aria-hidden="true">
       <path
         d={paths[itemId] ?? paths.overview}
         fill={itemId === 'overview' ? 'currentColor' : 'none'}
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -122,7 +122,7 @@ export function DashboardSidebar({
                 }
               >
                 <span className="flex min-w-0 items-start gap-3">
-                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-current opacity-80">
+                  <span className="grid size-6 shrink-0 place-items-center text-current">
                     <NavigationIcon itemId={item.id} />
                   </span>
                   <span className="min-w-0">

@@ -1,9 +1,6 @@
 import {
   Button,
   Description,
-  Dialog,
-  DialogBackdrop,
-  DialogPanel,
   DialogTitle,
   Field,
   Input,
@@ -15,6 +12,10 @@ import { useState } from 'react'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { FieldError } from '../../../components/ui/FieldError'
 import { NotificationBanner } from '../../../components/ui/NotificationBanner'
+import {
+  SidePanel,
+  SidePanelCloseButton,
+} from '../../../components/ui/SidePanel'
 import type { Project, Subcontractor } from '../../../lib/database.types'
 import { projectCode } from '../../../lib/organizations'
 import {
@@ -82,67 +83,78 @@ function ProjectEditForm({
   }
 
   return (
-    <form noValidate autoComplete="off" onSubmit={submit}>
-      <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-forest/80">
-        Project directory
-      </p>
-      <DialogTitle className="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-ink">
-        Edit project
-      </DialogTitle>
-      <Description className="mt-2 text-sm leading-6 font-medium text-ink/80">
-        Update the project name and code for this workspace.
-      </Description>
+    <form
+      noValidate
+      autoComplete="off"
+      onSubmit={submit}
+      className="flex min-h-full flex-col"
+    >
+      <SidePanelCloseButton disabled={isSaving} onClick={onCancel} />
+      <div className="flex flex-1 flex-col gap-6 p-6 pt-16 sm:p-8 sm:pt-20">
+        <div className="pr-10">
+          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-forest/80">
+            Project directory
+          </p>
+          <DialogTitle className="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-ink">
+            Edit project
+          </DialogTitle>
+          <Description className="mt-2 text-sm leading-6 font-medium text-ink/80">
+            Update the project name and code for this workspace.
+          </Description>
+        </div>
 
-      {serverError && (
-        <NotificationBanner tone="error" className="mt-5">
-          {serverError}
-        </NotificationBanner>
-      )}
+        {serverError && (
+          <NotificationBanner tone="error">{serverError}</NotificationBanner>
+        )}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
-          <Label>Project name</Label>
-          <Input
-            autoFocus
-            autoComplete="off"
-            required
-            maxLength={160}
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value)
-              setErrors((current) => ({ ...current, name: undefined }))
-              onClearError()
-            }}
-            aria-invalid={Boolean(errors.name)}
-            data-validation-error={Boolean(errors.name) || undefined}
-            aria-describedby={errors.name ? 'edit-project-name-error' : undefined}
-            className={fieldClassName}
-          />
-          <FieldError id="edit-project-name-error" message={errors.name} />
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+            <Label>Project name</Label>
+            <Input
+              autoComplete="off"
+              required
+              maxLength={160}
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value)
+                setErrors((current) => ({ ...current, name: undefined }))
+                onClearError()
+              }}
+              aria-invalid={Boolean(errors.name)}
+              data-validation-error={Boolean(errors.name) || undefined}
+              aria-describedby={
+                errors.name ? 'edit-project-name-error' : undefined
+              }
+              className={fieldClassName}
+            />
+            <FieldError id="edit-project-name-error" message={errors.name} />
+          </Field>
 
-        <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
-          <Label>Project code</Label>
-          <Input
-            autoComplete="off"
-            required
-            maxLength={32}
-            value={code}
-            onChange={(event) => {
-              setCode(projectCode(event.target.value))
-              setErrors((current) => ({ ...current, code: undefined }))
-              onClearError()
-            }}
-            aria-invalid={Boolean(errors.code)}
-            data-validation-error={Boolean(errors.code) || undefined}
-            aria-describedby={errors.code ? 'edit-project-code-error' : undefined}
-            className={fieldClassName + ' font-mono'}
-          />
-          <FieldError id="edit-project-code-error" message={errors.code} />
-        </Field>
+          <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+            <Label>Project code</Label>
+            <Input
+              autoComplete="off"
+              required
+              maxLength={32}
+              value={code}
+              onChange={(event) => {
+                setCode(projectCode(event.target.value))
+                setErrors((current) => ({ ...current, code: undefined }))
+                onClearError()
+              }}
+              aria-invalid={Boolean(errors.code)}
+              data-validation-error={Boolean(errors.code) || undefined}
+              aria-describedby={
+                errors.code ? 'edit-project-code-error' : undefined
+              }
+              className={fieldClassName + ' font-mono'}
+            />
+            <FieldError id="edit-project-code-error" message={errors.code} />
+          </Field>
+        </div>
       </div>
 
-      <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-3 border-t border-ink/10 bg-white p-4 sm:flex-row sm:justify-end sm:p-6">
         <Button
           type="button"
           disabled={isSaving}
@@ -211,104 +223,122 @@ function SubcontractorEditForm({
   }
 
   return (
-    <form noValidate autoComplete="off" onSubmit={submit}>
-      <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-forest/80">
-        Subcontractor directory
-      </p>
-      <DialogTitle className="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-ink">
-        Edit subcontractor
-      </DialogTitle>
-      <Description className="mt-2 text-sm leading-6 font-medium text-ink/80">
-        Update the company and optional contact details for this workspace.
-      </Description>
+    <form
+      noValidate
+      autoComplete="off"
+      onSubmit={submit}
+      className="flex min-h-full flex-col"
+    >
+      <SidePanelCloseButton disabled={isSaving} onClick={onCancel} />
+      <div className="flex flex-1 flex-col gap-6 p-6 pt-16 sm:p-8 sm:pt-20">
+        <div className="pr-10">
+          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-forest/80">
+            Subcontractor directory
+          </p>
+          <DialogTitle className="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-ink">
+            Edit subcontractor
+          </DialogTitle>
+          <Description className="mt-2 text-sm leading-6 font-medium text-ink/80">
+            Update the company and optional contact details for this workspace.
+          </Description>
+        </div>
 
-      {serverError && (
-        <NotificationBanner tone="error" className="mt-5">
-          {serverError}
-        </NotificationBanner>
-      )}
+        {serverError && (
+          <NotificationBanner tone="error">{serverError}</NotificationBanner>
+        )}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
-          <Label>Company name</Label>
-          <Input
-            autoFocus
-            autoComplete="off"
-            required
-            maxLength={160}
-            value={companyName}
-            onChange={(event) => {
-              setCompanyName(event.target.value)
-              setErrors((current) => ({ ...current, companyName: undefined }))
-              onClearError()
-            }}
-            aria-invalid={Boolean(errors.companyName)}
-            data-validation-error={Boolean(errors.companyName) || undefined}
-            aria-describedby={
-              errors.companyName ? 'edit-subcontractor-company-error' : undefined
-            }
-            className={fieldClassName}
-          />
-          <FieldError
-            id="edit-subcontractor-company-error"
-            message={errors.companyName}
-          />
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
+            <Label>Company name</Label>
+            <Input
+              autoComplete="off"
+              required
+              maxLength={160}
+              value={companyName}
+              onChange={(event) => {
+                setCompanyName(event.target.value)
+                setErrors((current) => ({ ...current, companyName: undefined }))
+                onClearError()
+              }}
+              aria-invalid={Boolean(errors.companyName)}
+              data-validation-error={Boolean(errors.companyName) || undefined}
+              aria-describedby={
+                errors.companyName
+                  ? 'edit-subcontractor-company-error'
+                  : undefined
+              }
+              className={fieldClassName}
+            />
+            <FieldError
+              id="edit-subcontractor-company-error"
+              message={errors.companyName}
+            />
+          </Field>
 
-        <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
-          <span className="flex items-center justify-between gap-3">
-            <Label>Contact name</Label>
-            <span className="text-[11px] font-medium text-ink/65">Optional</span>
-          </span>
-          <Input
-            autoComplete="off"
-            maxLength={160}
-            value={contactName}
-            onChange={(event) => {
-              setContactName(event.target.value)
-              setErrors((current) => ({ ...current, contactName: undefined }))
-              onClearError()
-            }}
-            aria-invalid={Boolean(errors.contactName)}
-            data-validation-error={Boolean(errors.contactName) || undefined}
-            aria-describedby={
-              errors.contactName ? 'edit-subcontractor-contact-error' : undefined
-            }
-            className={fieldClassName}
-          />
-          <FieldError
-            id="edit-subcontractor-contact-error"
-            message={errors.contactName}
-          />
-        </Field>
+          <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+            <span className="flex items-center justify-between gap-3">
+              <Label>Contact name</Label>
+              <span className="text-[11px] font-medium text-ink/65">
+                Optional
+              </span>
+            </span>
+            <Input
+              autoComplete="off"
+              maxLength={160}
+              value={contactName}
+              onChange={(event) => {
+                setContactName(event.target.value)
+                setErrors((current) => ({ ...current, contactName: undefined }))
+                onClearError()
+              }}
+              aria-invalid={Boolean(errors.contactName)}
+              data-validation-error={Boolean(errors.contactName) || undefined}
+              aria-describedby={
+                errors.contactName
+                  ? 'edit-subcontractor-contact-error'
+                  : undefined
+              }
+              className={fieldClassName}
+            />
+            <FieldError
+              id="edit-subcontractor-contact-error"
+              message={errors.contactName}
+            />
+          </Field>
 
-        <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
-          <span className="flex items-center justify-between gap-3">
-            <Label>Email</Label>
-            <span className="text-[11px] font-medium text-ink/65">Optional</span>
-          </span>
-          <Input
-            autoComplete="off"
-            type="email"
-            maxLength={320}
-            value={email}
-            onChange={(event) => {
-              setEmail(event.target.value)
-              setErrors((current) => ({ ...current, email: undefined }))
-              onClearError()
-            }}
-            aria-invalid={Boolean(errors.email)}
-            data-validation-error={Boolean(errors.email) || undefined}
-            aria-describedby={
-              errors.email ? 'edit-subcontractor-email-error' : undefined
-            }
-            className={fieldClassName}
-          />
-          <FieldError id="edit-subcontractor-email-error" message={errors.email} />
-        </Field>
+          <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
+            <span className="flex items-center justify-between gap-3">
+              <Label>Email</Label>
+              <span className="text-[11px] font-medium text-ink/65">
+                Optional
+              </span>
+            </span>
+            <Input
+              autoComplete="off"
+              type="email"
+              maxLength={320}
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value)
+                setErrors((current) => ({ ...current, email: undefined }))
+                onClearError()
+              }}
+              aria-invalid={Boolean(errors.email)}
+              data-validation-error={Boolean(errors.email) || undefined}
+              aria-describedby={
+                errors.email ? 'edit-subcontractor-email-error' : undefined
+              }
+              className={fieldClassName}
+            />
+            <FieldError
+              id="edit-subcontractor-email-error"
+              message={errors.email}
+            />
+          </Field>
+        </div>
       </div>
 
-      <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-3 border-t border-ink/10 bg-white p-4 sm:flex-row sm:justify-end sm:p-6">
         <Button
           type="button"
           disabled={isSaving}
@@ -341,40 +371,33 @@ export function DirectoryEditDialog({
   onSaveSubcontractor,
 }: DirectoryEditDialogProps) {
   return (
-    <Dialog
+    <SidePanel
       open={target !== null}
-      onClose={() => {
-        if (!isSaving) onClose()
-      }}
-      className="relative z-50"
+      busy={isSaving}
+      onClose={onClose}
     >
-      <DialogBackdrop className="fixed inset-0 bg-ink/55 backdrop-blur-sm" />
-      <div className="fixed inset-0 grid place-items-center overflow-y-auto p-4 sm:p-6">
-        <DialogPanel className="w-full max-w-2xl border border-ink/15 bg-white p-6 shadow-[0_24px_64px_rgba(19,37,31,0.22)] sm:p-8">
-          {target?.kind === 'project' && (
-            <ProjectEditForm
-              key={target.record.id}
-              project={target.record}
-              isSaving={isSaving}
-              serverError={serverError}
-              onCancel={onClose}
-              onClearError={onClearError}
-              onSave={onSaveProject}
-            />
-          )}
-          {target?.kind === 'subcontractor' && (
-            <SubcontractorEditForm
-              key={target.record.id}
-              subcontractor={target.record}
-              isSaving={isSaving}
-              serverError={serverError}
-              onCancel={onClose}
-              onClearError={onClearError}
-              onSave={onSaveSubcontractor}
-            />
-          )}
-        </DialogPanel>
-      </div>
-    </Dialog>
+      {target?.kind === 'project' && (
+        <ProjectEditForm
+          key={target.record.id}
+          project={target.record}
+          isSaving={isSaving}
+          serverError={serverError}
+          onCancel={onClose}
+          onClearError={onClearError}
+          onSave={onSaveProject}
+        />
+      )}
+      {target?.kind === 'subcontractor' && (
+        <SubcontractorEditForm
+          key={target.record.id}
+          subcontractor={target.record}
+          isSaving={isSaving}
+          serverError={serverError}
+          onCancel={onClose}
+          onClearError={onClearError}
+          onSave={onSaveSubcontractor}
+        />
+      )}
+    </SidePanel>
   )
 }

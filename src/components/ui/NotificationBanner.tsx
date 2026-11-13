@@ -13,20 +13,20 @@ const toneStyles: Record<
   { container: string; icon: string }
 > = {
   success: {
-    container: 'border-forest/15 bg-forest/[0.045] text-ink',
-    icon: 'text-forest',
+    container: 'border-emerald-200 bg-emerald-50/70 text-emerald-950',
+    icon: 'text-emerald-700',
   },
   error: {
-    container: 'border-red-950/15 bg-red-950/[0.035] text-red-950',
-    icon: 'text-red-800',
+    container: 'border-red-200 bg-red-50/70 text-red-950',
+    icon: 'text-red-700',
   },
   warning: {
-    container: 'border-amber-950/20 bg-amber-950/[0.04] text-amber-950',
-    icon: 'text-amber-800',
+    container: 'border-amber-300/80 bg-amber-50/70 text-amber-950',
+    icon: 'text-amber-700',
   },
   info: {
-    container: 'border-sky-950/15 bg-sky-950/[0.035] text-sky-950',
-    icon: 'text-sky-800',
+    container: 'border-sky-200 bg-sky-50/70 text-sky-950',
+    icon: 'text-sky-700',
   },
 }
 

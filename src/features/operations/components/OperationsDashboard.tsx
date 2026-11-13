@@ -12,8 +12,11 @@ import {
   MenuButton,
   MenuItem,
   MenuItems,
-  Radio,
-  RadioGroup,
+  Tab,
+  TabGroup,
+  TabList,
+  TabPanel,
+  TabPanels,
 } from '@headlessui/react'
 import type { Session } from '@supabase/supabase-js'
 import type { FormEvent } from 'react'
@@ -34,7 +37,6 @@ import { FieldError } from '../../../components/ui/FieldError'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { NotificationBanner } from '../../../components/ui/NotificationBanner'
 import { formatCurrency, formatStatus } from '../../../lib/format'
-import { projectCode } from '../../../lib/organizations'
 import {
   trustedStripeCheckoutUrl,
   trustedSupabaseWaiverUrl,
@@ -51,10 +53,12 @@ import {
 } from '../../../lib/validation'
 import { SelectControl } from '../../../components/ui/SelectControl'
 import {
+  SidePanel,
+  SidePanelCloseButton,
+} from '../../../components/ui/SidePanel'
+import {
   organizationMemberFormSchema,
   paymentRequestFormSchema,
-  projectFormSchema,
-  subcontractorFormSchema,
   type OrganizationMemberFormValues,
   type PaymentRequestFormValues,
   type ProjectFormValues,
@@ -64,6 +68,10 @@ import {
   DashboardSidebar,
   type DashboardNavigationItem,
 } from './DashboardSidebar'
+import {
+  DirectoryCreateDrawer,
+  type DirectoryCreateTarget,
+} from './DirectoryCreateDrawer'
 import {
   DirectoryEditDialog,
   type DirectoryEditTarget,
@@ -83,7 +91,6 @@ interface OperationsDashboardProps {
   onSelectOrganization: (organizationId: string) => void
 }
 
-type CreatePanel = 'project' | 'subcontractor' | 'payment'
 type PaymentTransition = {
   requestId: string
   action: 'submit' | 'approve'
@@ -164,6 +171,25 @@ const fieldClassName =
 const selectFieldClassName =
   'h-10 border border-ink/15 bg-white pl-3.5 text-sm font-medium text-ink outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:!border-red-600 aria-invalid:!ring-1 aria-invalid:!ring-red-600/20 aria-invalid:focus:!border-red-700 aria-invalid:focus:!ring-2 aria-invalid:focus:!ring-red-600/20'
 
+function EditIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-[18px]"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
+      <path d="m15 5 3 3" />
+    </svg>
+  )
+}
+
 function statusClassName(status: string): string {
   switch (status) {
     case 'approved':
@@ -239,7 +265,6 @@ export function OperationsDashboard({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [createPanel, setCreatePanel] = useState<CreatePanel>('project')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [paymentTransition, setPaymentTransition] =
     useState<PaymentTransition | null>(null)
@@ -262,6 +287,17 @@ export function OperationsDashboard({
     useState<DemoWorkspaceStatus | null>(null)
   const [isDemoRemovalOpen, setIsDemoRemovalOpen] = useState(false)
   const [isRemovingDemoData, setIsRemovingDemoData] = useState(false)
+  const [directoryCreateTarget, setDirectoryCreateTarget] =
+    useState<DirectoryCreateTarget | null>(null)
+  const [directoryCreateError, setDirectoryCreateError] = useState<string | null>(
+    null,
+  )
+  const [isPaymentCreateOpen, setIsPaymentCreateOpen] = useState(false)
+  const [paymentCreateError, setPaymentCreateError] = useState<string | null>(
+    null,
+  )
+  const [isTeamAccessOpen, setIsTeamAccessOpen] = useState(false)
+  const [teamAccessError, setTeamAccessError] = useState<string | null>(null)
   const [directoryEditTarget, setDirectoryEditTarget] =
     useState<DirectoryEditTarget | null>(null)
   const [directoryEditError, setDirectoryEditError] = useState<string | null>(
@@ -270,11 +306,6 @@ export function OperationsDashboard({
   const [isSavingDirectoryRecord, setIsSavingDirectoryRecord] = useState(false)
   const dashboardLoadSequence = useRef(0)
 
-  const [projectName, setProjectName] = useState('')
-  const [projectReference, setProjectReference] = useState('')
-  const [subcontractorCompany, setSubcontractorCompany] = useState('')
-  const [subcontractorContact, setSubcontractorContact] = useState('')
-  const [subcontractorEmail, setSubcontractorEmail] = useState('')
   const [requestProjectId, setRequestProjectId] = useState('')
   const [requestSubcontractorId, setRequestSubcontractorId] = useState('')
   const [requestDescription, setRequestDescription] = useState('')
@@ -294,24 +325,6 @@ export function OperationsDashboard({
     organization.role,
   )
   const canApprovePayments = ['owner', 'accountant'].includes(organization.role)
-  const activeCreatePanel =
-    activeNavigationId === 'payments'
-      ? 'payment'
-      : !canManageProjects && canManagePayments
-        ? 'payment'
-        : createPanel === 'payment'
-          ? 'project'
-          : createPanel
-  const createPanelOptions = (
-    [
-      activeNavigationId === 'directory' &&
-        canManageProjects && ['project', 'Project'],
-      activeNavigationId === 'directory' &&
-        canManageProjects && ['subcontractor', 'Subcontractor'],
-      activeNavigationId === 'payments' &&
-        canManagePayments && ['payment', 'Payment'],
-    ].filter(Boolean) as [CreatePanel, string][]
-  )
   const navigationItems = useMemo<DashboardNavigationItem[]>(() => {
     const directoryCount = projects.length + subcontractors.length
     const activeMemberCount = organizationMembers.filter(
@@ -476,13 +489,12 @@ export function OperationsDashboard({
         ? current
         : nextProjects[0]?.id ?? '',
     )
-    setRequestSubcontractorId(
-      (current) =>
-        nextSubcontractors.some(
-          (subcontractor) => subcontractor.id === current,
-        )
-          ? current
-          : nextSubcontractors[0]?.id ?? '',
+    setRequestSubcontractorId((current) =>
+      nextSubcontractors.some(
+        (subcontractor) => subcontractor.id === current,
+      )
+        ? current
+        : nextSubcontractors[0]?.id ?? '',
     )
     setIsLoading(false)
   }, [canManageTeam, organization.id, organization.role])
@@ -603,77 +615,47 @@ export function OperationsDashboard({
     return calculateRetainage(grossAmount, Math.round(percentage * 100))
   }, [requestGross, requestRetainage])
 
-  async function createProject(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function createProject(values: ProjectFormValues) {
     setError(null)
     setNotice(null)
-
-    const validation = projectFormSchema.safeParse({
-      name: projectName,
-      code: projectCode(projectReference || projectName),
-    })
-
-    if (!validation.success) {
-      setFormErrors(
-        fieldErrorsFromZod<OperationsFormField>(validation.error),
-      )
-      return
-    }
-
-    setFormErrors({})
+    setDirectoryCreateError(null)
     setIsSubmitting(true)
     const { error: createError } = await supabase.from('projects').insert({
       organization_id: organization.id,
-      name: validation.data.name,
-      code: validation.data.code,
+      name: values.name,
+      code: values.code,
       status: 'active',
     })
     setIsSubmitting(false)
 
     if (createError) {
-      setError(
+      setDirectoryCreateError(
         safeDatabaseErrorMessage(createError, 'The project could not be created.'),
       )
       return
     }
 
-    setProjectName('')
-    setProjectReference('')
+    setDirectoryCreateTarget(null)
     setNotice('Project created inside the current organization boundary.')
     await loadDashboard()
   }
 
-  async function createSubcontractor(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function createSubcontractor(values: SubcontractorFormValues) {
     setError(null)
     setNotice(null)
-
-    const validation = subcontractorFormSchema.safeParse({
-      companyName: subcontractorCompany,
-      contactName: subcontractorContact,
-      email: subcontractorEmail,
-    })
-
-    if (!validation.success) {
-      setFormErrors(
-        fieldErrorsFromZod<OperationsFormField>(validation.error),
-      )
-      return
-    }
-
-    setFormErrors({})
+    setDirectoryCreateError(null)
     setIsSubmitting(true)
     const { error: createError } = await supabase.from('subcontractors').insert({
       organization_id: organization.id,
-      company_name: validation.data.companyName,
-      contact_name: validation.data.contactName || null,
-      email: validation.data.email || null,
+      company_name: values.companyName,
+      contact_name: values.contactName || null,
+      email: values.email || null,
       status: 'active',
     })
     setIsSubmitting(false)
 
     if (createError) {
-      setError(
+      setDirectoryCreateError(
         safeDatabaseErrorMessage(
           createError,
           'The subcontractor could not be created.',
@@ -682,9 +664,7 @@ export function OperationsDashboard({
       return
     }
 
-    setSubcontractorCompany('')
-    setSubcontractorContact('')
-    setSubcontractorEmail('')
+    setDirectoryCreateTarget(null)
     setNotice('Subcontractor added to this organization only.')
     await loadDashboard()
   }
@@ -767,6 +747,7 @@ export function OperationsDashboard({
     event.preventDefault()
     setError(null)
     setNotice(null)
+    setPaymentCreateError(null)
 
     const validation = paymentRequestFormSchema.safeParse({
       projectId: requestProjectId,
@@ -799,7 +780,7 @@ export function OperationsDashboard({
     setIsSubmitting(false)
 
     if (createError) {
-      setError(
+      setPaymentCreateError(
         safeDatabaseErrorMessage(
           createError,
           'The payment request could not be created.',
@@ -808,6 +789,7 @@ export function OperationsDashboard({
       return
     }
 
+    setIsPaymentCreateOpen(false)
     setRequestDescription('')
     setRequestGross('')
     setNotice('Draft payment request created with database-calculated retainage.')
@@ -857,6 +839,7 @@ export function OperationsDashboard({
     event.preventDefault()
     setError(null)
     setNotice(null)
+    setTeamAccessError(null)
     const validation = organizationMemberFormSchema.safeParse({
       email: memberEmail,
       role: memberRole,
@@ -884,7 +867,7 @@ export function OperationsDashboard({
     setIsSubmitting(false)
 
     if (memberError) {
-      setError(
+      setTeamAccessError(
         safeDatabaseErrorMessage(
           memberError,
           'Team access could not be updated.',
@@ -894,6 +877,7 @@ export function OperationsDashboard({
     }
 
     setMemberEmail('')
+    setIsTeamAccessOpen(false)
     setNotice('Team access updated successfully.')
     await loadDashboard()
   }
@@ -1350,7 +1334,7 @@ export function OperationsDashboard({
       {((activeNavigationId === 'directory' && canManageProjects) ||
         (activeNavigationId === 'payments' && canManagePayments)) && (
         <section
-          className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]"
+          className="grid items-start gap-6 xl:grid-cols-[1.35fr_0.65fr]"
         >
           <div className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.06)] sm:p-7">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -1361,218 +1345,90 @@ export function OperationsDashboard({
                 <h2 className="mt-1 text-xl font-extrabold tracking-[-0.03em] text-ink">
                   {activeNavigationId === 'payments'
                     ? 'Create payment request'
-                    : 'Add directory record'}
+                    : 'Directory actions'}
                 </h2>
               </div>
-              {createPanelOptions.length > 1 && (
-                <RadioGroup
-                  value={activeCreatePanel}
-                  onChange={(panel) => {
-                    setCreatePanel(panel as CreatePanel)
-                    setFormErrors({})
-                  }}
-                  aria-label="Data type to create"
-                  className="flex border border-ink/6 bg-cream p-1"
-                >
-                  {createPanelOptions.map(([panel, label]) => (
-                    <Radio
-                      key={panel}
-                      value={panel}
-                      className="cursor-pointer px-3 py-1.5 text-xs font-bold text-ink/80 transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/25 data-checked:bg-white data-checked:text-ink data-checked:shadow-sm"
-                    >
-                      {label}
-                    </Radio>
-                  ))}
-                </RadioGroup>
-              )}
             </div>
 
-            {activeCreatePanel === 'project' && canManageProjects && (
-              <form
-                noValidate
-                autoComplete="off"
-                onSubmit={(event) => void createProject(event)}
-                className="mt-6 grid gap-4 sm:grid-cols-[1fr_0.7fr_auto] sm:items-end"
-              >
-                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  <Label>Project name</Label>
-                  <Input
-                    autoComplete="off"
-                    required
-                    maxLength={160}
-                    value={projectName}
-                    onChange={(event) => {
-                      setProjectName(event.target.value)
-                      setFormErrors((current) => ({
-                        ...current,
-                        name: undefined,
-                      }))
-                    }}
-                    aria-invalid={Boolean(formErrors.name)}
-                    data-validation-error={Boolean(formErrors.name) || undefined}
-                    aria-describedby={
-                      formErrors.name ? 'project-name-error' : undefined
-                    }
-                    placeholder="Cedar Kitchen Remodel"
-                    className={fieldClassName}
-                  />
-                  <FieldError
-                    id="project-name-error"
-                    message={formErrors.name}
-                  />
-                </Field>
-                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  <Label>Project code</Label>
-                  <Input
-                    autoComplete="off"
-                    maxLength={32}
-                    value={projectReference}
-                    onChange={(event) => {
-                      setProjectReference(projectCode(event.target.value))
-                      setFormErrors((current) => ({
-                        ...current,
-                        code: undefined,
-                      }))
-                    }}
-                    aria-invalid={Boolean(formErrors.code)}
-                    data-validation-error={Boolean(formErrors.code) || undefined}
-                    aria-describedby={
-                      formErrors.code ? 'project-code-error' : undefined
-                    }
-                    placeholder="CEDAR-01"
-                    className={fieldClassName + ' font-mono'}
-                  />
-                  <FieldError
-                    id="project-code-error"
-                    message={formErrors.code}
-                  />
-                </Field>
+            {activeNavigationId === 'directory' && canManageProjects && (
+              <div className="mt-6 flex flex-col gap-4 sm:flex-row">
                 <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  aria-busy={isSubmitting}
-                  className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-wait disabled:opacity-60"
+                  type="button"
+                  onClick={() => {
+                    setDirectoryCreateError(null)
+                    setDirectoryCreateTarget('project')
+                  }}
+                  className="inline-flex h-10 items-center justify-center bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
                 >
-                  {isSubmitting && <ButtonSpinner tone="light" />}
-                  {isSubmitting ? 'Adding project…' : 'Add project'}
+                  Add project
                 </Button>
-              </form>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setDirectoryCreateError(null)
+                    setDirectoryCreateTarget('subcontractor')
+                  }}
+                  className="inline-flex h-10 items-center justify-center border border-ink/15 bg-white px-4 text-sm font-bold text-ink transition hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+                >
+                  Add subcontractor
+                </Button>
+              </div>
             )}
 
-            {activeCreatePanel === 'subcontractor' && canManageProjects && (
-              <form
-                noValidate
-                autoComplete="off"
-                onSubmit={(event) => void createSubcontractor(event)}
-                className="mt-6 grid gap-4 sm:grid-cols-2"
-              >
-                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  <Label>Company name</Label>
-                  <Input
-                    autoComplete="off"
-                    required
-                    maxLength={160}
-                    value={subcontractorCompany}
-                    onChange={(event) => {
-                      setSubcontractorCompany(event.target.value)
-                      setFormErrors((current) => ({
-                        ...current,
-                        companyName: undefined,
-                      }))
-                    }}
-                    aria-invalid={Boolean(formErrors.companyName)}
-                    data-validation-error={
-                      Boolean(formErrors.companyName) || undefined
-                    }
-                    aria-describedby={
-                      formErrors.companyName
-                        ? 'subcontractor-company-error'
-                        : undefined
-                    }
-                    placeholder="Fine Finish Carpentry"
-                    className={fieldClassName}
-                  />
-                  <FieldError
-                    id="subcontractor-company-error"
-                    message={formErrors.companyName}
-                  />
-                </Field>
-                <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
-                  <Label>Contact name</Label>
-                  <Input
-                    autoComplete="off"
-                    maxLength={160}
-                    value={subcontractorContact}
-                    onChange={(event) => {
-                      setSubcontractorContact(event.target.value)
-                      setFormErrors((current) => ({
-                        ...current,
-                        contactName: undefined,
-                      }))
-                    }}
-                    aria-invalid={Boolean(formErrors.contactName)}
-                    data-validation-error={
-                      Boolean(formErrors.contactName) || undefined
-                    }
-                    aria-describedby={
-                      formErrors.contactName
-                        ? 'subcontractor-contact-error'
-                        : undefined
-                    }
-                    placeholder="Hector Ramirez"
-                    className={fieldClassName}
-                  />
-                  <FieldError
-                    id="subcontractor-contact-error"
-                    message={formErrors.contactName}
-                  />
-                </Field>
-                <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
-                  <Label>Email</Label>
-                  <Input
-                    autoComplete="off"
-                    type="email"
-                    maxLength={320}
-                    value={subcontractorEmail}
-                    onChange={(event) => {
-                      setSubcontractorEmail(event.target.value)
-                      setFormErrors((current) => ({
-                        ...current,
-                        email: undefined,
-                      }))
-                    }}
-                    aria-invalid={Boolean(formErrors.email)}
-                    data-validation-error={Boolean(formErrors.email) || undefined}
-                    aria-describedby={
-                      formErrors.email ? 'subcontractor-email-error' : undefined
-                    }
-                    placeholder="hector@example.com"
-                    className={fieldClassName}
-                  />
-                  <FieldError
-                    id="subcontractor-email-error"
-                    message={formErrors.email}
-                  />
-                </Field>
+            {activeNavigationId === 'payments' && canManagePayments && (
+              <>
                 <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  aria-busy={isSubmitting}
-                  className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-wait disabled:opacity-60 sm:col-span-2 sm:justify-self-end"
+                  type="button"
+                  disabled={projects.length === 0 || subcontractors.length === 0}
+                  onClick={() => {
+                    setPaymentCreateError(null)
+                    setFormErrors({})
+                    setIsPaymentCreateOpen(true)
+                  }}
+                  className="mt-6 inline-flex h-10 items-center justify-center bg-ink px-4 text-sm font-bold text-white transition-colors hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isSubmitting && <ButtonSpinner tone="light" />}
-                  {isSubmitting ? 'Adding subcontractor…' : 'Add subcontractor'}
+                  Create draft request
                 </Button>
-              </form>
-            )}
-
-            {activeCreatePanel === 'payment' && canManagePayments && (
-              <form
-                noValidate
-                autoComplete="off"
-                onSubmit={(event) => void createPaymentRequest(event)}
-                className="mt-6 grid gap-4 sm:grid-cols-2"
-              >
+                <SidePanel
+                  open={isPaymentCreateOpen}
+                  busy={isSubmitting}
+                  onClose={() => {
+                    setIsPaymentCreateOpen(false)
+                    setPaymentCreateError(null)
+                    setFormErrors({})
+                  }}
+                >
+                  <form
+                    noValidate
+                    autoComplete="off"
+                    onSubmit={(event) => void createPaymentRequest(event)}
+                    className="flex min-h-full flex-col"
+                  >
+                    <SidePanelCloseButton
+                      disabled={isSubmitting}
+                      onClick={() => {
+                        setIsPaymentCreateOpen(false)
+                        setPaymentCreateError(null)
+                        setFormErrors({})
+                      }}
+                    />
+                    <div className="grid flex-1 content-start gap-4 p-6 pt-16 sm:grid-cols-2 sm:p-8 sm:pt-20">
+                    <div className="pr-10 sm:col-span-2">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-forest/80">
+                        Financial workflow
+                      </p>
+                      <DialogTitle className="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-ink">
+                        Create payment request
+                      </DialogTitle>
+                      <Description className="mt-2 text-sm leading-6 font-medium text-ink/80">
+                        Create a draft request with database-calculated retainage.
+                      </Description>
+                    </div>
+                    {paymentCreateError && (
+                      <NotificationBanner tone="error" className="sm:col-span-2">
+                        {paymentCreateError}
+                      </NotificationBanner>
+                    )}
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Project</Label>
                   <SelectControl
@@ -1757,44 +1613,61 @@ export function OperationsDashboard({
                     </div>
                   </div>
                 </div>
+                    </div>
 
-                <Button
-                  type="submit"
-                  disabled={
-                    isSubmitting || projects.length === 0 || subcontractors.length === 0
-                  }
-                  aria-busy={isSubmitting}
-                  className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:justify-self-end"
-                >
-                  {isSubmitting && <ButtonSpinner tone="light" />}
-                  {isSubmitting ? 'Creating draft…' : 'Create draft request'}
-                </Button>
-              </form>
+                    <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-3 border-t border-ink/10 bg-white p-4 sm:flex-row sm:justify-end sm:p-6">
+                      <Button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => {
+                          setIsPaymentCreateOpen(false)
+                          setPaymentCreateError(null)
+                          setFormErrors({})
+                        }}
+                        className="h-10 border border-ink/15 bg-white px-4 text-sm font-bold text-ink transition hover:bg-cream disabled:opacity-50"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={
+                          isSubmitting ||
+                          projects.length === 0 ||
+                          subcontractors.length === 0
+                        }
+                        aria-busy={isSubmitting}
+                        className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isSubmitting && <ButtonSpinner tone="light" />}
+                        {isSubmitting
+                          ? 'Creating draft…'
+                          : 'Create draft request'}
+                      </Button>
+                    </div>
+                  </form>
+                </SidePanel>
+              </>
             )}
           </div>
 
-          <aside className="flex self-start flex-col gap-7 bg-forest p-6 text-white shadow-[0_16px_40px_rgba(19,37,31,0.12)] sm:p-7">
+          <aside className="flex self-start flex-col gap-4 bg-forest p-6 text-white shadow-[0_16px_40px_rgba(19,37,31,0.12)] sm:p-7">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-mint/75">
                 Security evidence
               </p>
-              <h2 className="mt-2 text-2xl font-extrabold tracking-[-0.035em]">
+              <h2 className="mt-1 text-xl font-extrabold tracking-[-0.035em]">
                 The database owns the boundary.
               </h2>
-              <p className="mt-3 text-sm leading-6 font-medium text-white/70">
-                Client controls improve usability. Access policies, role checks,
-                constraints, and server workflows enforce the financial-data rules.
-              </p>
             </div>
-            <ul className="flex flex-col gap-2.5 border-t border-white/10 pt-5 text-sm font-medium text-white/80">
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-white/10 pt-4 text-xs font-medium text-white/80">
               {[
-                'Tenant A receives zero Tenant B rows',
-                'Money is stored in integer minor units',
-                'Retainage is generated by the database',
-                'State changes append audit evidence',
+                'Tenant-isolated records',
+                'Integer-safe money',
+                'Database-owned retainage',
+                'Audited state changes',
               ].map((item) => (
-                <li key={item} className="flex items-start gap-3">
-                  <span className="mt-1 grid size-4 shrink-0 place-items-center rounded-full bg-mint text-[10px] font-extrabold text-ink">
+                <li key={item} className="flex items-center gap-2">
+                  <span className="grid size-4 shrink-0 place-items-center rounded-full bg-mint text-[10px] font-extrabold text-ink">
                     ✓
                   </span>
                   {item}
@@ -1806,131 +1679,192 @@ export function OperationsDashboard({
       )}
 
       {activeNavigationId === 'directory' && (
-      <section className="grid gap-6 xl:grid-cols-2">
-        <div className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-ink/75">
+        <TabGroup
+          as="section"
+          className="overflow-hidden border border-ink/10 bg-white shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
+        >
+          <div className="border-b border-ink/10 px-6 pt-6 sm:px-7 sm:pt-7">
+            <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-ink/75">
+              Organization directory
+            </p>
+            <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">
+              Projects and subcontractors
+            </h2>
+            <TabList className="mt-5 flex gap-6 overflow-x-auto" aria-label="Directory records">
+              <Tab className="inline-flex min-w-max border-b-2 border-transparent px-1 pb-3 text-sm font-bold text-ink/65 outline-none transition hover:text-ink focus-visible:ring-2 focus-visible:ring-forest/25 data-selected:border-forest data-selected:text-forest">
                 Projects
-              </p>
-              <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">Active job ledger</h2>
-            </div>
-            <span className="font-mono text-xs font-bold text-forest/75">
-              {projects.length.toString().padStart(2, '0')}
-            </span>
-          </div>
-          <div className="mt-5 flex flex-col gap-2">
-            {projects.length === 0 ? (
-              <p className="border border-dashed border-ink/12 bg-cream/70 p-5 text-sm font-medium text-ink/80">
-                No projects yet. Add the first project above.
-              </p>
-            ) : (
-              projects.map((project) => (
-                <div
-                  key={project.id}
-                  className="flex items-center justify-between gap-4 border border-ink/8 px-4 py-3 transition-colors hover:bg-cream/45"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-ink">{project.name}</p>
-                    <p className="mt-1 font-mono text-[11px] text-ink/70">
-                      {project.code}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span
-                      className={
-                        'border px-2.5 py-1 text-[11px] font-bold ' +
-                        statusClassName(project.status)
-                      }
-                    >
-                      {formatStatus(project.status)}
-                    </span>
-                    {canManageProjects && (
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setDirectoryEditError(null)
-                          setDirectoryEditTarget({
-                            kind: 'project',
-                            record: project,
-                          })
-                        }}
-                        aria-label={`Edit ${project.name}`}
-                        className="h-8 border border-ink/15 bg-white px-3 text-xs font-bold text-ink transition hover:border-forest/35 hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
-                      >
-                        Edit
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-ink/75">
+              </Tab>
+              <Tab className="inline-flex min-w-max border-b-2 border-transparent px-1 pb-3 text-sm font-bold text-ink/65 outline-none transition hover:text-ink focus-visible:ring-2 focus-visible:ring-forest/25 data-selected:border-forest data-selected:text-forest">
                 Subcontractors
-              </p>
-              <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">Organization directory</h2>
-            </div>
-            <span className="font-mono text-xs font-bold text-forest/75">
-              {subcontractors.length.toString().padStart(2, '0')}
-            </span>
+              </Tab>
+            </TabList>
           </div>
-          <div className="mt-5 flex flex-col gap-2">
-            {subcontractors.length === 0 ? (
-              <p className="border border-dashed border-ink/12 bg-cream/70 p-5 text-sm font-medium text-ink/80">
-                No subcontractors yet. Add one before creating a payment request.
-              </p>
-            ) : (
-              subcontractors.map((subcontractor) => (
-                <div
-                  key={subcontractor.id}
-                  className="flex items-center justify-between gap-4 border border-ink/8 px-4 py-3 transition-colors hover:bg-cream/45"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-ink">
-                      {subcontractor.company_name}
-                    </p>
-                    <p className="mt-1 truncate text-xs text-ink/75">
-                      {subcontractor.contact_name ?? subcontractor.email ?? 'No contact added'}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span
-                      className={
-                        'border px-2.5 py-1 text-[11px] font-bold ' +
-                        statusClassName(subcontractor.status)
-                      }
-                    >
-                      {formatStatus(subcontractor.status)}
-                    </span>
-                    {canManageProjects && (
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setDirectoryEditError(null)
-                          setDirectoryEditTarget({
-                            kind: 'subcontractor',
-                            record: subcontractor,
-                          })
-                        }}
-                        aria-label={`Edit ${subcontractor.company_name}`}
-                        className="h-8 border border-ink/15 bg-white px-3 text-xs font-bold text-ink transition hover:border-forest/35 hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
-                      >
-                        Edit
-                      </Button>
+
+          <TabPanels>
+            <TabPanel className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-forest/25">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse text-left">
+                  <thead className="bg-cream/70">
+                    <tr className="border-b border-ink/10">
+                      <th scope="col" className="w-1/2 px-6 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
+                        Project
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
+                        Code
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
+                        Status
+                      </th>
+                      {canManageProjects && (
+                        <th scope="col" className="w-20 px-6 py-3 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
+                          Edit
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-ink/8">
+                    {projects.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={canManageProjects ? 4 : 3}
+                          className="px-6 py-8 text-sm font-medium text-ink/75"
+                        >
+                          No projects yet. Add the first project above.
+                        </td>
+                      </tr>
+                    ) : (
+                      projects.map((project) => (
+                        <tr key={project.id} className="transition-colors hover:bg-cream/45">
+                          <th scope="row" className="px-6 py-4 text-sm font-bold text-ink">
+                            {project.name}
+                          </th>
+                          <td className="px-4 py-4 font-mono text-[11px] font-medium text-ink/75">
+                            {project.code}
+                          </td>
+                          <td className="px-4 py-4">
+                            <span
+                              className={
+                                'inline-flex border px-2.5 py-1 text-[11px] font-bold ' +
+                                statusClassName(project.status)
+                              }
+                            >
+                              {formatStatus(project.status)}
+                            </span>
+                          </td>
+                          {canManageProjects && (
+                            <td className="px-6 py-4 text-center">
+                              <Button
+                                type="button"
+                                onClick={() => {
+                                  setDirectoryEditError(null)
+                                  setDirectoryEditTarget({
+                                    kind: 'project',
+                                    record: project,
+                                  })
+                                }}
+                                aria-label={`Edit ${project.name}`}
+                                title={`Edit ${project.name}`}
+                                className="inline-grid size-8 place-items-center text-ink/65 transition hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+                              >
+                                <EditIcon />
+                              </Button>
+                            </td>
+                          )}
+                        </tr>
+                      ))
                     )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </section>
+                  </tbody>
+                </table>
+              </div>
+            </TabPanel>
+
+            <TabPanel className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-forest/25">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] border-collapse text-left">
+                  <thead className="bg-cream/70">
+                    <tr className="border-b border-ink/10">
+                      <th scope="col" className="w-1/3 px-6 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
+                        Company
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
+                        Contact
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
+                        Email
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
+                        Status
+                      </th>
+                      {canManageProjects && (
+                        <th scope="col" className="w-20 px-6 py-3 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
+                          Edit
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-ink/8">
+                    {subcontractors.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={canManageProjects ? 5 : 4}
+                          className="px-6 py-8 text-sm font-medium text-ink/75"
+                        >
+                          No subcontractors yet. Add one before creating a payment request.
+                        </td>
+                      </tr>
+                    ) : (
+                      subcontractors.map((subcontractor) => (
+                        <tr
+                          key={subcontractor.id}
+                          className="transition-colors hover:bg-cream/45"
+                        >
+                          <th scope="row" className="px-6 py-4 text-sm font-bold text-ink">
+                            {subcontractor.company_name}
+                          </th>
+                          <td className="px-4 py-4 text-xs font-medium text-ink/75">
+                            {subcontractor.contact_name ?? '—'}
+                          </td>
+                          <td className="px-4 py-4 text-xs font-medium text-ink/75">
+                            {subcontractor.email ?? '—'}
+                          </td>
+                          <td className="px-4 py-4">
+                            <span
+                              className={
+                                'inline-flex border px-2.5 py-1 text-[11px] font-bold ' +
+                                statusClassName(subcontractor.status)
+                              }
+                            >
+                              {formatStatus(subcontractor.status)}
+                            </span>
+                          </td>
+                          {canManageProjects && (
+                            <td className="px-6 py-4 text-center">
+                              <Button
+                                type="button"
+                                onClick={() => {
+                                  setDirectoryEditError(null)
+                                  setDirectoryEditTarget({
+                                    kind: 'subcontractor',
+                                    record: subcontractor,
+                                  })
+                                }}
+                                aria-label={`Edit ${subcontractor.company_name}`}
+                                title={`Edit ${subcontractor.company_name}`}
+                                className="inline-grid size-8 place-items-center text-ink/65 transition hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+                              >
+                                <EditIcon />
+                              </Button>
+                            </td>
+                          )}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </TabPanel>
+          </TabPanels>
+        </TabGroup>
       )}
 
       {activeNavigationId === 'payments' && (
@@ -2175,7 +2109,21 @@ export function OperationsDashboard({
           role={memberRole}
           busyUserId={memberUserId}
           isSubmitting={isSubmitting}
+          isFormOpen={isTeamAccessOpen}
+          serverError={teamAccessError}
           fieldErrors={{ email: formErrors.email, role: formErrors.role }}
+          onOpenForm={() => {
+            setTeamAccessError(null)
+            setFormErrors({})
+            setIsTeamAccessOpen(true)
+          }}
+          onCloseForm={() => {
+            if (!isSubmitting) {
+              setIsTeamAccessOpen(false)
+              setTeamAccessError(null)
+              setFormErrors({})
+            }
+          }}
           onEmailChange={(value) => {
             setMemberEmail(value)
             setFormErrors((current) => ({ ...current, email: undefined }))
@@ -2279,25 +2227,44 @@ export function OperationsDashboard({
               No audit events have been recorded for this workspace yet.
             </p>
           ) : (
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              {auditEvents.map((event) => (
-              <div
-                key={event.id}
-                className="flex items-start justify-between gap-4 border border-ink/8 p-4 transition-colors hover:bg-cream/45"
-              >
-                <div>
-                  <p className="text-sm font-bold text-ink">
-                    {formatStatus(event.action.replaceAll('.', '_'))}
-                  </p>
-                  <p className="mt-1 font-mono text-[11px] text-ink/70">
-                    {event.entity_type} · {event.entity_id?.slice(0, 8) ?? 'system'}
-                  </p>
-                </div>
-                <time className="shrink-0 text-[11px] font-semibold text-ink/70">
-                  {shortDate(event.created_at)}
-                </time>
-              </div>
-              ))}
+            <div className="mt-5 overflow-x-auto border border-ink/10">
+              <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+                <thead className="bg-cream text-[10px] font-bold uppercase tracking-[0.15em] text-ink/80">
+                  <tr>
+                    <th scope="col" className="px-4 py-3">Event</th>
+                    <th scope="col" className="px-4 py-3">Entity</th>
+                    <th scope="col" className="px-4 py-3">Record ID</th>
+                    <th scope="col" className="px-4 py-3">Actor</th>
+                    <th scope="col" className="px-4 py-3 text-right">Recorded</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ink/8">
+                  {auditEvents.map((event) => (
+                    <tr
+                      key={event.id}
+                      className="transition-colors hover:bg-cream/40"
+                    >
+                      <th scope="row" className="px-4 py-4 font-bold text-ink">
+                        {formatStatus(event.action.replaceAll('.', '_'))}
+                      </th>
+                      <td className="px-4 py-4 text-ink/85">
+                        {formatStatus(event.entity_type)}
+                      </td>
+                      <td className="px-4 py-4 font-mono text-[11px] font-medium text-ink/70">
+                        {event.entity_id?.slice(0, 8) ?? 'system'}
+                      </td>
+                      <td className="px-4 py-4 font-mono text-[11px] font-medium text-ink/70">
+                        {event.actor_user_id?.slice(0, 8) ?? 'system'}
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <time className="text-[11px] font-semibold text-ink/70">
+                          {shortDate(event.created_at)}
+                        </time>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
@@ -2322,6 +2289,21 @@ export function OperationsDashboard({
           </DialogPanel>
         </div>
       </Dialog>
+
+      <DirectoryCreateDrawer
+        target={directoryCreateTarget}
+        isSaving={isSubmitting}
+        serverError={directoryCreateError}
+        onClose={() => {
+          if (!isSubmitting) {
+            setDirectoryCreateTarget(null)
+            setDirectoryCreateError(null)
+          }
+        }}
+        onClearError={() => setDirectoryCreateError(null)}
+        onCreateProject={createProject}
+        onCreateSubcontractor={createSubcontractor}
+      />
 
       <DirectoryEditDialog
         target={directoryEditTarget}
