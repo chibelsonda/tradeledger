@@ -1,0 +1,30 @@
+interface BrandProps {
+  compact?: boolean
+}
+
+export function Brand({ compact = false }: BrandProps) {
+  return (
+    <a
+      href="/"
+      className="group inline-flex items-center gap-3"
+      aria-label="TradeLedger home"
+    >
+      <span className="grid size-10 place-items-center bg-ink text-mint shadow-[0_8px_24px_rgba(16,35,31,0.18)] transition-transform group-hover:-rotate-3">
+        <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+          <path
+            d="M5 5.5h14M5 10h14M5 14.5h9M5 19h9"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      </span>
+      {!compact && (
+        <span className="text-lg font-bold tracking-tight text-ink">
+          tradeledger
+        </span>
+      )}
+    </a>
+  )
+}
