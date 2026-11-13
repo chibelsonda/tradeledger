@@ -22,7 +22,7 @@ export function Header({ session }: HeaderProps) {
     <header className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-4 px-6 lg:px-8">
       <Brand />
 
-      {session ? (
+      {session && (
         <div className="flex items-center gap-2">
           <span className="hidden max-w-56 truncate text-xs font-semibold text-ink/85 sm:block">
             {session.user.email}
@@ -35,18 +35,6 @@ export function Header({ session }: HeaderProps) {
           >
             {isSigningOut ? 'Signing out…' : 'Sign out'}
           </Button>
-        </div>
-      ) : (
-        <div className="inline-flex h-9 items-center gap-2 border border-ink/10 bg-white/75 px-3 text-xs font-semibold text-ink/80 shadow-[0_6px_18px_rgba(19,37,31,0.05)] backdrop-blur">
-          <svg viewBox="0 0 20 20" className="size-4 text-forest" aria-hidden="true">
-            <path
-              fill="currentColor"
-              fillRule="evenodd"
-              d="M10 1.75a4.25 4.25 0 0 0-4.25 4.25v1.25A2.75 2.75 0 0 0 3 10v5.5a2.75 2.75 0 0 0 2.75 2.75h8.5A2.75 2.75 0 0 0 17 15.5V10a2.75 2.75 0 0 0-2.75-2.75V6A4.25 4.25 0 0 0 10 1.75Zm2.75 5.5V6a2.75 2.75 0 1 0-5.5 0v1.25h5.5Z"
-              clipRule="evenodd"
-            />
-          </svg>
-          Supabase secured
         </div>
       )}
     </header>

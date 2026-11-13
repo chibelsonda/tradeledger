@@ -1,12 +1,23 @@
 import { Button, Field, Input, Label } from '@headlessui/react'
 import { useState } from 'react'
 
+import { FieldError } from '../../../components/ui/FieldError'
 import { organizationSlug } from '../../../lib/organizations'
 import { supabase } from '../../../lib/supabase'
+import {
+  fieldErrorsFromZod,
+  type FieldErrors,
+} from '../../../lib/validation'
+import {
+  organizationFormSchema,
+  type OrganizationFormValues,
+} from '../workspace.schemas'
 
 interface OrganizationOnboardingProps {
   onCreated: (organizationId: string) => void
 }
+
+type OrganizationField = keyof OrganizationFormValues
 
 export function OrganizationOnboarding({
   onCreated,
@@ -17,6 +28,9 @@ export function OrganizationOnboarding({
   const [includeDemoData, setIncludeDemoData] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<
+    FieldErrors<OrganizationField>
+  >({})
 
   function updateName(value: string) {
     setName(value)
@@ -30,22 +44,26 @@ export function OrganizationOnboarding({
     event.preventDefault()
     setError(null)
 
-    const normalizedName = name.trim()
-    const normalizedSlug = organizationSlug(slug)
+    const validation = organizationFormSchema.safeParse({
+      name,
+      slug,
+      includeDemoData,
+    })
 
-    if (normalizedName.length < 2 || normalizedSlug.length < 2) {
-      setError('Enter an organization name and a valid workspace URL.')
+    if (!validation.success) {
+      setFieldErrors(fieldErrorsFromZod<OrganizationField>(validation.error))
       return
     }
 
+    setFieldErrors({})
     setIsSubmitting(true)
 
     const { data, error: createError } = await supabase.rpc(
       'create_organization_workspace',
       {
-        p_name: normalizedName,
-        p_slug: normalizedSlug,
-        p_seed_demo: includeDemoData,
+        p_name: validation.data.name,
+        p_slug: validation.data.slug,
+        p_seed_demo: validation.data.includeDemoData,
       },
     )
 
@@ -75,7 +93,7 @@ export function OrganizationOnboarding({
           </h1>
           <p className="max-w-lg text-base leading-7 font-medium text-ink/85">
             Projects, subcontractors, payment requests, and audit history are
-            isolated by organization with PostgreSQL Row-Level Security.
+            isolated by organization with data-layer access policies.
           </p>
         </div>
         <div className="grid gap-3 text-sm text-ink/80 sm:grid-cols-3">
@@ -95,6 +113,7 @@ export function OrganizationOnboarding({
       </div>
 
       <form
+        noValidate
         onSubmit={(event) => void createOrganization(event)}
         className="flex flex-col gap-6 border border-ink/10 bg-white p-7 shadow-[0_24px_64px_rgba(19,37,31,0.12)] sm:p-9"
       >
@@ -118,9 +137,20 @@ export function OrganizationOnboarding({
             minLength={2}
             maxLength={120}
             value={name}
-            onChange={(event) => updateName(event.target.value)}
+            onChange={(event) => {
+              updateName(event.target.value)
+              setFieldErrors((current) => ({ ...current, name: undefined }))
+            }}
+            aria-invalid={Boolean(fieldErrors.name)}
+            aria-describedby={
+              fieldErrors.name ? 'organization-name-error' : undefined
+            }
             placeholder="North Ridge Contracting"
-            className="h-10 border border-ink/15 bg-white px-3.5 font-medium outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10"
+            className="h-10 border border-ink/15 bg-white px-3.5 font-medium outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:border-red-500 aria-invalid:focus:border-red-600 aria-invalid:focus:ring-red-500/10"
+          />
+          <FieldError
+            id="organization-name-error"
+            message={fieldErrors.name}
           />
         </Field>
 
@@ -144,22 +174,39 @@ export function OrganizationOnboarding({
 
         <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
           <Label>Workspace URL</Label>
-          <div className="flex h-10 items-center overflow-hidden border border-ink/15 bg-white focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/10">
+          <div
+            className={
+              'flex h-10 items-center overflow-hidden border bg-white focus-within:ring-2 ' +
+              (fieldErrors.slug
+                ? 'border-red-500 focus-within:border-red-600 focus-within:ring-red-500/10'
+                : 'border-ink/15 focus-within:border-forest focus-within:ring-forest/10')
+            }
+          >
             <span className="border-r border-ink/10 px-3 text-xs font-semibold text-ink/80">
               /workspace/
             </span>
             <Input
               required
               minLength={2}
+              maxLength={63}
               value={slug}
               onChange={(event) => {
                 setIsSlugEdited(true)
                 setSlug(organizationSlug(event.target.value))
+                setFieldErrors((current) => ({ ...current, slug: undefined }))
               }}
+              aria-invalid={Boolean(fieldErrors.slug)}
+              aria-describedby={
+                fieldErrors.slug ? 'organization-slug-error' : undefined
+              }
               placeholder="north-ridge"
               className="h-full min-w-0 flex-1 bg-white px-3 font-mono text-sm font-normal outline-none placeholder:text-ink/60"
             />
           </div>
+          <FieldError
+            id="organization-slug-error"
+            message={fieldErrors.slug}
+          />
         </Field>
 
         {error && (

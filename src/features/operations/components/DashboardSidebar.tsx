@@ -151,7 +151,7 @@ export function DashboardSidebar({
       </nav>
 
       <div className="border-t border-ink/8 px-6 py-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/70">
-        RLS protected workspace
+        Protected workspace
       </div>
     </div>
   )

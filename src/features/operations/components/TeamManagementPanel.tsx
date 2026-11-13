@@ -5,6 +5,7 @@ import type {
   OrganizationMember,
   OrganizationRole,
 } from '../../../lib/database.types'
+import { FieldError } from '../../../components/ui/FieldError'
 import { formatStatus } from '../../../lib/format'
 import { SelectControl } from '../../../components/ui/SelectControl'
 
@@ -16,6 +17,7 @@ interface TeamManagementPanelProps {
   role: Exclude<OrganizationRole, 'owner'>
   busyUserId: string | null
   isSubmitting: boolean
+  fieldErrors: { email?: string; role?: string }
   onEmailChange: (value: string) => void
   onRoleChange: (value: Exclude<OrganizationRole, 'owner'>) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -26,7 +28,7 @@ interface TeamManagementPanelProps {
 }
 
 const inputClassName =
-  'h-10 border border-ink/15 bg-white px-3.5 text-sm font-medium text-ink outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10'
+  'h-10 border border-ink/15 bg-white px-3.5 text-sm font-medium text-ink outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:border-red-500 aria-invalid:focus:border-red-600 aria-invalid:focus:ring-red-500/10'
 
 function canManageMember(
   actorRole: OrganizationRole,
@@ -46,6 +48,7 @@ export function TeamManagementPanel({
   role,
   busyUserId,
   isSubmitting,
+  fieldErrors,
   onEmailChange,
   onRoleChange,
   onSubmit,
@@ -66,8 +69,8 @@ export function TeamManagementPanel({
             </p>
             <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">Organization team</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 font-medium text-ink/80">
-              Roles are enforced by PostgreSQL policies and server-side workflow
-              functions. Suspended members immediately lose tenant access.
+              Roles are enforced by data-access policies and server-side workflow
+              controls. Suspended members immediately lose tenant access.
             </p>
           </div>
           <span className="w-fit border border-ink/10 bg-cream px-3 py-1.5 font-mono text-xs font-bold text-ink/80">
@@ -155,6 +158,7 @@ export function TeamManagementPanel({
       </section>
 
       <form
+        noValidate
         onSubmit={onSubmit}
         className="h-fit border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
       >
@@ -176,9 +180,14 @@ export function TeamManagementPanel({
               maxLength={320}
               value={email}
               onChange={(event) => onEmailChange(event.target.value)}
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={
+                fieldErrors.email ? 'member-email-error' : undefined
+              }
               placeholder="teammate@example.com"
               className={inputClassName}
             />
+            <FieldError id="member-email-error" message={fieldErrors.email} />
           </Field>
 
           <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
@@ -193,8 +202,13 @@ export function TeamManagementPanel({
                 label: formatStatus(availableRole),
               }))}
               ariaLabel="Role"
+              ariaDescribedBy={
+                fieldErrors.role ? 'member-role-error' : undefined
+              }
+              invalid={Boolean(fieldErrors.role)}
               className={inputClassName}
             />
+            <FieldError id="member-role-error" message={fieldErrors.role} />
           </Field>
         </div>
 

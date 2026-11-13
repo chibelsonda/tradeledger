@@ -30,6 +30,7 @@ import type {
   Subcontractor,
   WaiverDocument,
 } from '../../../lib/database.types'
+import { FieldError } from '../../../components/ui/FieldError'
 import { formatCurrency, formatStatus } from '../../../lib/format'
 import { projectCode } from '../../../lib/organizations'
 import {
@@ -37,11 +38,26 @@ import {
   dollarsToMinorUnits,
 } from '../../../lib/payment-calculations'
 import { supabase } from '../../../lib/supabase'
+import {
+  fieldErrorsFromZod,
+  type FieldErrors,
+} from '../../../lib/validation'
 import { SelectControl } from '../../../components/ui/SelectControl'
+import {
+  organizationMemberFormSchema,
+  paymentRequestFormSchema,
+  projectFormSchema,
+  subcontractorFormSchema,
+  type OrganizationMemberFormValues,
+  type PaymentRequestFormValues,
+  type ProjectFormValues,
+  type SubcontractorFormValues,
+} from '../operations.schemas'
 import {
   DashboardSidebar,
   type DashboardNavigationItem,
 } from './DashboardSidebar'
+import { OverviewCharts } from './OverviewCharts'
 import { TeamManagementPanel } from './TeamManagementPanel'
 import { WaiverDocumentControl } from './WaiverDocumentControl'
 
@@ -57,6 +73,11 @@ interface OperationsDashboardProps {
 }
 
 type CreatePanel = 'project' | 'subcontractor' | 'payment'
+type OperationsFormField =
+  | keyof ProjectFormValues
+  | keyof SubcontractorFormValues
+  | keyof PaymentRequestFormValues
+  | keyof OrganizationMemberFormValues
 type DashboardPage =
   | 'overview'
   | 'directory'
@@ -101,12 +122,12 @@ const dashboardPageDetails: Record<
   delivery: {
     eyebrow: 'Integration health',
     title: 'Webhook operations',
-    description: 'Stripe event processing and failure recovery',
+    description: 'Payment event processing and failure recovery',
   },
   audit: {
     eyebrow: 'Security evidence',
     title: 'Audit trail',
-    description: 'Immutable organization activity recorded by PostgreSQL',
+    description: 'Immutable organization activity recorded at the data layer',
   },
 }
 
@@ -119,9 +140,9 @@ function dashboardPageFromPath(pathname: string): DashboardPage {
 }
 
 const fieldClassName =
-  'h-10 border border-ink/15 bg-white px-3.5 text-sm font-medium text-ink outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10'
+  'h-10 border border-ink/15 bg-white px-3.5 text-sm font-medium text-ink outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:border-red-500 aria-invalid:focus:border-red-600 aria-invalid:focus:ring-red-500/10'
 const selectFieldClassName =
-  'h-10 border border-ink/15 bg-white pl-3.5 text-sm font-medium text-ink outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10'
+  'h-10 border border-ink/15 bg-white pl-3.5 text-sm font-medium text-ink outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10 aria-invalid:border-red-500 aria-invalid:focus:border-red-600 aria-invalid:focus:ring-red-500/10'
 
 function statusClassName(status: string): string {
   switch (status) {
@@ -231,6 +252,9 @@ export function OperationsDashboard({
   const [memberRole, setMemberRole] = useState<
     Exclude<OrganizationRole, 'owner'>
   >('member')
+  const [formErrors, setFormErrors] = useState<
+    FieldErrors<OperationsFormField>
+  >({})
 
   const canManageProjects = ['owner', 'admin'].includes(organization.role)
   const canManageTeam = ['owner', 'admin'].includes(organization.role)
@@ -257,6 +281,11 @@ export function OperationsDashboard({
     ].filter(Boolean) as [CreatePanel, string][]
   )
   const navigationItems = useMemo<DashboardNavigationItem[]>(() => {
+    const directoryCount = projects.length + subcontractors.length
+    const activeMemberCount = organizationMembers.filter(
+      (member) => member.status === 'active',
+    ).length
+
     return [
       {
         id: 'overview',
@@ -269,29 +298,28 @@ export function OperationsDashboard({
         href: dashboardPathByPage.directory,
         label: 'Directory',
         detail: 'Projects and subcontractors',
-        badge: String(projects.length + subcontractors.length),
+        badge: directoryCount > 0 ? String(directoryCount) : undefined,
       },
       {
         id: 'payments',
         href: dashboardPathByPage.payments,
         label: 'Payments',
         detail: 'Requests, checkout, and refunds',
-        badge: String(paymentRequests.length),
+        badge:
+          paymentRequests.length > 0 ? String(paymentRequests.length) : undefined,
       },
       canManageTeam && {
         id: 'team',
         href: dashboardPathByPage.team,
         label: 'Team access',
         detail: 'Roles and membership',
-        badge: String(
-          organizationMembers.filter((member) => member.status === 'active').length,
-        ),
+        badge: activeMemberCount > 0 ? String(activeMemberCount) : undefined,
       },
       canManagePayments && {
         id: 'delivery',
         href: dashboardPathByPage.delivery,
         label: 'Webhooks',
-        detail: 'Stripe event health',
+        detail: 'Payment event health',
         badge:
           webhookFailures.length > 0 ? String(webhookFailures.length) : undefined,
       },
@@ -442,6 +470,7 @@ export function OperationsDashboard({
       }
 
       setActiveNavigationId(isAllowed ? nextPage : 'overview')
+      setFormErrors({})
       setIsNavigationOpen(false)
       window.scrollTo({ top: 0 })
     }
@@ -503,19 +532,24 @@ export function OperationsDashboard({
     setError(null)
     setNotice(null)
 
-    const name = projectName.trim()
-    const code = projectCode(projectReference || name)
+    const validation = projectFormSchema.safeParse({
+      name: projectName,
+      code: projectCode(projectReference || projectName),
+    })
 
-    if (name.length < 2 || code.length < 2) {
-      setError('Enter a project name and a valid project code.')
+    if (!validation.success) {
+      setFormErrors(
+        fieldErrorsFromZod<OperationsFormField>(validation.error),
+      )
       return
     }
 
+    setFormErrors({})
     setIsSubmitting(true)
     const { error: createError } = await supabase.from('projects').insert({
       organization_id: organization.id,
-      name,
-      code,
+      name: validation.data.name,
+      code: validation.data.code,
       status: 'active',
     })
     setIsSubmitting(false)
@@ -536,17 +570,26 @@ export function OperationsDashboard({
     setError(null)
     setNotice(null)
 
-    if (subcontractorCompany.trim().length < 2) {
-      setError('Enter a subcontractor company name.')
+    const validation = subcontractorFormSchema.safeParse({
+      companyName: subcontractorCompany,
+      contactName: subcontractorContact,
+      email: subcontractorEmail,
+    })
+
+    if (!validation.success) {
+      setFormErrors(
+        fieldErrorsFromZod<OperationsFormField>(validation.error),
+      )
       return
     }
 
+    setFormErrors({})
     setIsSubmitting(true)
     const { error: createError } = await supabase.from('subcontractors').insert({
       organization_id: organization.id,
-      company_name: subcontractorCompany.trim(),
-      contact_name: subcontractorContact.trim() || null,
-      email: subcontractorEmail.trim().toLowerCase() || null,
+      company_name: validation.data.companyName,
+      contact_name: validation.data.contactName || null,
+      email: validation.data.email || null,
       status: 'active',
     })
     setIsSubmitting(false)
@@ -568,30 +611,32 @@ export function OperationsDashboard({
     setError(null)
     setNotice(null)
 
-    const grossAmount = dollarsToMinorUnits(requestGross)
-    const retainagePercentage = Number(requestRetainage)
+    const validation = paymentRequestFormSchema.safeParse({
+      projectId: requestProjectId,
+      subcontractorId: requestSubcontractorId,
+      description: requestDescription,
+      grossAmount: requestGross,
+      retainagePercentage: requestRetainage,
+    })
 
-    if (
-      !requestProjectId ||
-      !requestSubcontractorId ||
-      requestDescription.trim().length < 3 ||
-      grossAmount === null ||
-      !Number.isFinite(retainagePercentage) ||
-      retainagePercentage < 0 ||
-      retainagePercentage > 100
-    ) {
-      setError('Complete every payment request field with valid values.')
+    if (!validation.success) {
+      setFormErrors(
+        fieldErrorsFromZod<OperationsFormField>(validation.error),
+      )
       return
     }
 
+    setFormErrors({})
     setIsSubmitting(true)
     const { error: createError } = await supabase.rpc('create_payment_request', {
       p_organization_id: organization.id,
-      p_project_id: requestProjectId,
-      p_subcontractor_id: requestSubcontractorId,
-      p_description: requestDescription.trim(),
-      p_gross_amount: grossAmount,
-      p_retainage_basis_points: Math.round(retainagePercentage * 100),
+      p_project_id: validation.data.projectId,
+      p_subcontractor_id: validation.data.subcontractorId,
+      p_description: validation.data.description,
+      p_gross_amount: validation.data.grossAmount,
+      p_retainage_basis_points: Math.round(
+        validation.data.retainagePercentage * 100,
+      ),
       p_currency: 'usd',
     })
     setIsSubmitting(false)
@@ -648,14 +693,27 @@ export function OperationsDashboard({
     event.preventDefault()
     setError(null)
     setNotice(null)
+    const validation = organizationMemberFormSchema.safeParse({
+      email: memberEmail,
+      role: memberRole,
+    })
+
+    if (!validation.success) {
+      setFormErrors(
+        fieldErrorsFromZod<OperationsFormField>(validation.error),
+      )
+      return
+    }
+
+    setFormErrors({})
     setIsSubmitting(true)
 
     const { error: memberError } = await supabase.rpc(
       'upsert_organization_member',
       {
         p_organization_id: organization.id,
-        p_email: memberEmail.trim(),
-        p_role: memberRole,
+        p_email: validation.data.email,
+        p_role: validation.data.role,
       },
     )
 
@@ -731,7 +789,7 @@ export function OperationsDashboard({
 
     if (typeof url !== 'string' || !url.startsWith('https://')) {
       setCheckoutRequestId(null)
-      setError('Stripe did not return a valid secure checkout URL.')
+      setError('The payment provider did not return a valid checkout URL.')
       await loadDashboard()
       return
     }
@@ -755,7 +813,7 @@ export function OperationsDashboard({
       setError(
         await edgeFunctionErrorMessage(
           reconciliationError,
-          'Stripe reconciliation could not be completed.',
+          'Payment reconciliation could not be completed.',
         ),
       )
       await loadDashboard()
@@ -764,7 +822,7 @@ export function OperationsDashboard({
 
     const status = (data as { status?: unknown } | null)?.status
     setNotice(
-      `Stripe reconciliation completed${typeof status === 'string' ? ` with ${formatStatus(status)} status` : ''}.`,
+      `Payment reconciliation completed${typeof status === 'string' ? ` with ${formatStatus(status)} status` : ''}.`,
     )
     await loadDashboard()
   }
@@ -796,8 +854,8 @@ export function OperationsDashboard({
     const status = (data as { status?: unknown } | null)?.status
     setNotice(
       typeof status === 'string' && status !== 'succeeded'
-        ? `Stripe accepted the refund with ${formatStatus(status)} status. Reconciliation will keep the ledger current.`
-        : 'The Stripe refund succeeded and the payment ledger was updated.',
+        ? `The payment provider accepted the refund with ${formatStatus(status)} status. Reconciliation will keep the ledger current.`
+        : 'The refund succeeded and the payment ledger was updated.',
     )
     await loadDashboard()
   }
@@ -869,6 +927,7 @@ export function OperationsDashboard({
     }
 
     setActiveNavigationId(nextPage)
+    setFormErrors({})
     setIsNavigationOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -970,7 +1029,7 @@ export function OperationsDashboard({
                     {userEmail}
                   </p>
                   <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-ink/70">
-                    Supabase authenticated
+                    Verified account
                   </p>
                 </div>
 
@@ -1054,28 +1113,35 @@ export function OperationsDashboard({
       )}
 
       {activeNavigationId === 'overview' && (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          ['Active projects', projects.filter((project) => project.status === 'active').length],
-          ['Subcontractors', subcontractors.length],
-          ['Payment requests', paymentRequests.length],
-          ['Approved net', formatCurrency(approvedNetAmount, 'usd')],
-          ['Refunded', formatCurrency(refundedAmount, 'usd')],
-        ].map(([label, value]) => (
-          <div
-            key={label}
-            className="group relative overflow-hidden border border-ink/10 bg-white p-5 shadow-[0_14px_36px_rgba(19,37,31,0.05)] transition-transform hover:-translate-y-0.5"
-          >
-            <span className="absolute inset-x-0 top-0 h-0.5 bg-forest/70" />
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink/75">
-              {label}
-            </p>
-            <p className="mt-3 text-3xl font-extrabold tracking-[-0.04em] text-ink">
-              {value}
-            </p>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {[
+              [
+                'Active projects',
+                projects.filter((project) => project.status === 'active').length,
+              ],
+              ['Subcontractors', subcontractors.length],
+              ['Payment requests', paymentRequests.length],
+              ['Approved net', formatCurrency(approvedNetAmount, 'usd')],
+              ['Refunded', formatCurrency(refundedAmount, 'usd')],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="group relative overflow-hidden border border-ink/10 bg-white p-5 shadow-[0_14px_36px_rgba(19,37,31,0.05)] transition-transform hover:-translate-y-0.5"
+              >
+                <span className="absolute inset-x-0 top-0 h-0.5 bg-forest/70" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink/75">
+                  {label}
+                </p>
+                <p className="mt-3 text-3xl font-extrabold tracking-[-0.04em] text-ink">
+                  {value}
+                </p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+
+          <OverviewCharts paymentRequests={paymentRequests} />
+        </>
       )}
 
       {((activeNavigationId === 'directory' && canManageProjects) ||
@@ -1098,7 +1164,10 @@ export function OperationsDashboard({
               {createPanelOptions.length > 1 && (
                 <RadioGroup
                   value={activeCreatePanel}
-                  onChange={setCreatePanel}
+                  onChange={(panel) => {
+                    setCreatePanel(panel as CreatePanel)
+                    setFormErrors({})
+                  }}
                   aria-label="Data type to create"
                   className="flex border border-ink/6 bg-cream p-1"
                 >
@@ -1117,6 +1186,7 @@ export function OperationsDashboard({
 
             {activeCreatePanel === 'project' && canManageProjects && (
               <form
+                noValidate
                 onSubmit={(event) => void createProject(event)}
                 className="mt-6 grid gap-4 sm:grid-cols-[1fr_0.7fr_auto] sm:items-end"
               >
@@ -1124,21 +1194,49 @@ export function OperationsDashboard({
                   <Label>Project name</Label>
                   <Input
                     required
+                    maxLength={160}
                     value={projectName}
-                    onChange={(event) => setProjectName(event.target.value)}
+                    onChange={(event) => {
+                      setProjectName(event.target.value)
+                      setFormErrors((current) => ({
+                        ...current,
+                        name: undefined,
+                      }))
+                    }}
+                    aria-invalid={Boolean(formErrors.name)}
+                    aria-describedby={
+                      formErrors.name ? 'project-name-error' : undefined
+                    }
                     placeholder="Cedar Kitchen Remodel"
                     className={fieldClassName}
+                  />
+                  <FieldError
+                    id="project-name-error"
+                    message={formErrors.name}
                   />
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Project code</Label>
                   <Input
+                    maxLength={32}
                     value={projectReference}
-                    onChange={(event) =>
+                    onChange={(event) => {
                       setProjectReference(projectCode(event.target.value))
+                      setFormErrors((current) => ({
+                        ...current,
+                        code: undefined,
+                      }))
+                    }}
+                    aria-invalid={Boolean(formErrors.code)}
+                    aria-describedby={
+                      formErrors.code ? 'project-code-error' : undefined
                     }
                     placeholder="CEDAR-01"
                     className={fieldClassName + ' font-mono'}
+                  />
+                  <FieldError
+                    id="project-code-error"
+                    message={formErrors.code}
                   />
                 </Field>
                 <Button
@@ -1153,6 +1251,7 @@ export function OperationsDashboard({
 
             {activeCreatePanel === 'subcontractor' && canManageProjects && (
               <form
+                noValidate
                 onSubmit={(event) => void createSubcontractor(event)}
                 className="mt-6 grid gap-4 sm:grid-cols-2"
               >
@@ -1160,29 +1259,78 @@ export function OperationsDashboard({
                   <Label>Company name</Label>
                   <Input
                     required
+                    maxLength={160}
                     value={subcontractorCompany}
-                    onChange={(event) => setSubcontractorCompany(event.target.value)}
+                    onChange={(event) => {
+                      setSubcontractorCompany(event.target.value)
+                      setFormErrors((current) => ({
+                        ...current,
+                        companyName: undefined,
+                      }))
+                    }}
+                    aria-invalid={Boolean(formErrors.companyName)}
+                    aria-describedby={
+                      formErrors.companyName
+                        ? 'subcontractor-company-error'
+                        : undefined
+                    }
                     placeholder="Fine Finish Carpentry"
                     className={fieldClassName}
+                  />
+                  <FieldError
+                    id="subcontractor-company-error"
+                    message={formErrors.companyName}
                   />
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Contact name</Label>
                   <Input
+                    maxLength={160}
                     value={subcontractorContact}
-                    onChange={(event) => setSubcontractorContact(event.target.value)}
+                    onChange={(event) => {
+                      setSubcontractorContact(event.target.value)
+                      setFormErrors((current) => ({
+                        ...current,
+                        contactName: undefined,
+                      }))
+                    }}
+                    aria-invalid={Boolean(formErrors.contactName)}
+                    aria-describedby={
+                      formErrors.contactName
+                        ? 'subcontractor-contact-error'
+                        : undefined
+                    }
                     placeholder="Hector Ramirez"
                     className={fieldClassName}
+                  />
+                  <FieldError
+                    id="subcontractor-contact-error"
+                    message={formErrors.contactName}
                   />
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
                   <Label>Email</Label>
                   <Input
                     type="email"
+                    maxLength={320}
                     value={subcontractorEmail}
-                    onChange={(event) => setSubcontractorEmail(event.target.value)}
+                    onChange={(event) => {
+                      setSubcontractorEmail(event.target.value)
+                      setFormErrors((current) => ({
+                        ...current,
+                        email: undefined,
+                      }))
+                    }}
+                    aria-invalid={Boolean(formErrors.email)}
+                    aria-describedby={
+                      formErrors.email ? 'subcontractor-email-error' : undefined
+                    }
                     placeholder="hector@example.com"
                     className={fieldClassName}
+                  />
+                  <FieldError
+                    id="subcontractor-email-error"
+                    message={formErrors.email}
                   />
                 </Field>
                 <Button
@@ -1197,6 +1345,7 @@ export function OperationsDashboard({
 
             {activeCreatePanel === 'payment' && canManagePayments && (
               <form
+                noValidate
                 onSubmit={(event) => void createPaymentRequest(event)}
                 className="mt-6 grid gap-4 sm:grid-cols-2"
               >
@@ -1204,7 +1353,13 @@ export function OperationsDashboard({
                   <Label>Project</Label>
                   <SelectControl
                     value={requestProjectId}
-                    onChange={setRequestProjectId}
+                    onChange={(value) => {
+                      setRequestProjectId(value)
+                      setFormErrors((current) => ({
+                        ...current,
+                        projectId: undefined,
+                      }))
+                    }}
                     options={[
                       { value: '', label: 'Select a project' },
                       ...projects.map((project) => ({
@@ -1213,14 +1368,28 @@ export function OperationsDashboard({
                       })),
                     ]}
                     ariaLabel="Project"
+                    ariaDescribedBy={
+                      formErrors.projectId ? 'payment-project-error' : undefined
+                    }
+                    invalid={Boolean(formErrors.projectId)}
                     className={selectFieldClassName}
+                  />
+                  <FieldError
+                    id="payment-project-error"
+                    message={formErrors.projectId}
                   />
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Subcontractor</Label>
                   <SelectControl
                     value={requestSubcontractorId}
-                    onChange={setRequestSubcontractorId}
+                    onChange={(value) => {
+                      setRequestSubcontractorId(value)
+                      setFormErrors((current) => ({
+                        ...current,
+                        subcontractorId: undefined,
+                      }))
+                    }}
                     options={[
                       { value: '', label: 'Select a subcontractor' },
                       ...subcontractors.map((subcontractor) => ({
@@ -1229,17 +1398,44 @@ export function OperationsDashboard({
                       })),
                     ]}
                     ariaLabel="Subcontractor"
+                    ariaDescribedBy={
+                      formErrors.subcontractorId
+                        ? 'payment-subcontractor-error'
+                        : undefined
+                    }
+                    invalid={Boolean(formErrors.subcontractorId)}
                     className={selectFieldClassName}
+                  />
+                  <FieldError
+                    id="payment-subcontractor-error"
+                    message={formErrors.subcontractorId}
                   />
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
                   <Label>Milestone description</Label>
                   <Input
                     required
+                    maxLength={500}
                     value={requestDescription}
-                    onChange={(event) => setRequestDescription(event.target.value)}
+                    onChange={(event) => {
+                      setRequestDescription(event.target.value)
+                      setFormErrors((current) => ({
+                        ...current,
+                        description: undefined,
+                      }))
+                    }}
+                    aria-invalid={Boolean(formErrors.description)}
+                    aria-describedby={
+                      formErrors.description
+                        ? 'payment-description-error'
+                        : undefined
+                    }
                     placeholder="Kitchen trim milestone"
                     className={fieldClassName}
+                  />
+                  <FieldError
+                    id="payment-description-error"
+                    message={formErrors.description}
                   />
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
@@ -1248,9 +1444,25 @@ export function OperationsDashboard({
                     required
                     inputMode="decimal"
                     value={requestGross}
-                    onChange={(event) => setRequestGross(event.target.value)}
+                    onChange={(event) => {
+                      setRequestGross(event.target.value)
+                      setFormErrors((current) => ({
+                        ...current,
+                        grossAmount: undefined,
+                      }))
+                    }}
+                    aria-invalid={Boolean(formErrors.grossAmount)}
+                    aria-describedby={
+                      formErrors.grossAmount
+                        ? 'payment-gross-error'
+                        : undefined
+                    }
                     placeholder="2850.00"
                     className={fieldClassName}
+                  />
+                  <FieldError
+                    id="payment-gross-error"
+                    message={formErrors.grossAmount}
                   />
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
@@ -1262,8 +1474,24 @@ export function OperationsDashboard({
                     max="100"
                     step="0.01"
                     value={requestRetainage}
-                    onChange={(event) => setRequestRetainage(event.target.value)}
+                    onChange={(event) => {
+                      setRequestRetainage(event.target.value)
+                      setFormErrors((current) => ({
+                        ...current,
+                        retainagePercentage: undefined,
+                      }))
+                    }}
+                    aria-invalid={Boolean(formErrors.retainagePercentage)}
+                    aria-describedby={
+                      formErrors.retainagePercentage
+                        ? 'payment-retainage-error'
+                        : undefined
+                    }
                     className={fieldClassName}
+                  />
+                  <FieldError
+                    id="payment-retainage-error"
+                    message={formErrors.retainagePercentage}
                   />
                 </Field>
 
@@ -1271,7 +1499,7 @@ export function OperationsDashboard({
                   <div>
                     <p className="font-bold text-ink">Server-validated preview</p>
                     <p className="mt-1 text-xs text-ink/75">
-                      PostgreSQL recalculates and constrains these values.
+                      The database recalculates and constrains these values.
                     </p>
                   </div>
                   <div className="flex gap-5 text-right">
@@ -1316,15 +1544,15 @@ export function OperationsDashboard({
                 The database owns the boundary.
               </h2>
               <p className="mt-3 text-sm leading-6 font-medium text-white/70">
-                Client controls improve usability. RLS, role checks, constraints,
-                and RPCs enforce the actual financial-data rules.
+                Client controls improve usability. Access policies, role checks,
+                constraints, and server workflows enforce the financial-data rules.
               </p>
             </div>
             <ul className="flex flex-col gap-2.5 border-t border-white/10 pt-5 text-sm font-medium text-white/80">
               {[
                 'Tenant A receives zero Tenant B rows',
                 'Money is stored in integer minor units',
-                'Retainage is generated by PostgreSQL',
+                'Retainage is generated by the database',
                 'State changes append audit evidence',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3">
@@ -1446,7 +1674,7 @@ export function OperationsDashboard({
             href="/?demo=checkout"
             className="inline-flex h-10 items-center justify-center border border-ink/10 px-4 text-xs font-bold text-ink transition hover:bg-cream"
           >
-            Open Stripe checkout demo
+            Open checkout demo
           </a>
         </div>
 
@@ -1586,7 +1814,7 @@ export function OperationsDashboard({
                         )}
                       {request.status === 'processing' && (
                         <span className="text-xs font-semibold text-amber-700">
-                          Confirming with Stripe
+                          Confirming payment
                         </span>
                       )}
                       {['checkout_created', 'processing', 'failed'].includes(
@@ -1651,8 +1879,15 @@ export function OperationsDashboard({
           role={memberRole}
           busyUserId={memberUserId}
           isSubmitting={isSubmitting}
-          onEmailChange={setMemberEmail}
-          onRoleChange={setMemberRole}
+          fieldErrors={{ email: formErrors.email, role: formErrors.role }}
+          onEmailChange={(value) => {
+            setMemberEmail(value)
+            setFormErrors((current) => ({ ...current, email: undefined }))
+          }}
+          onRoleChange={(value) => {
+            setMemberRole(value)
+            setFormErrors((current) => ({ ...current, role: undefined }))
+          }}
           onSubmit={(event) => void upsertOrganizationMember(event)}
           onStatusChange={(member, status) =>
             void setOrganizationMemberStatus(member, status)
@@ -1703,7 +1938,7 @@ export function OperationsDashboard({
 
           {webhookFailures.length === 0 ? (
             <p className="mt-4 text-sm leading-6 text-emerald-950/80">
-              Signed Stripe events are processing without unresolved ledger errors.
+              Signed payment events are processing without unresolved ledger errors.
             </p>
           ) : (
             <div className="mt-5 grid gap-3 lg:grid-cols-2">
@@ -1805,18 +2040,18 @@ export function OperationsDashboard({
         <div className="fixed inset-0 grid place-items-center overflow-y-auto p-6">
           <DialogPanel className="w-full max-w-lg border border-red-200 bg-white p-6 shadow-[0_24px_64px_rgba(19,37,31,0.22)] sm:p-8">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-red-700/70">
-              Irreversible Stripe action
+              Irreversible payment action
             </p>
             <DialogTitle className="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-ink">
               Refund this payment?
             </DialogTitle>
             <Description className="mt-3 text-sm leading-6 text-ink/85">
-              This refunds the remaining Stripe payment for{' '}
+              This refunds the remaining payment for{' '}
               <span className="font-bold text-ink">
                 {refundConfirmation?.description}
               </span>
-              . The ledger and audit trail will be updated after Stripe accepts
-              the request.
+              . The ledger and audit trail will be updated after the payment
+              provider accepts the request.
             </Description>
             {refundConfirmation && (
               <div className="mt-5 border border-ink/10 bg-cream/65 p-4">

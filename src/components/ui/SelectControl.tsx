@@ -19,6 +19,8 @@ interface SelectControlProps {
   containerClassName?: string
   disabled?: boolean
   ariaLabel?: string
+  ariaDescribedBy?: string
+  invalid?: boolean
 }
 
 export function SelectControl({
@@ -29,6 +31,8 @@ export function SelectControl({
   containerClassName = '',
   disabled = false,
   ariaLabel,
+  ariaDescribedBy,
+  invalid = false,
 }: SelectControlProps) {
   const selectedOption =
     options.find((option) => option.value === value) ?? options[0]
@@ -39,6 +43,8 @@ export function SelectControl({
         <ListboxButton
           type="button"
           aria-label={ariaLabel}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={invalid || undefined}
           className={`${className} relative w-full cursor-default rounded-none pr-10 text-left disabled:cursor-not-allowed disabled:opacity-50`}
         >
           <span className="block truncate">{selectedOption?.label ?? ''}</span>

@@ -166,13 +166,13 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
               }
               description={
                 isRefunded
-                  ? 'Stripe completed the refund and the payment ledger has been updated.'
+                  ? 'The refund is complete and the payment ledger has been updated.'
                   : isPartiallyRefunded
-                    ? 'Stripe returned part of this payment. The refunded amount is shown below.'
+                    ? 'Part of this payment was returned. The refunded amount is shown below.'
                     : isPaid
                   ? 'Thanks for your purchase. Your payment was confirmed and your order is ready.'
                   : isProcessing
-                    ? 'Stripe is finalizing the payment. This page refreshes the status recorded by the signed webhook.'
+                    ? 'The payment is being finalized. This page refreshes the status recorded by the signed payment event.'
                     : 'No successful charge was recorded. You can safely return and try checkout again.'
               }
             />

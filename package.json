@@ -21,7 +21,9 @@
     "@headlessui/react": "^2.2.10",
     "@supabase/supabase-js": "^2.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "recharts": "^3.10.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

@@ -84,8 +84,8 @@ export default function App() {
 
       {!isDashboard && (
         <footer className="mx-auto flex w-full max-w-7xl flex-col gap-2 border-t border-ink/8 px-6 py-7 text-xs font-medium text-ink/80 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-          <p>Tenant boundaries are enforced by PostgreSQL Row-Level Security.</p>
-          <p>React × Supabase × Stripe</p>
+          <p>Tenant boundaries are enforced at the data layer.</p>
+          <p>TradeLedger Operations</p>
         </footer>
       )}
     </div>

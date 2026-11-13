@@ -66,7 +66,7 @@ export function CheckoutCard() {
     }
 
     if (!data?.url) {
-      setError('Stripe did not return a checkout URL. Please try again.')
+      setError('The payment provider did not return a checkout URL. Please try again.')
       setIsSubmitting(false)
       return
     }
@@ -245,7 +245,7 @@ export function CheckoutCard() {
               className="group inline-flex h-11 items-center justify-center gap-3 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.2)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-70"
             >
               <span>
-                {isSubmitting ? 'Opening Stripe…' : 'Continue to secure checkout'}
+                {isSubmitting ? 'Opening checkout…' : 'Continue to secure checkout'}
               </span>
               <svg
                 viewBox="0 0 20 20"
@@ -264,7 +264,7 @@ export function CheckoutCard() {
             <div className="flex items-center justify-center gap-4 text-[11px] font-semibold text-ink/75">
               <span>Private order history</span>
               <span className="size-1 rounded-full bg-ink/20" />
-              <span>Powered by Stripe</span>
+              <span>Secure payment handoff</span>
             </div>
           </div>
         </div>
