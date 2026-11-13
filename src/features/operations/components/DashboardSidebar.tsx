@@ -9,22 +9,40 @@ export interface DashboardNavigationItem {
 }
 
 interface DashboardSidebarProps {
-  email: string | undefined
   items: DashboardNavigationItem[]
   activeItemId: string
-  isSigningOut: boolean
   onNavigate: (itemId: string) => void
-  onSignOut: () => void
   onClose?: () => void
 }
 
+function NavigationIcon({ itemId }: { itemId: string }) {
+  const paths: Record<string, string> = {
+    overview: 'M4 4h5v5H4V4Zm7 0h5v3h-5V4ZM4 11h5v5H4v-5Zm7-2h5v7h-5V9Z',
+    directory: 'M3.5 5.25h5l1.5 1.5h6.5v8H3.5v-9.5Z',
+    payments: 'M3.5 5.5h13v9h-13v-9Zm0 3h13M6 12h3',
+    team: 'M7.25 9a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Zm5.5-.75a1.75 1.75 0 1 0 0-3.5m-9.5 10.5c.2-2.6 1.54-4 4-4s3.8 1.4 4 4m.75-4c2.53.08 3.77 1.5 3.75 4',
+    delivery: 'M3.5 5.25h13v9.5h-13v-9.5Zm.5.5 6 4.75 6-4.75',
+    audit: 'M10 2.75 15.5 5v4.25c0 3.64-2.17 6.2-5.5 8-3.33-1.8-5.5-4.36-5.5-8V5L10 2.75Zm-2.25 7L9.3 11.3l3.1-3.1',
+  }
+
+  return (
+    <svg viewBox="0 0 20 20" className="size-4" fill="none" aria-hidden="true">
+      <path
+        d={paths[itemId] ?? paths.overview}
+        fill={itemId === 'overview' ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export function DashboardSidebar({
-  email,
   items,
   activeItemId,
-  isSigningOut,
   onNavigate,
-  onSignOut,
   onClose,
 }: DashboardSidebarProps) {
   return (
@@ -36,9 +54,9 @@ export function DashboardSidebar({
             event.preventDefault()
             onNavigate('overview')
           }}
-          className="group inline-flex items-center gap-3"
+          className="group inline-flex items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-mint/60"
         >
-          <span className="grid size-10 place-items-center bg-mint text-ink transition-transform group-hover:-rotate-3">
+          <span className="grid size-9 place-items-center bg-mint text-ink transition-transform duration-200 group-hover:-rotate-3">
             <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
               <path
                 d="M5 5.5h14M5 10h14M5 14.5h9M5 19h9"
@@ -50,10 +68,10 @@ export function DashboardSidebar({
             </svg>
           </span>
           <span>
-            <span className="block text-base font-black tracking-tight">
+            <span className="block text-[15px] font-extrabold tracking-[-0.035em]">
               tradeledger
             </span>
-            <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">
+            <span className="mt-0.5 block text-[9px] font-bold uppercase tracking-[0.18em] text-white/70">
               Operations admin
             </span>
           </span>
@@ -64,7 +82,7 @@ export function DashboardSidebar({
             type="button"
             onClick={onClose}
             aria-label="Close navigation"
-            className="grid size-10 place-items-center border border-white/10 text-white/65 transition hover:border-white/25 hover:text-white"
+            className="grid size-10 place-items-center border border-white/10 text-white/75 transition hover:border-white/25 hover:text-white"
           >
             <svg viewBox="0 0 20 20" className="size-5" aria-hidden="true">
               <path
@@ -79,11 +97,11 @@ export function DashboardSidebar({
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-5" aria-label="Dashboard">
-        <p className="px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-ink/55">
+      <nav className="flex-1 overflow-y-auto px-3 py-6" aria-label="Dashboard">
+        <p className="px-3 text-[10px] font-bold uppercase tracking-[0.19em] text-ink/75">
           Workspace
         </p>
-        <div className="mt-3 flex flex-col gap-1">
+        <div className="mt-3 flex flex-col gap-1.5">
           {items.map((item) => {
             const isActive = activeItemId === item.id
 
@@ -97,25 +115,30 @@ export function DashboardSidebar({
                 }}
                 aria-current={isActive ? 'page' : undefined}
                 className={
-                  'group flex items-center justify-between gap-3 border-l-2 px-3 py-3 transition ' +
+                  'group flex items-center justify-between gap-3 border-l-2 px-3 py-3 transition-colors ' +
                   (isActive
-                    ? 'border-forest bg-mint/20 text-forest'
+                    ? 'border-forest bg-mint/25 text-forest'
                     : 'border-transparent text-ink/85 hover:border-forest/25 hover:bg-cream hover:text-ink')
                 }
               >
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold">{item.label}</span>
-                  <span className="mt-0.5 block truncate text-[11px] text-current opacity-75">
-                    {item.detail}
+                <span className="flex min-w-0 items-start gap-3">
+                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-current opacity-80">
+                    <NavigationIcon itemId={item.id} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-bold">{item.label}</span>
+                    <span className="mt-0.5 block truncate text-[10px] font-medium text-current opacity-85">
+                      {item.detail}
+                    </span>
                   </span>
                 </span>
                 {item.badge && (
                   <span
                     className={
-                      'shrink-0 border px-2 py-1 font-mono text-[10px] font-bold ' +
+                      'grid size-5 shrink-0 place-items-center rounded-full border font-mono text-[9px] font-bold ' +
                       (isActive
                         ? 'border-forest/20 bg-white text-forest'
-                        : 'border-ink/15 text-ink/60')
+                        : 'border-ink/15 text-ink/70')
                     }
                   >
                     {item.badge}
@@ -127,23 +150,8 @@ export function DashboardSidebar({
         </div>
       </nav>
 
-      <div className="border-t border-ink/10 p-4">
-        <div className="min-w-0 px-1">
-          <p className="truncate text-xs font-semibold text-ink/70">
-            {email ?? 'Authenticated user'}
-          </p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-ink/35">
-            Supabase secured
-          </p>
-        </div>
-        <Button
-          type="button"
-          onClick={onSignOut}
-          disabled={isSigningOut}
-          className="mt-4 inline-flex h-10 w-full items-center justify-center border border-ink/15 px-4 text-xs font-bold text-ink/70 transition hover:border-forest/30 hover:bg-cream hover:text-forest disabled:cursor-wait disabled:opacity-50"
-        >
-          {isSigningOut ? 'Signing out…' : 'Sign out'}
-        </Button>
+      <div className="border-t border-ink/8 px-6 py-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/70">
+        RLS protected workspace
       </div>
     </div>
   )

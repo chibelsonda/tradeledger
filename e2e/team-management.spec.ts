@@ -28,7 +28,8 @@ test('owner grants and suspends tenant access from the team workspace', async ({
   await expect(page.getByText('Protected owner')).toBeVisible()
 
   await page.getByLabel('Email').fill('accountant@example.test')
-  await page.getByLabel('Role').selectOption('accountant')
+  await page.getByLabel('Role').click()
+  await page.getByRole('option', { name: 'Accountant' }).click()
   await page.getByRole('button', { name: 'Add or update member' }).click()
 
   await expect(page.getByText('accountant@example.test')).toBeVisible()

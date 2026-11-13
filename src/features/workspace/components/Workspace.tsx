@@ -103,8 +103,8 @@ export function Workspace({ session }: WorkspaceProps) {
   if (isLoading) {
     return (
       <div className="grid min-h-[65vh] place-items-center px-6">
-        <div className="flex items-center gap-3 text-sm font-bold text-forest">
-          <span className="size-5 animate-spin rounded-full border-2 border-forest/20 border-t-forest" />
+        <div className="flex items-center gap-3 text-sm font-semibold text-forest">
+          <span className="size-5 animate-spin rounded-full border-2 border-forest/15 border-t-forest" />
           Loading tenant-safe workspace…
         </div>
       </div>

@@ -119,9 +119,9 @@ function dashboardPageFromPath(pathname: string): DashboardPage {
 }
 
 const fieldClassName =
-  'h-10 border border-ink/15 bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10'
+  'h-10 border border-ink/15 bg-white px-3.5 text-sm font-medium text-ink outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10'
 const selectFieldClassName =
-  'h-10 border border-ink/15 bg-white pl-3 text-sm text-ink outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10'
+  'h-10 border border-ink/15 bg-white pl-3.5 text-sm font-medium text-ink outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/10'
 
 function statusClassName(status: string): string {
   switch (status) {
@@ -145,7 +145,7 @@ function statusClassName(status: string): string {
     case 'voided':
       return 'border-slate-300 bg-slate-100 text-slate-700'
     default:
-      return 'border-ink/10 bg-cream text-ink/65'
+      return 'border-ink/10 bg-cream text-ink/85'
   }
 }
 
@@ -879,17 +879,14 @@ export function OperationsDashboard({
     <div className="min-h-screen bg-cream lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       <aside className="sticky top-0 hidden h-screen lg:block">
         <DashboardSidebar
-          email={session.user.email}
           items={navigationItems}
           activeItemId={activeNavigationId}
-          isSigningOut={isSigningOut}
           onNavigate={navigateTo}
-          onSignOut={() => void signOut()}
         />
       </aside>
 
       <div className="min-w-0">
-        <header className="sticky top-0 z-30 flex h-20 items-center justify-between gap-4 border-b border-ink/10 bg-cream/95 px-4 backdrop-blur sm:px-6 xl:px-8">
+        <header className="sticky top-0 z-30 flex h-20 items-center justify-between gap-4 border-b border-ink/10 bg-white/92 px-4 shadow-[0_1px_0_rgba(19,37,31,0.02)] backdrop-blur-xl sm:px-6 xl:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <Button
               type="button"
@@ -908,10 +905,10 @@ export function OperationsDashboard({
               </svg>
             </Button>
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-forest/50">
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-forest/80">
                 Operations dashboard
               </p>
-              <p className="truncate text-sm font-black text-ink sm:text-base">
+              <p className="truncate text-sm font-extrabold tracking-[-0.02em] text-ink sm:text-base">
                 {organization.name}
               </p>
             </div>
@@ -923,35 +920,34 @@ export function OperationsDashboard({
                 <Label className="sr-only">Workspace</Label>
                 <SelectControl
                   value={organization.id}
-                  onChange={(event) => onSelectOrganization(event.target.value)}
+                  onChange={onSelectOrganization}
+                  options={organizations.map((item) => ({
+                    value: item.id,
+                    label: item.name,
+                  }))}
+                  ariaLabel="Workspace"
                   containerClassName="w-32 sm:w-48 xl:w-56"
-                  className="h-10 border border-ink/15 bg-white pl-3 text-sm font-semibold text-ink outline-none focus:border-forest"
-                >
-                  {organizations.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </SelectControl>
+                  className="h-9 border border-ink/15 bg-white pl-3 text-sm font-semibold text-ink outline-none focus:border-forest focus:ring-2 focus:ring-forest/10"
+                />
               </Field>
             )}
 
             <Menu as="div" className="relative">
               <MenuButton className="inline-flex items-center gap-2 py-1 text-left text-ink transition hover:text-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/20">
-                <span className="grid size-7 shrink-0 place-items-center bg-forest text-xs font-black text-mint">
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-forest text-xs font-extrabold text-mint">
                   {userInitial}
                 </span>
                 <span className="hidden min-w-0 lg:block">
-                  <span className="block max-w-36 truncate text-xs font-bold">
+                  <span className="block max-w-40 truncate text-xs font-bold">
                     {userEmail}
                   </span>
-                  <span className="block text-[10px] font-semibold text-ink/45">
+                  <span className="mt-0.5 block text-[9px] font-semibold text-ink/75">
                     {formatStatus(organization.role)} access
                   </span>
                 </span>
                 <svg
                   viewBox="0 0 20 20"
-                  className="size-4 shrink-0 text-ink/45"
+                  className="size-4 shrink-0 text-ink/70"
                   fill="none"
                   aria-hidden="true"
                 >
@@ -967,26 +963,26 @@ export function OperationsDashboard({
 
               <MenuItems
                 transition
-                className="absolute right-0 z-50 mt-2 w-72 origin-top-right border border-ink/12 bg-white p-2 shadow-[0_24px_60px_rgba(16,35,31,0.18)] transition duration-100 ease-out focus:outline-none data-closed:scale-95 data-closed:opacity-0"
+                className="absolute right-0 z-50 mt-2 w-72 origin-top-right border border-ink/12 bg-white p-2 shadow-[0_20px_48px_rgba(19,37,31,0.16)] transition duration-100 ease-out focus:outline-none data-closed:scale-95 data-closed:opacity-0"
               >
                 <div className="border-b border-ink/8 p-3">
-                  <p className="truncate text-sm font-black text-ink">
+                  <p className="truncate text-sm font-extrabold text-ink">
                     {userEmail}
                   </p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/35">
+                  <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-ink/70">
                     Supabase authenticated
                   </p>
                 </div>
 
                 <dl className="grid gap-3 border-b border-ink/8 p-3 text-xs">
                   <div className="flex items-center justify-between gap-4">
-                    <dt className="text-ink/45">Access level</dt>
+                    <dt className="text-ink/75">Access level</dt>
                     <dd className="border border-forest/15 bg-mint/15 px-2 py-1 font-bold text-forest">
                       {formatStatus(organization.role)}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <dt className="text-ink/45">Workspace</dt>
+                    <dt className="text-ink/75">Workspace</dt>
                     <dd className="max-w-40 truncate font-bold text-ink">
                       {organization.name}
                     </dd>
@@ -1022,15 +1018,15 @@ export function OperationsDashboard({
           </div>
         </header>
 
-        <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8 xl:px-8 xl:py-10">
-          <section className="border-b border-ink/10 pb-7">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-forest/60">
+        <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-7 px-4 py-6 sm:px-6 sm:py-8 xl:px-10 xl:py-9">
+          <section className="border-b border-ink/10 pb-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-forest/80">
               {activePageDetails.eyebrow}
             </p>
-            <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] text-ink sm:text-4xl">
+            <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-ink sm:text-[2.25rem]">
               {activePageDetails.title}
             </h1>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink/55">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm font-medium text-ink/85">
               <span className="border border-forest/15 bg-white px-2.5 py-1 text-xs font-bold text-forest">
                 {formatStatus(organization.role)}
               </span>
@@ -1068,12 +1064,13 @@ export function OperationsDashboard({
         ].map(([label, value]) => (
           <div
             key={label}
-            className="border border-ink/10 bg-white p-5 shadow-[0_18px_42px_rgba(16,35,31,0.07)]"
+            className="group relative overflow-hidden border border-ink/10 bg-white p-5 shadow-[0_14px_36px_rgba(19,37,31,0.05)] transition-transform hover:-translate-y-0.5"
           >
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/40">
+            <span className="absolute inset-x-0 top-0 h-0.5 bg-forest/70" />
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink/75">
               {label}
             </p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-ink">
+            <p className="mt-3 text-3xl font-extrabold tracking-[-0.04em] text-ink">
               {value}
             </p>
           </div>
@@ -1086,13 +1083,13 @@ export function OperationsDashboard({
         <section
           className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]"
         >
-          <div className="border border-ink/10 bg-white p-6 shadow-[0_24px_60px_rgba(16,35,31,0.08)] sm:p-8">
+          <div className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.06)] sm:p-7">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-forest/60">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-forest/80">
                   Controlled write path
                 </p>
-                <h2 className="mt-1 text-xl font-black tracking-tight text-ink">
+                <h2 className="mt-1 text-xl font-extrabold tracking-[-0.03em] text-ink">
                   {activeNavigationId === 'payments'
                     ? 'Create payment request'
                     : 'Add directory record'}
@@ -1103,13 +1100,13 @@ export function OperationsDashboard({
                   value={activeCreatePanel}
                   onChange={setCreatePanel}
                   aria-label="Data type to create"
-                  className="flex bg-cream p-1"
+                  className="flex border border-ink/6 bg-cream p-1"
                 >
                   {createPanelOptions.map(([panel, label]) => (
                     <Radio
                       key={panel}
                       value={panel}
-                      className="cursor-pointer px-3 py-1.5 text-xs font-bold text-ink/45 transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/30 data-checked:bg-white data-checked:text-ink data-checked:shadow-sm"
+                      className="cursor-pointer px-3 py-1.5 text-xs font-bold text-ink/80 transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/25 data-checked:bg-white data-checked:text-ink data-checked:shadow-sm"
                     >
                       {label}
                     </Radio>
@@ -1206,36 +1203,34 @@ export function OperationsDashboard({
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Project</Label>
                   <SelectControl
-                    required
                     value={requestProjectId}
-                    onChange={(event) => setRequestProjectId(event.target.value)}
+                    onChange={setRequestProjectId}
+                    options={[
+                      { value: '', label: 'Select a project' },
+                      ...projects.map((project) => ({
+                        value: project.id,
+                        label: project.name,
+                      })),
+                    ]}
+                    ariaLabel="Project"
                     className={selectFieldClassName}
-                  >
-                    <option value="">Select a project</option>
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </SelectControl>
+                  />
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
                   <Label>Subcontractor</Label>
                   <SelectControl
-                    required
                     value={requestSubcontractorId}
-                    onChange={(event) =>
-                      setRequestSubcontractorId(event.target.value)
-                    }
+                    onChange={setRequestSubcontractorId}
+                    options={[
+                      { value: '', label: 'Select a subcontractor' },
+                      ...subcontractors.map((subcontractor) => ({
+                        value: subcontractor.id,
+                        label: subcontractor.company_name,
+                      })),
+                    ]}
+                    ariaLabel="Subcontractor"
                     className={selectFieldClassName}
-                  >
-                    <option value="">Select a subcontractor</option>
-                    {subcontractors.map((subcontractor) => (
-                      <option key={subcontractor.id} value={subcontractor.id}>
-                        {subcontractor.company_name}
-                      </option>
-                    ))}
-                  </SelectControl>
+                  />
                 </Field>
                 <Field className="flex flex-col gap-2 text-sm font-bold text-ink sm:col-span-2">
                   <Label>Milestone description</Label>
@@ -1275,13 +1270,13 @@ export function OperationsDashboard({
                 <div className="flex flex-col gap-3 border border-ink/10 bg-cream/65 p-4 text-sm sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="font-bold text-ink">Server-validated preview</p>
-                    <p className="mt-1 text-xs text-ink/50">
+                    <p className="mt-1 text-xs text-ink/75">
                       PostgreSQL recalculates and constrains these values.
                     </p>
                   </div>
                   <div className="flex gap-5 text-right">
                     <div>
-                      <p className="text-xs text-ink/45">Retainage</p>
+                      <p className="text-xs text-ink/75">Retainage</p>
                       <p className="font-bold text-ink">
                         {requestPreview
                           ? formatCurrency(requestPreview.retainageAmount, 'usd')
@@ -1289,8 +1284,8 @@ export function OperationsDashboard({
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-ink/45">Net payable</p>
-                      <p className="font-black text-forest">
+                      <p className="text-xs text-ink/75">Net payable</p>
+                      <p className="font-extrabold text-forest">
                         {requestPreview
                           ? formatCurrency(requestPreview.netAmount, 'usd')
                           : '—'}
@@ -1312,20 +1307,20 @@ export function OperationsDashboard({
             )}
           </div>
 
-          <aside className="flex flex-col gap-8 bg-forest p-6 text-white shadow-[0_24px_60px_rgba(16,35,31,0.16)] sm:p-8">
+          <aside className="flex self-start flex-col gap-7 bg-forest p-6 text-white shadow-[0_16px_40px_rgba(19,37,31,0.12)] sm:p-7">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-mint/70">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-mint/75">
                 Security evidence
               </p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight">
+              <h2 className="mt-2 text-2xl font-extrabold tracking-[-0.035em]">
                 The database owns the boundary.
               </h2>
-              <p className="mt-3 text-sm leading-6 text-white/65">
+              <p className="mt-3 text-sm leading-6 font-medium text-white/70">
                 Client controls improve usability. RLS, role checks, constraints,
                 and RPCs enforce the actual financial-data rules.
               </p>
             </div>
-            <ul className="flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-white/80">
+            <ul className="flex flex-col gap-2.5 border-t border-white/10 pt-5 text-sm font-medium text-white/80">
               {[
                 'Tenant A receives zero Tenant B rows',
                 'Money is stored in integer minor units',
@@ -1333,7 +1328,7 @@ export function OperationsDashboard({
                 'State changes append audit evidence',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3">
-                  <span className="mt-1 grid size-4 shrink-0 place-items-center rounded-full bg-mint text-[10px] font-black text-ink">
+                  <span className="mt-1 grid size-4 shrink-0 place-items-center rounded-full bg-mint text-[10px] font-extrabold text-ink">
                     ✓
                   </span>
                   {item}
@@ -1346,32 +1341,32 @@ export function OperationsDashboard({
 
       {activeNavigationId === 'directory' && (
       <section className="grid gap-6 xl:grid-cols-2">
-        <div className="border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]">
+        <div className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/40">
+              <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-ink/75">
                 Projects
               </p>
-              <h2 className="mt-1 text-lg font-black text-ink">Active job ledger</h2>
+              <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">Active job ledger</h2>
             </div>
-            <span className="font-mono text-xs font-bold text-forest/50">
+            <span className="font-mono text-xs font-bold text-forest/75">
               {projects.length.toString().padStart(2, '0')}
             </span>
           </div>
           <div className="mt-5 flex flex-col gap-2">
             {projects.length === 0 ? (
-              <p className="bg-cream p-4 text-sm text-ink/50">
+              <p className="border border-dashed border-ink/12 bg-cream/70 p-5 text-sm font-medium text-ink/80">
                 No projects yet. Add the first project above.
               </p>
             ) : (
               projects.slice(0, 5).map((project) => (
                 <div
                   key={project.id}
-                  className="flex items-center justify-between gap-4 border border-ink/8 px-4 py-3"
+                  className="flex items-center justify-between gap-4 border border-ink/8 px-4 py-3 transition-colors hover:bg-cream/45"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-ink">{project.name}</p>
-                    <p className="mt-1 font-mono text-[11px] text-ink/40">
+                    <p className="mt-1 font-mono text-[11px] text-ink/70">
                       {project.code}
                     </p>
                   </div>
@@ -1389,34 +1384,34 @@ export function OperationsDashboard({
           </div>
         </div>
 
-        <div className="border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]">
+        <div className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/40">
+              <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-ink/75">
                 Subcontractors
               </p>
-              <h2 className="mt-1 text-lg font-black text-ink">Organization directory</h2>
+              <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">Organization directory</h2>
             </div>
-            <span className="font-mono text-xs font-bold text-forest/50">
+            <span className="font-mono text-xs font-bold text-forest/75">
               {subcontractors.length.toString().padStart(2, '0')}
             </span>
           </div>
           <div className="mt-5 flex flex-col gap-2">
             {subcontractors.length === 0 ? (
-              <p className="bg-cream p-4 text-sm text-ink/50">
+              <p className="border border-dashed border-ink/12 bg-cream/70 p-5 text-sm font-medium text-ink/80">
                 No subcontractors yet. Add one before creating a payment request.
               </p>
             ) : (
               subcontractors.slice(0, 5).map((subcontractor) => (
                 <div
                   key={subcontractor.id}
-                  className="flex items-center justify-between gap-4 border border-ink/8 px-4 py-3"
+                  className="flex items-center justify-between gap-4 border border-ink/8 px-4 py-3 transition-colors hover:bg-cream/45"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-ink">
                       {subcontractor.company_name}
                     </p>
-                    <p className="mt-1 truncate text-xs text-ink/45">
+                    <p className="mt-1 truncate text-xs text-ink/75">
                       {subcontractor.contact_name ?? subcontractor.email ?? 'No contact added'}
                     </p>
                   </div>
@@ -1438,14 +1433,14 @@ export function OperationsDashboard({
 
       {activeNavigationId === 'payments' && (
       <section
-        className="overflow-hidden border border-ink/10 bg-white shadow-[0_18px_42px_rgba(16,35,31,0.06)]"
+        className="overflow-hidden border border-ink/10 bg-white shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
       >
         <div className="flex flex-col justify-between gap-3 border-b border-ink/10 p-6 sm:flex-row sm:items-center">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/40">
+            <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-ink/75">
               Financial workflow
             </p>
-            <h2 className="mt-1 text-lg font-black text-ink">Payment requests</h2>
+            <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">Payment requests</h2>
           </div>
           <a
             href="/?demo=checkout"
@@ -1456,15 +1451,15 @@ export function OperationsDashboard({
         </div>
 
         {isLoading ? (
-          <p className="p-6 text-sm text-ink/50">Refreshing payment ledger…</p>
+          <p className="p-6 text-sm font-medium text-ink/80">Refreshing payment ledger…</p>
         ) : paymentRequests.length === 0 ? (
-          <p className="p-6 text-sm text-ink/50">
+          <p className="p-6 text-sm font-medium text-ink/80">
             No payment requests yet. Draft one after adding a project and subcontractor.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
-              <thead className="bg-cream/75 text-[11px] font-bold uppercase tracking-[0.12em] text-ink/45">
+              <thead className="bg-cream text-[10px] font-bold uppercase tracking-[0.15em] text-ink/80">
                 <tr>
                   <th className="px-6 py-3">Request</th>
                   <th className="px-4 py-3">Project / subcontractor</th>
@@ -1481,12 +1476,12 @@ export function OperationsDashboard({
                   const waiver = waiverByRequestId.get(request.id)
 
                   return (
-                    <tr key={request.id} className="align-middle">
+                    <tr key={request.id} className="align-middle transition-colors hover:bg-cream/40">
                     <td className="px-6 py-4">
                       <p className="max-w-56 truncate font-bold text-ink">
                         {request.description}
                       </p>
-                      <p className="mt-1 text-xs text-ink/40">
+                      <p className="mt-1 text-xs text-ink/70">
                         {shortDate(request.created_at)}
                       </p>
                     </td>
@@ -1494,18 +1489,18 @@ export function OperationsDashboard({
                       <p className="font-semibold text-ink">
                         {selectedProject(request.project_id)}
                       </p>
-                      <p className="mt-1 text-xs text-ink/45">
+                      <p className="mt-1 text-xs text-ink/75">
                         {selectedSubcontractor(request.subcontractor_id)}
                       </p>
                     </td>
                     <td className="px-4 py-4 text-right font-semibold text-ink">
                       {formatCurrency(request.gross_amount, request.currency)}
                     </td>
-                    <td className="px-4 py-4 text-right text-ink/60">
+                    <td className="px-4 py-4 text-right text-ink/85">
                       {formatCurrency(request.retainage_amount, request.currency)}
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <p className="font-black text-forest">
+                      <p className="font-extrabold text-forest">
                         {formatCurrency(request.net_amount, request.currency)}
                       </p>
                       {request.refunded_amount > 0 && (
@@ -1668,7 +1663,7 @@ export function OperationsDashboard({
       {activeNavigationId === 'delivery' && canManagePayments && (
         <section
           className={
-            'border p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)] ' +
+            'border p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)] ' +
             (webhookFailures.length > 0
               ? 'border-amber-300 bg-amber-50/60'
               : 'border-emerald-200 bg-emerald-50/50')
@@ -1678,15 +1673,15 @@ export function OperationsDashboard({
             <div>
               <p
                 className={
-                  'text-xs font-bold uppercase tracking-[0.14em] ' +
+                  'text-[10px] font-bold uppercase tracking-[0.17em] ' +
                   (webhookFailures.length > 0
                     ? 'text-amber-800/70'
-                    : 'text-emerald-800/65')
+                    : 'text-emerald-800/80')
                 }
               >
                 Payment operations
               </p>
-              <h2 className="mt-1 text-lg font-black text-ink">
+              <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">
                 {webhookFailures.length > 0
                   ? 'Webhook attention queue'
                   : 'Webhook delivery healthy'}
@@ -1694,7 +1689,7 @@ export function OperationsDashboard({
             </div>
             <span
               className={
-                'border px-3 py-1.5 text-xs font-black ' +
+                'border px-3 py-1.5 text-xs font-extrabold ' +
                 (webhookFailures.length > 0
                   ? 'border-amber-300 bg-white text-amber-900'
                   : 'border-emerald-200 bg-white text-emerald-800')
@@ -1707,7 +1702,7 @@ export function OperationsDashboard({
           </div>
 
           {webhookFailures.length === 0 ? (
-            <p className="mt-4 text-sm leading-6 text-emerald-950/65">
+            <p className="mt-4 text-sm leading-6 text-emerald-950/80">
               Signed Stripe events are processing without unresolved ledger errors.
             </p>
           ) : (
@@ -1719,7 +1714,7 @@ export function OperationsDashboard({
                       <p className="truncate font-mono text-xs font-bold text-amber-900">
                         {failure.event_type}
                       </p>
-                      <p className="mt-1 font-mono text-[10px] text-ink/40">
+                      <p className="mt-1 font-mono text-[10px] text-ink/70">
                         {failure.event_id}
                       </p>
                     </div>
@@ -1730,7 +1725,7 @@ export function OperationsDashboard({
                   <p className="mt-3 break-words text-sm leading-5 text-red-800">
                     {failure.error_message}
                   </p>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-ink/8 pt-3 text-[11px] text-ink/45">
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-ink/8 pt-3 text-[11px] text-ink/75">
                     <span>{failure.error_code ?? 'processing_error'}</span>
                     <time>{shortDate(failure.last_failed_at)}</time>
                   </div>
@@ -1743,13 +1738,13 @@ export function OperationsDashboard({
 
       {activeNavigationId === 'audit' && (
         <section
-          className="border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]"
+          className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
         >
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/40">
+          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-ink/75">
             Immutable audit trail
           </p>
           {auditEvents.length === 0 ? (
-            <p className="mt-5 bg-cream p-4 text-sm text-ink/50">
+            <p className="mt-5 border border-dashed border-ink/12 bg-cream/70 p-5 text-sm font-medium text-ink/80">
               No audit events have been recorded for this workspace yet.
             </p>
           ) : (
@@ -1757,17 +1752,17 @@ export function OperationsDashboard({
               {auditEvents.map((event) => (
               <div
                 key={event.id}
-                className="flex items-start justify-between gap-4 border border-ink/8 p-4"
+                className="flex items-start justify-between gap-4 border border-ink/8 p-4 transition-colors hover:bg-cream/45"
               >
                 <div>
                   <p className="text-sm font-bold text-ink">
                     {formatStatus(event.action.replaceAll('.', '_'))}
                   </p>
-                  <p className="mt-1 font-mono text-[11px] text-ink/40">
+                  <p className="mt-1 font-mono text-[11px] text-ink/70">
                     {event.entity_type} · {event.entity_id?.slice(0, 8) ?? 'system'}
                   </p>
                 </div>
-                <time className="shrink-0 text-[11px] font-semibold text-ink/40">
+                <time className="shrink-0 text-[11px] font-semibold text-ink/70">
                   {shortDate(event.created_at)}
                 </time>
               </div>
@@ -1788,12 +1783,9 @@ export function OperationsDashboard({
         <div className="fixed inset-0 flex">
           <DialogPanel className="h-full w-[min(88vw,18rem)] shadow-[24px_0_64px_rgba(16,35,31,0.28)]">
             <DashboardSidebar
-              email={session.user.email}
               items={navigationItems}
               activeItemId={activeNavigationId}
-              isSigningOut={isSigningOut}
               onNavigate={navigateTo}
-              onSignOut={() => void signOut()}
               onClose={() => setIsNavigationOpen(false)}
             />
           </DialogPanel>
@@ -1811,14 +1803,14 @@ export function OperationsDashboard({
       >
         <DialogBackdrop className="fixed inset-0 bg-ink/55 backdrop-blur-sm" />
         <div className="fixed inset-0 grid place-items-center overflow-y-auto p-6">
-          <DialogPanel className="w-full max-w-lg border border-red-200 bg-white p-6 shadow-[0_32px_80px_rgba(16,35,31,0.24)] sm:p-8">
+          <DialogPanel className="w-full max-w-lg border border-red-200 bg-white p-6 shadow-[0_24px_64px_rgba(19,37,31,0.22)] sm:p-8">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-red-700/70">
               Irreversible Stripe action
             </p>
-            <DialogTitle className="mt-2 text-2xl font-black tracking-tight text-ink">
+            <DialogTitle className="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-ink">
               Refund this payment?
             </DialogTitle>
-            <Description className="mt-3 text-sm leading-6 text-ink/60">
+            <Description className="mt-3 text-sm leading-6 text-ink/85">
               This refunds the remaining Stripe payment for{' '}
               <span className="font-bold text-ink">
                 {refundConfirmation?.description}
@@ -1828,10 +1820,10 @@ export function OperationsDashboard({
             </Description>
             {refundConfirmation && (
               <div className="mt-5 border border-ink/10 bg-cream/65 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink/40">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink/70">
                   Remaining refundable amount
                 </p>
-                <p className="mt-2 text-2xl font-black text-ink">
+                <p className="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-ink">
                   {formatCurrency(
                     refundConfirmation.net_amount -
                       refundConfirmation.refunded_amount,

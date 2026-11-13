@@ -28,8 +28,8 @@ const Workspace = lazy(() =>
 function PageLoader() {
   return (
     <div className="grid min-h-[68vh] place-items-center px-6">
-      <div className="flex items-center gap-3 text-sm font-bold text-forest">
-        <span className="size-5 animate-spin rounded-full border-2 border-forest/20 border-t-forest" />
+      <div className="flex items-center gap-3 text-sm font-semibold text-forest">
+        <span className="size-5 animate-spin rounded-full border-2 border-forest/15 border-t-forest" />
         Loading secure workspace…
       </div>
     </div>
@@ -54,12 +54,12 @@ export default function App() {
     <div
       className={
         'relative isolate min-h-screen ' +
-        (isDashboard ? '' : 'overflow-hidden')
+        (isDashboard ? '' : 'overflow-hidden bg-cream')
       }
     >
       {!isDashboard && (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-96 bg-[radial-gradient(circle_at_top_left,_rgba(217,249,157,0.65),_transparent_48%)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(circle_at_top_left,_rgba(216,247,143,0.54),_transparent_52%)]" />
           <Header session={session} />
         </>
       )}
@@ -83,7 +83,7 @@ export default function App() {
       </main>
 
       {!isDashboard && (
-        <footer className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-6 py-8 text-xs text-ink/50 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+        <footer className="mx-auto flex w-full max-w-7xl flex-col gap-2 border-t border-ink/8 px-6 py-7 text-xs font-medium text-ink/80 sm:flex-row sm:items-center sm:justify-between lg:px-8">
           <p>Tenant boundaries are enforced by PostgreSQL Row-Level Security.</p>
           <p>React × Supabase × Stripe</p>
         </footer>

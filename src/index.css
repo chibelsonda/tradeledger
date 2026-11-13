@@ -1,12 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", "Instrument Sans", ui-sans-serif, system-ui, sans-serif,
+  --font-sans: "Manrope Variable", "Manrope", ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji";
-  --color-ink: #10231f;
-  --color-forest: #173f35;
-  --color-mint: #d9f99d;
-  --color-cream: #f7f6f0;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --color-ink: #0b1e18;
+  --color-forest: #153f34;
+  --color-mint: #d8f78f;
+  --color-cream: #f4f5f1;
+  --color-paper: #ffffff;
+  --color-line: #dce2de;
 }
 
 @layer base {
@@ -17,6 +20,9 @@
   html {
     min-width: 320px;
     background: var(--color-cream);
+    color-scheme: light;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
   }
 
   body {
@@ -25,11 +31,24 @@
     margin: 0;
     background: var(--color-cream);
     color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss02" 1, "ss03" 1, "cv11" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   button,
-  input {
+  input,
+  select,
+  textarea {
     font: inherit;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    border-radius: 0;
   }
 
   button,
@@ -40,5 +59,19 @@
   ::selection {
     background: var(--color-mint);
     color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline-color: color-mix(in srgb, var(--color-forest) 55%, transparent);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
   }
 }

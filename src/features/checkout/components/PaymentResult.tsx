@@ -82,7 +82,7 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
     return (
       <ResultShell>
         <div className="flex flex-col items-center gap-5 text-center">
-          <span className="grid size-20 place-items-center rounded-full bg-mint/10 text-mint">
+          <span className="grid size-20 place-items-center rounded-full bg-forest/5 text-forest">
             <svg viewBox="0 0 24 24" className="size-10 animate-spin" aria-hidden="true">
               <path
                 d="M12 3a9 9 0 1 0 9 9"
@@ -93,7 +93,7 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
               />
             </svg>
           </span>
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-mint">
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-forest">
             Loading payment
           </p>
         </div>
@@ -123,7 +123,7 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
 
   return (
     <section className="mx-auto flex min-h-[68vh] w-full max-w-4xl items-center justify-center px-6 py-12 lg:px-8">
-      <div className="w-full overflow-hidden border border-ink/10 bg-white shadow-[0_32px_80px_rgba(16,35,31,0.13)]">
+      <div className="w-full overflow-hidden border border-ink/10 bg-white shadow-[0_24px_64px_rgba(19,37,31,0.12)]">
         <div className="grid lg:grid-cols-[0.8fr_1.2fr]">
           <div className="relative grid min-h-72 place-items-center overflow-hidden bg-forest p-10 text-white">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_rgba(217,249,157,0.18),_transparent_42%)]" />
@@ -179,13 +179,13 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
 
             <dl className="divide-y divide-ink/10 border border-ink/10 bg-cream/50 px-5">
               <div className="flex items-center justify-between gap-4 py-4 text-sm">
-                <dt className="text-ink/55">Item</dt>
+                <dt className="text-ink/80">Item</dt>
                 <dd className="font-bold text-ink">
                   {payment.product_name} × {payment.quantity}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-4 py-4 text-sm">
-                <dt className="text-ink/55">Status</dt>
+                <dt className="text-ink/80">Status</dt>
                 <dd
                   className={
                     'px-2.5 py-1 text-xs font-bold ' +
@@ -200,15 +200,15 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-4 py-4 text-sm">
-                <dt className="text-ink/55">Total</dt>
-                <dd className="text-lg font-black text-ink">
+                <dt className="text-ink/80">Total</dt>
+                <dd className="text-lg font-extrabold text-ink">
                   {formatCurrency(payment.amount_total, payment.currency)}
                 </dd>
               </div>
               {payment.amount_refunded > 0 && (
                 <div className="flex items-center justify-between gap-4 py-4 text-sm">
-                  <dt className="text-ink/55">Refunded</dt>
-                  <dd className="text-lg font-black text-blue-700">
+                  <dt className="text-ink/80">Refunded</dt>
+                  <dd className="text-lg font-extrabold text-blue-700">
                     {formatCurrency(payment.amount_refunded, payment.currency)}
                   </dd>
                 </div>
@@ -231,11 +231,11 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
 function ResultShell({ children }: { children: React.ReactNode }) {
   return (
     <section className="mx-auto flex min-h-[68vh] w-full max-w-2xl items-center justify-center px-6 py-12 lg:px-8">
-      <div className="flex w-full flex-col items-center gap-7 border border-ink/10 bg-forest p-8 text-center text-white shadow-[0_32px_80px_rgba(16,35,31,0.14)] sm:p-14">
+      <div className="flex w-full flex-col items-center gap-7 border border-ink/10 bg-white p-8 text-center text-ink shadow-[0_24px_64px_rgba(19,37,31,0.12)] sm:p-12">
         {children}
         <a
           href="/"
-          className="inline-flex h-10 items-center justify-center bg-mint px-5 text-sm font-bold text-ink transition hover:bg-white"
+          className="inline-flex h-10 items-center justify-center bg-ink px-5 text-sm font-bold text-white transition hover:bg-forest"
         >
           Return home
         </a>
@@ -250,7 +250,7 @@ function ResultIcon({
   tone: 'success' | 'loading' | 'warning'
 }) {
   const sharedClass =
-    'grid size-24 place-items-center rounded-full border shadow-[0_0_0_12px_rgba(217,249,157,0.05)]'
+    'grid size-24 place-items-center rounded-full border shadow-[0_0_0_12px_rgba(19,63,52,0.035)]'
 
   if (tone === 'success') {
     return (
@@ -284,7 +284,7 @@ function ResultIcon({
   }
 
   return (
-    <span className={sharedClass + ' border-amber-200/30 bg-amber-200/10 text-amber-200'}>
+    <span className={sharedClass + ' border-amber-200 bg-amber-50 text-amber-700'}>
       <svg viewBox="0 0 24 24" className="size-11" fill="none" aria-hidden="true">
         <path
           d="M12 8v5m0 3.5v.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
@@ -308,13 +308,13 @@ function ResultContent({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest/55">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest/80">
         {eyebrow}
       </p>
-      <h1 className="text-3xl font-black tracking-tight text-ink sm:text-4xl">
+      <h1 className="text-3xl font-extrabold tracking-[-0.035em] text-ink sm:text-4xl">
         {title}
       </h1>
-      <p className="mx-auto max-w-lg text-sm leading-6 text-ink/60">
+      <p className="mx-auto max-w-lg text-sm leading-6 font-medium text-ink/85">
         {description}
       </p>
     </div>

@@ -19,25 +19,25 @@ export function Header({ session }: HeaderProps) {
   }
 
   return (
-    <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-6 lg:px-8">
+    <header className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-4 px-6 lg:px-8">
       <Brand />
 
       {session ? (
         <div className="flex items-center gap-2">
-          <span className="hidden max-w-56 truncate text-xs font-semibold text-ink/55 sm:block">
+          <span className="hidden max-w-56 truncate text-xs font-semibold text-ink/85 sm:block">
             {session.user.email}
           </span>
           <Button
             type="button"
             onClick={() => void signOut()}
             disabled={isSigningOut}
-            className="inline-flex h-10 items-center justify-center border border-ink/10 bg-white/70 px-4 text-xs font-bold text-ink shadow-sm backdrop-blur transition hover:border-ink/20 hover:bg-white disabled:cursor-wait disabled:opacity-60"
+            className="inline-flex h-9 items-center justify-center border border-ink/12 bg-white/80 px-4 text-xs font-bold text-ink shadow-[0_6px_18px_rgba(19,37,31,0.06)] backdrop-blur transition hover:border-forest/30 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest/50 disabled:cursor-wait disabled:opacity-60"
           >
             {isSigningOut ? 'Signing out…' : 'Sign out'}
           </Button>
         </div>
       ) : (
-        <div className="inline-flex items-center gap-2 border border-ink/10 bg-white/65 px-3 py-2 text-xs font-semibold text-ink/70 shadow-sm backdrop-blur">
+        <div className="inline-flex h-9 items-center gap-2 border border-ink/10 bg-white/75 px-3 text-xs font-semibold text-ink/80 shadow-[0_6px_18px_rgba(19,37,31,0.05)] backdrop-blur">
           <svg viewBox="0 0 20 20" className="size-4 text-forest" aria-hidden="true">
             <path
               fill="currentColor"

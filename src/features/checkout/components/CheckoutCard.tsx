@@ -75,15 +75,15 @@ export function CheckoutCard() {
   }
 
   return (
-    <section className="mx-auto grid w-full max-w-7xl items-center gap-12 px-6 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-20">
+    <section className="mx-auto grid w-full max-w-7xl items-center gap-12 px-6 py-10 lg:min-h-[calc(100vh-10rem)] lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-16">
       <div className="flex max-w-2xl flex-col gap-8">
-        <div className="inline-flex w-fit items-center gap-2 border border-forest/15 bg-white/70 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-forest shadow-sm backdrop-blur">
-          <span className="size-2 rounded-full bg-lime-500" />
+        <div className="inline-flex w-fit items-center gap-2 border border-forest/15 bg-white/75 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.17em] text-forest shadow-[0_6px_18px_rgba(19,37,31,0.05)] backdrop-blur">
+          <span className="size-1.5 rounded-full bg-lime-500" />
           Built for momentum
         </div>
 
         <div className="flex flex-col gap-5">
-          <h1 className="max-w-xl text-5xl leading-[0.98] font-black tracking-[-0.045em] text-ink sm:text-6xl lg:text-7xl">
+          <h1 className="max-w-xl text-4xl leading-[1.02] font-extrabold tracking-[-0.045em] text-ink sm:text-5xl lg:text-[3.75rem]">
             Your next idea deserves a{' '}
             <span className="relative inline-block text-forest">
               real launch.
@@ -102,7 +102,7 @@ export function CheckoutCard() {
               </svg>
             </span>
           </h1>
-          <p className="max-w-lg text-base leading-7 text-ink/65 sm:text-lg">
+          <p className="max-w-lg text-base leading-7 font-medium text-ink/85 sm:text-lg">
             A focused toolkit with the templates, prompts, and checklists you
             need to move from rough concept to launch day.
           </p>
@@ -113,12 +113,12 @@ export function CheckoutCard() {
             (feature, index) => (
               <div
                 key={feature}
-                className="flex items-center gap-3 border-t border-ink/15 pt-4"
+                className="flex items-center gap-3 border-t border-ink/12 pt-4"
               >
-                <span className="font-mono text-xs font-bold text-forest/55">
+                <span className="font-mono text-[11px] font-bold text-forest/80">
                   0{index + 1}
                 </span>
-                <span className="text-sm font-semibold text-ink">{feature}</span>
+                <span className="text-sm font-bold text-ink/85">{feature}</span>
               </div>
             ),
           )}
@@ -129,18 +129,18 @@ export function CheckoutCard() {
         <div className="absolute -top-5 -right-4 -z-10 size-36 rounded-full bg-mint blur-2xl" />
         <div className="absolute -bottom-5 -left-4 -z-10 size-40 rounded-full bg-emerald-200/50 blur-3xl" />
 
-        <div className="overflow-hidden border border-ink/10 bg-white shadow-[0_32px_80px_rgba(16,35,31,0.16)]">
-          <div className="relative overflow-hidden bg-forest p-8 text-white sm:p-10">
+        <div className="overflow-hidden border border-ink/10 bg-white shadow-[0_24px_64px_rgba(19,37,31,0.14)]">
+          <div className="relative overflow-hidden bg-forest p-8 text-white sm:p-9">
             <div className="absolute -top-12 -right-12 size-48 rounded-full border-[28px] border-white/5" />
             <div className="absolute right-12 -bottom-16 size-32 rotate-45 bg-mint/10" />
 
             <div className="relative flex flex-col gap-8">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex flex-col gap-2">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-mint/80">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-mint/80">
                     Digital toolkit
                   </p>
-                  <h2 className="text-3xl font-bold tracking-tight">
+                  <h2 className="text-3xl font-extrabold tracking-[-0.035em]">
                     {product.name}
                   </h2>
                 </div>
@@ -149,14 +149,14 @@ export function CheckoutCard() {
                 </span>
               </div>
 
-              <p className="max-w-md text-sm leading-6 text-white/65">
+              <p className="max-w-md text-sm leading-6 font-medium text-white/80">
                 {product.description}
               </p>
 
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-xs text-white/50">One-time payment</p>
-                  <p className="mt-1 text-4xl font-black tracking-tight">
+                  <p className="text-xs font-medium text-white/70">One-time payment</p>
+                  <p className="mt-1 text-4xl font-extrabold tracking-[-0.04em]">
                     {formatCurrency(product.unitAmount, product.currency)}
                   </p>
                 </div>
@@ -186,7 +186,7 @@ export function CheckoutCard() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-6 p-8 sm:p-10">
+          <div className="flex flex-col gap-6 p-8 sm:p-9">
             {error && (
               <div
                 role="alert"
@@ -198,14 +198,14 @@ export function CheckoutCard() {
 
             <div className="flex items-end justify-between gap-6">
               <Field className="flex flex-col gap-2">
-                <Label htmlFor="quantity" className="text-sm font-bold text-ink">
+                <Label htmlFor="quantity" className="text-[13px] font-bold text-ink/85">
                   Quantity
                 </Label>
                 <div className="flex items-center overflow-hidden border border-ink/15 bg-white focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/10">
                   <Button
                     type="button"
                     onClick={() => updateQuantity(quantity - 1)}
-                    className="grid size-10 place-items-center text-lg font-semibold text-ink/65 transition hover:bg-ink/5 hover:text-ink"
+                    className="grid size-10 place-items-center text-lg font-semibold text-ink/85 transition hover:bg-ink/5 hover:text-ink"
                     aria-label="Decrease quantity"
                   >
                     −
@@ -222,7 +222,7 @@ export function CheckoutCard() {
                   <Button
                     type="button"
                     onClick={() => updateQuantity(quantity + 1)}
-                    className="grid size-10 place-items-center text-lg font-semibold text-ink/65 transition hover:bg-ink/5 hover:text-ink"
+                    className="grid size-10 place-items-center text-lg font-semibold text-ink/85 transition hover:bg-ink/5 hover:text-ink"
                     aria-label="Increase quantity"
                   >
                     +
@@ -231,8 +231,8 @@ export function CheckoutCard() {
               </Field>
 
               <div className="text-right">
-                <p className="text-xs font-medium text-ink/50">Total</p>
-                <p className="mt-1 text-2xl font-black tracking-tight text-ink">
+                <p className="text-xs font-semibold text-ink/80">Total</p>
+                <p className="mt-1 text-2xl font-extrabold tracking-[-0.035em] text-ink">
                   {total}
                 </p>
               </div>
@@ -242,7 +242,7 @@ export function CheckoutCard() {
               type="button"
               onClick={() => void startCheckout()}
               disabled={isSubmitting}
-              className="group inline-flex h-11 items-center justify-center gap-3 bg-ink px-5 text-sm font-bold text-white shadow-[0_14px_32px_rgba(16,35,31,0.24)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:translate-y-0 disabled:opacity-70"
+              className="group inline-flex h-11 items-center justify-center gap-3 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.2)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-70"
             >
               <span>
                 {isSubmitting ? 'Opening Stripe…' : 'Continue to secure checkout'}
@@ -261,7 +261,7 @@ export function CheckoutCard() {
               </svg>
             </Button>
 
-            <div className="flex items-center justify-center gap-4 text-[11px] font-semibold text-ink/45">
+            <div className="flex items-center justify-center gap-4 text-[11px] font-semibold text-ink/75">
               <span>Private order history</span>
               <span className="size-1 rounded-full bg-ink/20" />
               <span>Powered by Stripe</span>

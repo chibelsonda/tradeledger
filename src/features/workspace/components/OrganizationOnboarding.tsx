@@ -64,28 +64,28 @@ export function OrganizationOnboarding({
   }
 
   return (
-    <section className="mx-auto grid w-full max-w-6xl items-center gap-10 px-6 py-12 lg:grid-cols-[0.9fr_1.1fr] lg:px-8 lg:py-20">
+    <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-6 py-12 lg:min-h-[calc(100vh-10rem)] lg:grid-cols-[0.9fr_1.1fr] lg:px-8 lg:py-16">
       <div className="flex max-w-xl flex-col gap-6">
         <span className="w-fit border border-forest/15 bg-white/70 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-forest">
           Tenant-safe foundation
         </span>
         <div className="flex flex-col gap-4">
-          <h1 className="text-4xl leading-tight font-black tracking-[-0.04em] text-ink sm:text-5xl">
+          <h1 className="text-4xl leading-[1.05] font-extrabold tracking-[-0.045em] text-ink sm:text-5xl">
             Create your contractor workspace.
           </h1>
-          <p className="max-w-lg text-base leading-7 text-ink/65">
+          <p className="max-w-lg text-base leading-7 font-medium text-ink/85">
             Projects, subcontractors, payment requests, and audit history are
             isolated by organization with PostgreSQL Row-Level Security.
           </p>
         </div>
-        <div className="grid gap-3 text-sm text-ink/70 sm:grid-cols-3">
+        <div className="grid gap-3 text-sm text-ink/80 sm:grid-cols-3">
           {[
             ['01', 'Organization-scoped data'],
             ['02', 'Role-aware access'],
             ['03', 'Immutable audit events'],
           ].map(([number, label]) => (
             <div key={number} className="border-t border-ink/15 pt-3">
-              <span className="font-mono text-xs font-bold text-forest/55">
+              <span className="font-mono text-xs font-bold text-forest/80">
                 {number}
               </span>
               <p className="mt-2 font-semibold text-ink">{label}</p>
@@ -96,16 +96,16 @@ export function OrganizationOnboarding({
 
       <form
         onSubmit={(event) => void createOrganization(event)}
-        className="flex flex-col gap-6 border border-ink/10 bg-white p-7 shadow-[0_32px_80px_rgba(16,35,31,0.13)] sm:p-10"
+        className="flex flex-col gap-6 border border-ink/10 bg-white p-7 shadow-[0_24px_64px_rgba(19,37,31,0.12)] sm:p-9"
       >
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest/60">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest/80">
             Organization onboarding
           </p>
-          <h2 className="mt-2 text-2xl font-black tracking-tight text-ink">
+          <h2 className="mt-2 text-2xl font-extrabold tracking-[-0.03em] text-ink">
             Start your workspace
           </h2>
-          <p className="mt-2 text-sm leading-6 text-ink/55">
+          <p className="mt-2 text-sm leading-6 font-medium text-ink/80">
             You will become the owner. Membership creation and the audit event
             are committed in one database transaction.
           </p>
@@ -120,7 +120,7 @@ export function OrganizationOnboarding({
             value={name}
             onChange={(event) => updateName(event.target.value)}
             placeholder="North Ridge Contracting"
-            className="h-10 border border-ink/15 bg-white px-3 font-normal outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10"
+            className="h-10 border border-ink/15 bg-white px-3.5 font-medium outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10"
           />
         </Field>
 
@@ -135,7 +135,7 @@ export function OrganizationOnboarding({
             <span className="block text-sm font-bold text-ink">
               Add a production-safe sample workspace
             </span>
-            <span className="mt-1 block text-xs leading-5 text-ink/55">
+            <span className="mt-1 block text-xs leading-5 font-medium text-ink/80">
               Creates two projects, two subcontractors, and draft, submitted,
               and approved payment examples inside your tenant only.
             </span>
@@ -145,7 +145,7 @@ export function OrganizationOnboarding({
         <Field className="flex flex-col gap-2 text-sm font-bold text-ink">
           <Label>Workspace URL</Label>
           <div className="flex h-10 items-center overflow-hidden border border-ink/15 bg-white focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/10">
-            <span className="border-r border-ink/10 px-3 text-xs font-semibold text-ink/40">
+            <span className="border-r border-ink/10 px-3 text-xs font-semibold text-ink/80">
               /workspace/
             </span>
             <Input
@@ -157,7 +157,7 @@ export function OrganizationOnboarding({
                 setSlug(organizationSlug(event.target.value))
               }}
               placeholder="north-ridge"
-              className="h-full min-w-0 flex-1 bg-white px-3 font-mono text-sm font-normal outline-none placeholder:text-ink/30"
+              className="h-full min-w-0 flex-1 bg-white px-3 font-mono text-sm font-normal outline-none placeholder:text-ink/60"
             />
           </div>
         </Field>
@@ -174,7 +174,7 @@ export function OrganizationOnboarding({
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex h-10 items-center justify-center bg-ink px-5 text-sm font-bold text-white shadow-[0_14px_32px_rgba(16,35,31,0.2)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:translate-y-0 disabled:opacity-60"
+          className="inline-flex h-10 items-center justify-center bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.18)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-60"
         >
           {isSubmitting ? 'Creating secure workspace…' : 'Create organization'}
         </Button>

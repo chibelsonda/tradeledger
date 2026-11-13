@@ -77,5 +77,5 @@ export function WaiverDocumentControl({
     )
   }
 
-  return <span className="text-xs text-ink/30">—</span>
+  return <span className="text-xs text-ink/55">—</span>
 }

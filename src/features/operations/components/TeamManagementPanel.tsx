@@ -26,7 +26,7 @@ interface TeamManagementPanelProps {
 }
 
 const inputClassName =
-  'h-10 border border-ink/15 bg-white px-3 text-sm font-normal text-ink outline-none transition placeholder:text-ink/30 focus:border-forest focus:ring-2 focus:ring-forest/10'
+  'h-10 border border-ink/15 bg-white px-3.5 text-sm font-medium text-ink outline-none transition placeholder:text-ink/60 focus:border-forest focus:ring-2 focus:ring-forest/10'
 
 function canManageMember(
   actorRole: OrganizationRole,
@@ -58,26 +58,26 @@ export function TeamManagementPanel({
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <section className="border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]">
+      <section className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/40">
+            <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-forest/80">
               Access control
             </p>
-            <h2 className="mt-1 text-lg font-black text-ink">Organization team</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/55">
+            <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">Organization team</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 font-medium text-ink/80">
               Roles are enforced by PostgreSQL policies and server-side workflow
               functions. Suspended members immediately lose tenant access.
             </p>
           </div>
-          <span className="w-fit border border-ink/10 bg-cream px-3 py-1.5 font-mono text-xs font-bold text-ink/60">
+          <span className="w-fit border border-ink/10 bg-cream px-3 py-1.5 font-mono text-xs font-bold text-ink/80">
             {members.filter((member) => member.status === 'active').length} active
           </span>
         </div>
 
         <div className="mt-6 overflow-x-auto border border-ink/10">
           <table className="min-w-full divide-y divide-ink/10 text-left text-sm">
-            <thead className="bg-cream text-[11px] uppercase tracking-[0.12em] text-ink/45">
+            <thead className="bg-cream text-[10px] uppercase tracking-[0.15em] text-ink/80">
               <tr>
                 <th className="px-4 py-3 font-bold">User</th>
                 <th className="px-4 py-3 font-bold">Role</th>
@@ -91,7 +91,7 @@ export function TeamManagementPanel({
                 const isManageable = canManageMember(currentUserRole, member)
 
                 return (
-                  <tr key={member.user_id}>
+                  <tr key={member.user_id} className="transition-colors hover:bg-cream/45">
                     <td className="px-4 py-4">
                       <p className="font-bold text-ink">{member.email}</p>
                       {member.user_id === currentUserId && (
@@ -99,7 +99,7 @@ export function TeamManagementPanel({
                       )}
                     </td>
                     <td className="px-4 py-4">
-                      <span className="border border-ink/10 bg-cream px-2 py-1 text-xs font-bold text-ink/70">
+                      <span className="border border-ink/10 bg-cream px-2 py-1 text-xs font-bold text-ink/80">
                         {formatStatus(member.role)}
                       </span>
                     </td>
@@ -141,7 +141,7 @@ export function TeamManagementPanel({
                               : 'Restore'}
                         </Button>
                       ) : (
-                        <span className="text-xs text-ink/35">
+                        <span className="text-xs text-ink/55">
                           {member.role === 'owner' ? 'Protected owner' : 'Owner required'}
                         </span>
                       )}
@@ -156,13 +156,13 @@ export function TeamManagementPanel({
 
       <form
         onSubmit={onSubmit}
-        className="h-fit border border-ink/10 bg-white p-6 shadow-[0_18px_42px_rgba(16,35,31,0.06)]"
+        className="h-fit border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
       >
-        <p className="text-xs font-bold uppercase tracking-[0.14em] text-forest/60">
+        <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-forest/80">
           Add existing user
         </p>
-        <h2 className="mt-1 text-lg font-black text-ink">Grant workspace access</h2>
-        <p className="mt-2 text-sm leading-6 text-ink/55">
+        <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">Grant workspace access</h2>
+        <p className="mt-2 text-sm leading-6 font-medium text-ink/80">
           The user must already have a TradeLedger account. Re-adding a suspended
           user restores their access with the selected role.
         </p>
@@ -185,19 +185,16 @@ export function TeamManagementPanel({
             <Label>Role</Label>
             <SelectControl
               value={role}
-              onChange={(event) =>
-                onRoleChange(
-                  event.target.value as Exclude<OrganizationRole, 'owner'>,
-                )
+              onChange={(value) =>
+                onRoleChange(value as Exclude<OrganizationRole, 'owner'>)
               }
+              options={availableRoles.map((availableRole) => ({
+                value: availableRole,
+                label: formatStatus(availableRole),
+              }))}
+              ariaLabel="Role"
               className={inputClassName}
-            >
-              {availableRoles.map((availableRole) => (
-                <option key={availableRole} value={availableRole}>
-                  {formatStatus(availableRole)}
-                </option>
-              ))}
-            </SelectControl>
+            />
           </Field>
         </div>
 
