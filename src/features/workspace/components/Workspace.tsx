@@ -8,6 +8,7 @@ import type {
   OrganizationRole,
 } from '../../../lib/database.types'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
+import { NotificationBanner } from '../../../components/ui/NotificationBanner'
 import { supabase } from '../../../lib/supabase'
 import { safeDatabaseErrorMessage } from '../../../lib/public-errors'
 import { OperationsDashboard } from '../../operations/components/OperationsDashboard'
@@ -128,7 +129,7 @@ export function Workspace({ session }: WorkspaceProps) {
   if (error) {
     return (
       <section className="mx-auto w-full max-w-3xl px-6 py-16">
-        <div className="border border-red-200 bg-red-50 p-6 text-red-900">
+        <NotificationBanner tone="error" className="p-6">
           <p className="font-bold">Workspace could not be loaded</p>
           <p className="mt-2 text-sm leading-6">{error}</p>
           <Button
@@ -141,7 +142,7 @@ export function Workspace({ session }: WorkspaceProps) {
             {isRetrying && <ButtonSpinner tone="light" />}
             {isRetrying ? 'Trying again…' : 'Try again'}
           </Button>
-        </div>
+        </NotificationBanner>
       </section>
     )
   }

@@ -3,6 +3,7 @@ import { useState } from 'react'
 
 import { FieldError } from '../../../components/ui/FieldError'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
+import { NotificationBanner } from '../../../components/ui/NotificationBanner'
 import { organizationSlug } from '../../../lib/organizations'
 import { supabase } from '../../../lib/supabase'
 import { safeDatabaseErrorMessage } from '../../../lib/public-errors'
@@ -216,12 +217,7 @@ export function OrganizationOnboarding({
         </Field>
 
         {error && (
-          <div
-            role="alert"
-            className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-          >
-            {error}
-          </div>
+          <NotificationBanner tone="error">{error}</NotificationBanner>
         )}
 
         <Button

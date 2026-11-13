@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { clampQuantity, formatCurrency } from '../../../lib/format'
 import { supabase } from '../../../lib/supabase'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
+import { NotificationBanner } from '../../../components/ui/NotificationBanner'
 import { trustedStripeCheckoutUrl } from '../../../lib/navigation-security'
 
 const product = {
@@ -192,12 +193,7 @@ export function CheckoutCard() {
 
           <div className="flex flex-col gap-6 p-8 sm:p-9">
             {error && (
-              <div
-                role="alert"
-                className="border border-red-200 bg-red-50 p-4 text-sm text-red-800"
-              >
-                {error}
-              </div>
+              <NotificationBanner tone="error">{error}</NotificationBanner>
             )}
 
             <div className="flex items-end justify-between gap-6">

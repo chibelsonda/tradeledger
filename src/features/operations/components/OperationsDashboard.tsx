@@ -32,6 +32,7 @@ import type {
 } from '../../../lib/database.types'
 import { FieldError } from '../../../components/ui/FieldError'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
+import { NotificationBanner } from '../../../components/ui/NotificationBanner'
 import { formatCurrency, formatStatus } from '../../../lib/format'
 import { projectCode } from '../../../lib/organizations'
 import {
@@ -1193,20 +1194,10 @@ export function OperationsDashboard({
           </section>
 
       {error && (
-        <div
-          role="alert"
-          className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-        >
-          {error}
-        </div>
+        <NotificationBanner tone="error">{error}</NotificationBanner>
       )}
       {notice && (
-        <div
-          role="status"
-          className="border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
-        >
-          {notice}
-        </div>
+        <NotificationBanner tone="success">{notice}</NotificationBanner>
       )}
 
       {activeNavigationId === 'overview' && (
@@ -1240,9 +1231,9 @@ export function OperationsDashboard({
           <OverviewCharts paymentRequests={paymentRequests} />
 
           {demoWorkspaceStatus && (
-            <section className="grid gap-5 border border-amber-300 bg-amber-50/70 p-6 shadow-[0_14px_36px_rgba(19,37,31,0.05)] lg:grid-cols-[1fr_auto] lg:items-center">
+            <section className="grid gap-5 border border-amber-950/15 bg-amber-950/[0.035] p-6 shadow-[0_14px_36px_rgba(19,37,31,0.05)] lg:grid-cols-[1fr_auto] lg:items-center">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-800">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-950/70">
                   Demonstration workspace
                 </p>
                 <h2 className="mt-2 text-xl font-extrabold tracking-[-0.03em] text-ink">
@@ -1254,7 +1245,7 @@ export function OperationsDashboard({
                   retain evidence that the sample data was created and removed.
                 </p>
                 {!demoWorkspaceStatus.can_remove && demoWorkspaceStatus.reason && (
-                  <p className="mt-3 border-l-2 border-amber-500 pl-3 text-sm font-semibold text-amber-900">
+                  <p className="mt-3 border-l-2 border-amber-900/35 pl-3 text-sm font-semibold text-amber-950">
                     {demoWorkspaceStatus.reason}
                   </p>
                 )}
@@ -2056,8 +2047,8 @@ export function OperationsDashboard({
           className={
             'border p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)] ' +
             (webhookFailures.length > 0
-              ? 'border-amber-300 bg-amber-50/60'
-              : 'border-emerald-200 bg-emerald-50/50')
+              ? 'border-amber-950/15 bg-amber-950/[0.035]'
+              : 'border-forest/15 bg-forest/[0.035]')
           }
         >
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -2066,8 +2057,8 @@ export function OperationsDashboard({
                 className={
                   'text-[10px] font-bold uppercase tracking-[0.17em] ' +
                   (webhookFailures.length > 0
-                    ? 'text-amber-800/70'
-                    : 'text-emerald-800/80')
+                    ? 'text-amber-950/65'
+                    : 'text-forest/75')
                 }
               >
                 Payment operations
@@ -2082,8 +2073,8 @@ export function OperationsDashboard({
               className={
                 'border px-3 py-1.5 text-xs font-extrabold ' +
                 (webhookFailures.length > 0
-                  ? 'border-amber-300 bg-white text-amber-900'
-                  : 'border-emerald-200 bg-white text-emerald-800')
+                  ? 'border-amber-950/15 bg-white/80 text-amber-950'
+                  : 'border-forest/15 bg-white/80 text-forest')
               }
             >
               {webhookFailures.length > 0
@@ -2093,7 +2084,7 @@ export function OperationsDashboard({
           </div>
 
           {webhookFailures.length === 0 ? (
-            <p className="mt-4 text-sm leading-6 text-emerald-950/80">
+            <p className="mt-4 text-sm leading-6 text-ink/80">
               Signed payment events are processing without unresolved ledger errors.
             </p>
           ) : (
@@ -2207,11 +2198,11 @@ export function OperationsDashboard({
               Your organization, members, independent records, and immutable audit
               evidence remain intact.
             </Description>
-            <div className="mt-5 border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950">
+            <NotificationBanner tone="warning" className="mt-5 font-semibold">
               Cleanup is blocked automatically if a Stripe checkout, payment,
               waiver, delivered notification, or real record depends on the sample
               data.
-            </div>
+            </NotificationBanner>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Button
                 type="button"

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { FieldError } from '../../../components/ui/FieldError'
 import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
+import { NotificationBanner } from '../../../components/ui/NotificationBanner'
 import { supabase } from '../../../lib/supabase'
 import {
   fieldErrorsFromZod,
@@ -552,20 +553,10 @@ export function AuthCard() {
             )}
 
             {error && (
-              <p
-                role="alert"
-                className="border-l-2 border-red-600 bg-red-50 px-4 py-3 text-sm font-medium text-red-900"
-              >
-                {error}
-              </p>
+              <NotificationBanner tone="error">{error}</NotificationBanner>
             )}
             {message && (
-              <p
-                role="status"
-                className="border-l-2 border-forest bg-lime-50 px-4 py-3 text-sm font-medium text-ink"
-              >
-                {message}
-              </p>
+              <NotificationBanner tone="success">{message}</NotificationBanner>
             )}
 
             <Button
