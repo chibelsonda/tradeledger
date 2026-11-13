@@ -2,6 +2,7 @@ import { Button, Field, Input, Label } from '@headlessui/react'
 import { useState } from 'react'
 
 import { FieldError } from '../../../components/ui/FieldError'
+import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { organizationSlug } from '../../../lib/organizations'
 import { supabase } from '../../../lib/supabase'
 import {
@@ -221,8 +222,10 @@ export function OrganizationOnboarding({
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex h-10 items-center justify-center bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.18)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-60"
+          aria-busy={isSubmitting}
+          className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.18)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-60"
         >
+          {isSubmitting && <ButtonSpinner tone="light" />}
           {isSubmitting ? 'Creating secure workspace…' : 'Create organization'}
         </Button>
       </form>

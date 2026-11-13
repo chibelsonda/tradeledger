@@ -1,8 +1,9 @@
 import { Button, Field, Input, Label } from '@headlessui/react'
-import type { FormEvent } from 'react'
+import type { FormEvent, MouseEvent, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 
 import { FieldError } from '../../../components/ui/FieldError'
+import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { supabase } from '../../../lib/supabase'
 import {
   fieldErrorsFromZod,
@@ -10,11 +11,48 @@ import {
 } from '../../../lib/validation'
 import {
   authCredentialsSchema,
+  passwordResetRequestSchema,
+  passwordUpdateSchema,
   type AuthCredentials,
+  type PasswordResetRequest,
+  type PasswordUpdate,
 } from '../auth.schemas'
 
-type AuthMode = 'sign-in' | 'sign-up'
-type AuthField = keyof AuthCredentials
+type AuthMode =
+  | 'sign-in'
+  | 'sign-up'
+  | 'forgot-password'
+  | 'reset-password'
+type AuthField =
+  | keyof AuthCredentials
+  | keyof PasswordResetRequest
+  | keyof PasswordUpdate
+
+const authContent: Record<
+  AuthMode,
+  { title: string; description: string; submitLabel: string }
+> = {
+  'sign-in': {
+    title: 'Welcome back.',
+    description: 'Sign in with your organization email to continue.',
+    submitLabel: 'Sign in securely',
+  },
+  'sign-up': {
+    title: 'Create your account.',
+    description: 'Set up your credentials to join your organization workspace.',
+    submitLabel: 'Create your account',
+  },
+  'forgot-password': {
+    title: 'Reset your password.',
+    description: 'Enter your email and we’ll send you a secure reset link.',
+    submitLabel: 'Send reset link',
+  },
+  'reset-password': {
+    title: 'Choose a new password.',
+    description: 'Enter and confirm the new password for your account.',
+    submitLabel: 'Update password',
+  },
+}
 
 const platformFeatures = [
   {
@@ -32,40 +70,164 @@ const platformFeatures = [
 ]
 
 function authModeFromLocation(): AuthMode {
-  return new URLSearchParams(window.location.search).get('auth') ===
-    'create-account'
-    ? 'sign-up'
-    : 'sign-in'
+  const auth = new URLSearchParams(window.location.search).get('auth')
+
+  if (auth === 'create-account') return 'sign-up'
+  if (auth === 'forgot-password') return 'forgot-password'
+  if (auth === 'reset-password') return 'reset-password'
+  return 'sign-in'
 }
 
 function authModeHref(mode: AuthMode): string {
   const url = new URL(window.location.href)
 
+  url.searchParams.delete('auth')
+  url.searchParams.delete('code')
+  url.hash = ''
+
   if (mode === 'sign-up') {
     url.searchParams.set('auth', 'create-account')
-  } else {
-    url.searchParams.delete('auth')
+  } else if (mode !== 'sign-in') {
+    url.searchParams.set('auth', mode)
   }
 
   return `${url.pathname}${url.search}${url.hash}`
+}
+
+function passwordResetRedirectUrl(): string {
+  return new URL(authModeHref('reset-password'), window.location.origin).toString()
+}
+
+function recoveryErrorFromLocation(): string | null {
+  if (authModeFromLocation() !== 'reset-password') return null
+
+  const hash = new URLSearchParams(window.location.hash.slice(1))
+  return hash.get('error_description')
+}
+
+interface PasswordFieldProps {
+  id: string
+  label: string
+  value: string
+  error?: string
+  isVisible: boolean
+  autoComplete: 'current-password' | 'new-password'
+  placeholder: string
+  aside?: ReactNode
+  onChange: (value: string) => void
+  onToggleVisibility: () => void
+}
+
+function PasswordField({
+  id,
+  label,
+  value,
+  error,
+  isVisible,
+  autoComplete,
+  placeholder,
+  aside,
+  onChange,
+  onToggleVisibility,
+}: PasswordFieldProps) {
+  const errorId = `${id}-error`
+
+  return (
+    <Field className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-4">
+        <Label htmlFor={id} className="text-[13px] font-bold text-ink">
+          {label}
+        </Label>
+        {aside}
+      </div>
+      <div
+        className={
+          'flex h-10 items-center border bg-white transition focus-within:ring-2 ' +
+          (error
+            ? 'border-red-500 focus-within:border-red-600 focus-within:ring-red-500/10'
+            : 'border-ink/18 focus-within:border-forest focus-within:ring-forest/10')
+        }
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className="ml-3.5 size-4 shrink-0 text-forest/60"
+        >
+          <rect x="4.5" y="10" width="15" height="10" />
+          <path d="M8 10V7.5a4 4 0 0 1 8 0V10" />
+        </svg>
+        <Input
+          id={id}
+          type={isVisible ? 'text' : 'password'}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          autoComplete={autoComplete}
+          minLength={8}
+          required
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+          className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-sm font-medium text-ink outline-none placeholder:text-ink/50"
+          placeholder={placeholder}
+        />
+        <Button
+          type="button"
+          onClick={onToggleVisibility}
+          aria-label={isVisible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          aria-pressed={isVisible}
+          className="mr-1 inline-flex size-8 items-center justify-center text-ink/55 transition hover:bg-cream hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-forest"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="size-4"
+          >
+            {isVisible ? (
+              <>
+                <path d="M3 3l18 18" />
+                <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
+                <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5.5 0 9 7 9 7a16.5 16.5 0 0 1-2.2 3.2M6.6 6.6C4.3 8.1 3 12 3 12s3.5 7 9 7c1.4 0 2.7-.4 3.8-1" />
+              </>
+            ) : (
+              <>
+                <path d="M3 12s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7Z" />
+                <circle cx="12" cy="12" r="2.5" />
+              </>
+            )}
+          </svg>
+        </Button>
+      </div>
+      <FieldError id={errorId} message={error} />
+    </Field>
+  )
 }
 
 export function AuthCard() {
   const [mode, setMode] = useState<AuthMode>(authModeFromLocation)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(recoveryErrorFromLocation)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors<AuthField>>({})
 
   useEffect(() => {
     const handlePopState = () => {
       setMode(authModeFromLocation())
-      setError(null)
+      setError(recoveryErrorFromLocation())
       setMessage(null)
       setShowPassword(false)
+      setShowConfirmPassword(false)
+      setPassword('')
+      setConfirmPassword('')
       setFieldErrors({})
     }
 
@@ -77,6 +239,65 @@ export function AuthCard() {
     event.preventDefault()
     setError(null)
     setMessage(null)
+
+    if (mode === 'forgot-password') {
+      const validation = passwordResetRequestSchema.safeParse({ email })
+
+      if (!validation.success) {
+        setFieldErrors(fieldErrorsFromZod<AuthField>(validation.error))
+        return
+      }
+
+      setFieldErrors({})
+      setIsSubmitting(true)
+
+      const result = await supabase.auth.resetPasswordForEmail(
+        validation.data.email,
+        { redirectTo: passwordResetRedirectUrl() },
+      )
+
+      if (result.error) {
+        setError(result.error.message)
+      } else {
+        setMessage(
+          'If an account exists for that email, a password reset link has been sent.',
+        )
+      }
+
+      setIsSubmitting(false)
+      return
+    }
+
+    if (mode === 'reset-password') {
+      const validation = passwordUpdateSchema.safeParse({
+        password,
+        confirmPassword,
+      })
+
+      if (!validation.success) {
+        setFieldErrors(fieldErrorsFromZod<AuthField>(validation.error))
+        return
+      }
+
+      setFieldErrors({})
+      setIsSubmitting(true)
+
+      const result = await supabase.auth.updateUser({
+        password: validation.data.password,
+      })
+
+      if (result.error) {
+        setError(
+          result.error.message ||
+            'This reset link is invalid or expired. Request a new one.',
+        )
+        setIsSubmitting(false)
+        return
+      }
+
+      window.location.replace(authModeHref('sign-in'))
+      return
+    }
 
     const validation = authCredentialsSchema.safeParse({ email, password })
 
@@ -113,11 +334,33 @@ export function AuthCard() {
     setError(null)
     setMessage(null)
     setShowPassword(false)
+    setShowConfirmPassword(false)
+    setPassword('')
+    setConfirmPassword('')
     setFieldErrors({})
   }
 
   const alternateMode: AuthMode =
     mode === 'sign-in' ? 'sign-up' : 'sign-in'
+  const content = authContent[mode]
+
+  function followAuthLink(
+    event: MouseEvent<HTMLAnchorElement>,
+    nextMode: AuthMode,
+  ) {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return
+    }
+
+    event.preventDefault()
+    changeMode(nextMode)
+  }
 
   return (
     <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-6 py-10 lg:min-h-[calc(100vh-9.5rem)] lg:grid-cols-[1.02fr_0.98fr] lg:px-8 lg:py-12">
@@ -180,12 +423,10 @@ export function AuthCard() {
               </span>
             </div>
             <h2 className="text-2xl font-extrabold tracking-[-0.03em] text-ink">
-              {mode === 'sign-in' ? 'Welcome back.' : 'Create your account.'}
+              {content.title}
             </h2>
             <p className="text-sm leading-6 font-medium text-ink/70">
-              {mode === 'sign-in'
-                ? 'Sign in with your organization email to continue.'
-                : 'Set up your credentials to join your organization workspace.'}
+              {content.description}
             </p>
           </div>
 
@@ -194,103 +435,18 @@ export function AuthCard() {
             onSubmit={(event) => void submit(event)}
             className="mt-6 flex flex-col gap-5"
           >
-            <Field className="flex flex-col gap-2">
-              <Label htmlFor="email" className="text-[13px] font-bold text-ink">
-                Email address
-              </Label>
-              <div
-                className={
-                  'flex h-10 items-center border bg-white transition focus-within:ring-2 ' +
-                  (fieldErrors.email
-                    ? 'border-red-500 focus-within:border-red-600 focus-within:ring-red-500/10'
-                    : 'border-ink/18 focus-within:border-forest focus-within:ring-forest/10')
-                }
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  className="ml-3.5 size-4 shrink-0 text-forest/60"
-                >
-                  <path d="M3.75 6.75h16.5v10.5H3.75z" />
-                  <path d="m4.5 7.5 7.5 5.25 7.5-5.25" />
-                </svg>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => {
-                    setEmail(event.target.value)
-                    setFieldErrors((current) => ({ ...current, email: undefined }))
-                  }}
-                  autoComplete="email"
-                  required
-                  aria-invalid={Boolean(fieldErrors.email)}
-                  aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
-                  className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-sm font-medium text-ink outline-none placeholder:text-ink/50"
-                  placeholder="you@company.com"
-                />
-              </div>
-              <FieldError id="auth-email-error" message={fieldErrors.email} />
-            </Field>
-
-            <Field className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-4">
-                <Label htmlFor="password" className="text-[13px] font-bold text-ink">
-                  Password
+            {mode !== 'reset-password' && (
+              <Field className="flex flex-col gap-2">
+                <Label htmlFor="email" className="text-[13px] font-bold text-ink">
+                  Email address
                 </Label>
-                <span className="text-[11px] font-semibold text-ink/55">
-                  8 characters minimum
-                </span>
-              </div>
-              <div
-                className={
-                  'flex h-10 items-center border bg-white transition focus-within:ring-2 ' +
-                  (fieldErrors.password
-                    ? 'border-red-500 focus-within:border-red-600 focus-within:ring-red-500/10'
-                    : 'border-ink/18 focus-within:border-forest focus-within:ring-forest/10')
-                }
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  className="ml-3.5 size-4 shrink-0 text-forest/60"
-                >
-                  <rect x="4.5" y="10" width="15" height="10" />
-                  <path d="M8 10V7.5a4 4 0 0 1 8 0V10" />
-                </svg>
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(event) => {
-                    setPassword(event.target.value)
-                    setFieldErrors((current) => ({
-                      ...current,
-                      password: undefined,
-                    }))
-                  }}
-                  autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
-                  minLength={8}
-                  required
-                  aria-invalid={Boolean(fieldErrors.password)}
-                  aria-describedby={
-                    fieldErrors.password ? 'auth-password-error' : undefined
+                <div
+                  className={
+                    'flex h-10 items-center border bg-white transition focus-within:ring-2 ' +
+                    (fieldErrors.email
+                      ? 'border-red-500 focus-within:border-red-600 focus-within:ring-red-500/10'
+                      : 'border-ink/18 focus-within:border-forest focus-within:ring-forest/10')
                   }
-                  className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-sm font-medium text-ink outline-none placeholder:text-ink/50"
-                  placeholder="Enter your password"
-                />
-                <Button
-                  type="button"
-                  onClick={() => setShowPassword((isVisible) => !isVisible)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  aria-pressed={showPassword}
-                  className="mr-1 inline-flex size-8 items-center justify-center text-ink/55 transition hover:bg-cream hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-forest"
                 >
                   <svg
                     aria-hidden="true"
@@ -298,25 +454,102 @@ export function AuthCard() {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1.8"
-                    className="size-4"
+                    className="ml-3.5 size-4 shrink-0 text-forest/60"
                   >
-                    {showPassword ? (
-                      <>
-                        <path d="M3 3l18 18" />
-                        <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
-                        <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5.5 0 9 7 9 7a16.5 16.5 0 0 1-2.2 3.2M6.6 6.6C4.3 8.1 3 12 3 12s3.5 7 9 7c1.4 0 2.7-.4 3.8-1" />
-                      </>
-                    ) : (
-                      <>
-                        <path d="M3 12s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7Z" />
-                        <circle cx="12" cy="12" r="2.5" />
-                      </>
-                    )}
+                    <path d="M3.75 6.75h16.5v10.5H3.75z" />
+                    <path d="m4.5 7.5 7.5 5.25 7.5-5.25" />
                   </svg>
-                </Button>
-              </div>
-              <FieldError id="auth-password-error" message={fieldErrors.password} />
-            </Field>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(event) => {
+                      setEmail(event.target.value)
+                      setFieldErrors((current) => ({
+                        ...current,
+                        email: undefined,
+                      }))
+                    }}
+                    autoComplete="email"
+                    required
+                    aria-invalid={Boolean(fieldErrors.email)}
+                    aria-describedby={
+                      fieldErrors.email ? 'auth-email-error' : undefined
+                    }
+                    className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-sm font-medium text-ink outline-none placeholder:text-ink/50"
+                    placeholder="you@company.com"
+                  />
+                </div>
+                <FieldError id="auth-email-error" message={fieldErrors.email} />
+              </Field>
+            )}
+
+            {mode !== 'forgot-password' && (
+              <PasswordField
+                id="auth-password"
+                label={mode === 'reset-password' ? 'New password' : 'Password'}
+                value={password}
+                error={fieldErrors.password}
+                isVisible={showPassword}
+                autoComplete={
+                  mode === 'sign-in' ? 'current-password' : 'new-password'
+                }
+                placeholder={
+                  mode === 'reset-password'
+                    ? 'Enter your new password'
+                    : 'Enter your password'
+                }
+                aside={
+                  mode === 'sign-in' ? (
+                    <a
+                      href={authModeHref('forgot-password')}
+                      onClick={(event) =>
+                        followAuthLink(event, 'forgot-password')
+                      }
+                      className="text-[11px] font-bold text-forest underline decoration-forest/30 underline-offset-4 transition hover:decoration-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/25"
+                    >
+                      Forgot password?
+                    </a>
+                  ) : (
+                    <span className="text-[11px] font-semibold text-ink/55">
+                      8 characters minimum
+                    </span>
+                  )
+                }
+                onChange={(value) => {
+                  setPassword(value)
+                  setFieldErrors((current) => ({
+                    ...current,
+                    password: undefined,
+                  }))
+                }}
+                onToggleVisibility={() =>
+                  setShowPassword((isVisible) => !isVisible)
+                }
+              />
+            )}
+
+            {mode === 'reset-password' && (
+              <PasswordField
+                id="auth-confirm-password"
+                label="Confirm new password"
+                value={confirmPassword}
+                error={fieldErrors.confirmPassword}
+                isVisible={showConfirmPassword}
+                autoComplete="new-password"
+                placeholder="Repeat your new password"
+                onChange={(value) => {
+                  setConfirmPassword(value)
+                  setFieldErrors((current) => ({
+                    ...current,
+                    confirmPassword: undefined,
+                  }))
+                }}
+                onToggleVisibility={() =>
+                  setShowConfirmPassword((isVisible) => !isVisible)
+                }
+              />
+            )}
 
             {error && (
               <p
@@ -338,23 +571,24 @@ export function AuthCard() {
             <Button
               type="submit"
               disabled={isSubmitting}
+              aria-busy={isSubmitting}
               className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.18)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-60"
             >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className="size-4"
-              >
-                <path d="M5 12h14M14 7l5 5-5 5" />
-              </svg>
-              {isSubmitting
-                ? 'Please wait…'
-                : mode === 'sign-in'
-                  ? 'Sign in securely'
-                  : 'Create your account'}
+              {isSubmitting ? (
+                <ButtonSpinner tone="light" />
+              ) : (
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="size-4"
+                >
+                  <path d="M5 12h14M14 7l5 5-5 5" />
+                </svg>
+              )}
+              {isSubmitting ? 'Please wait…' : content.submitLabel}
             </Button>
           </form>
 
@@ -368,23 +602,12 @@ export function AuthCard() {
           <p className="mt-5 text-center text-sm font-medium text-ink/70">
             {mode === 'sign-in'
               ? 'New to TradeLedger?'
-              : 'Already have an account?'}{' '}
+              : mode === 'sign-up'
+                ? 'Already have an account?'
+                : 'Remember your password?'}{' '}
             <a
               href={authModeHref(alternateMode)}
-              onClick={(event) => {
-                if (
-                  event.button !== 0 ||
-                  event.metaKey ||
-                  event.ctrlKey ||
-                  event.shiftKey ||
-                  event.altKey
-                ) {
-                  return
-                }
-
-                event.preventDefault()
-                changeMode(alternateMode)
-              }}
+              onClick={(event) => followAuthLink(event, alternateMode)}
               className="font-extrabold text-forest underline decoration-forest/30 underline-offset-4 transition hover:decoration-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-forest/25"
             >
               {alternateMode === 'sign-up' ? 'Create account' : 'Sign in'}

@@ -42,9 +42,11 @@ export default function App() {
   const checkoutState = search.get('checkout')
   const sessionId = search.get('session_id')
   const isCheckoutDemo = search.get('demo') === 'checkout'
+  const isPasswordRecovery = search.get('auth') === 'reset-password'
   const isDashboard = Boolean(
     isReady &&
       session &&
+      !isPasswordRecovery &&
       checkoutState !== 'success' &&
       checkoutState !== 'canceled' &&
       !isCheckoutDemo,
@@ -60,7 +62,7 @@ export default function App() {
       {!isDashboard && (
         <>
           <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(circle_at_top_left,_rgba(216,247,143,0.54),_transparent_52%)]" />
-          <Header session={session} />
+          <Header session={isPasswordRecovery ? null : session} />
         </>
       )}
 
@@ -68,7 +70,7 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
           {!isReady ? (
             <PageLoader />
-          ) : !session ? (
+          ) : isPasswordRecovery || !session ? (
             <AuthCard />
           ) : checkoutState === 'success' && sessionId ? (
             <PaymentResult sessionId={sessionId} />

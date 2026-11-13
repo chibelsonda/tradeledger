@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 
 import { clampQuantity, formatCurrency } from '../../../lib/format'
 import { supabase } from '../../../lib/supabase'
+import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 
 const product = {
   name: 'Launch Kit',
@@ -242,23 +243,27 @@ export function CheckoutCard() {
               type="button"
               onClick={() => void startCheckout()}
               disabled={isSubmitting}
+              aria-busy={isSubmitting}
               className="group inline-flex h-11 items-center justify-center gap-3 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.2)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-70"
             >
+              {isSubmitting && <ButtonSpinner tone="light" />}
               <span>
                 {isSubmitting ? 'Opening checkout…' : 'Continue to secure checkout'}
               </span>
-              <svg
-                viewBox="0 0 20 20"
-                className="size-5 transition-transform group-hover:translate-x-1"
-                aria-hidden="true"
-              >
-                <path
-                  fill="currentColor"
-                  fillRule="evenodd"
-                  d="M3.25 10a.75.75 0 0 1 .75-.75h10.19l-3.22-3.22a.75.75 0 1 1 1.06-1.06l4.5 4.5a.75.75 0 0 1 0 1.06l-4.5 4.5a.75.75 0 1 1-1.06-1.06l3.22-3.22H4a.75.75 0 0 1-.75-.75Z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              {!isSubmitting && (
+                <svg
+                  viewBox="0 0 20 20"
+                  className="size-5 transition-transform group-hover:translate-x-1"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="currentColor"
+                    fillRule="evenodd"
+                    d="M3.25 10a.75.75 0 0 1 .75-.75h10.19l-3.22-3.22a.75.75 0 1 1 1.06-1.06l4.5 4.5a.75.75 0 0 1 0 1.06l-4.5 4.5a.75.75 0 1 1-1.06-1.06l3.22-3.22H4a.75.75 0 0 1-.75-.75Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
             </Button>
 
             <div className="flex items-center justify-center gap-4 text-[11px] font-semibold text-ink/75">

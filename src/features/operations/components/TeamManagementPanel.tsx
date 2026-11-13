@@ -6,6 +6,7 @@ import type {
   OrganizationRole,
 } from '../../../lib/database.types'
 import { FieldError } from '../../../components/ui/FieldError'
+import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { formatStatus } from '../../../lib/format'
 import { SelectControl } from '../../../components/ui/SelectControl'
 
@@ -131,12 +132,13 @@ export function TeamManagementPanel({
                             )
                           }
                           className={
-                            'border px-3 py-2 text-xs font-bold transition disabled:cursor-wait disabled:opacity-50 ' +
+                            'inline-flex items-center justify-center gap-2 border px-3 py-2 text-xs font-bold transition disabled:cursor-wait disabled:opacity-50 ' +
                             (member.status === 'active'
                               ? 'border-red-200 text-red-700 hover:bg-red-50'
                               : 'border-emerald-200 text-emerald-800 hover:bg-emerald-50')
                           }
                         >
+                          {isBusy && <ButtonSpinner />}
                           {isBusy
                             ? 'Updating…'
                             : member.status === 'active'
@@ -215,8 +217,10 @@ export function TeamManagementPanel({
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="mt-5 inline-flex h-10 w-full items-center justify-center bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-wait disabled:opacity-50"
+          aria-busy={isSubmitting}
+          className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-wait disabled:opacity-50"
         >
+          {isSubmitting && <ButtonSpinner tone="light" />}
           {isSubmitting ? 'Granting access…' : 'Add or update member'}
         </Button>
       </form>

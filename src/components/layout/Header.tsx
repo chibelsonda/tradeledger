@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { useState } from 'react'
 
 import { supabase } from '../../lib/supabase'
+import { ButtonSpinner } from '../ui/ButtonSpinner'
 import { Brand } from './Brand'
 
 interface HeaderProps {
@@ -31,8 +32,10 @@ export function Header({ session }: HeaderProps) {
             type="button"
             onClick={() => void signOut()}
             disabled={isSigningOut}
-            className="inline-flex h-9 items-center justify-center border border-ink/12 bg-white/80 px-4 text-xs font-bold text-ink shadow-[0_6px_18px_rgba(19,37,31,0.06)] backdrop-blur transition hover:border-forest/30 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest/50 disabled:cursor-wait disabled:opacity-60"
+            aria-busy={isSigningOut}
+            className="inline-flex h-9 items-center justify-center gap-2 border border-ink/12 bg-white/80 px-4 text-xs font-bold text-ink shadow-[0_6px_18px_rgba(19,37,31,0.06)] backdrop-blur transition hover:border-forest/30 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest/50 disabled:cursor-wait disabled:opacity-60"
           >
+            {isSigningOut && <ButtonSpinner />}
             {isSigningOut ? 'Signing out…' : 'Sign out'}
           </Button>
         </div>

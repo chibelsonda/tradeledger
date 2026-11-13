@@ -31,6 +31,7 @@ import type {
   WaiverDocument,
 } from '../../../lib/database.types'
 import { FieldError } from '../../../components/ui/FieldError'
+import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { formatCurrency, formatStatus } from '../../../lib/format'
 import { projectCode } from '../../../lib/organizations'
 import {
@@ -73,6 +74,10 @@ interface OperationsDashboardProps {
 }
 
 type CreatePanel = 'project' | 'subcontractor' | 'payment'
+type PaymentTransition = {
+  requestId: string
+  action: 'submit' | 'approve'
+}
 type OperationsFormField =
   | keyof ProjectFormValues
   | keyof SubcontractorFormValues
@@ -221,6 +226,8 @@ export function OperationsDashboard({
   const [notice, setNotice] = useState<string | null>(null)
   const [createPanel, setCreatePanel] = useState<CreatePanel>('project')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [paymentTransition, setPaymentTransition] =
+    useState<PaymentTransition | null>(null)
   const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null)
   const [reconcilingRequestId, setReconcilingRequestId] = useState<string | null>(
     null,
@@ -658,7 +665,7 @@ export function OperationsDashboard({
   ) {
     setError(null)
     setNotice(null)
-    setIsSubmitting(true)
+    setPaymentTransition({ requestId, action })
 
     const result =
       action === 'submit'
@@ -669,7 +676,7 @@ export function OperationsDashboard({
             p_payment_request_id: requestId,
           })
 
-    setIsSubmitting(false)
+    setPaymentTransition(null)
 
     if (result.error || result.data !== true) {
       setError(
@@ -1053,23 +1060,29 @@ export function OperationsDashboard({
                     type="button"
                     onClick={() => void signOut()}
                     disabled={isSigningOut}
+                    aria-busy={isSigningOut}
                     className="mt-1 flex h-10 w-full items-center justify-between px-3 text-sm font-bold text-red-700 transition data-focus:bg-red-50 disabled:cursor-wait disabled:opacity-50"
                   >
-                    <span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span>
-                    <svg
-                      viewBox="0 0 20 20"
-                      className="size-4"
-                      fill="none"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M8 4H4.75A1.75 1.75 0 0 0 3 5.75v8.5C3 15.22 3.78 16 4.75 16H8m4-3 3-3-3-3m3 3H7"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <span className="inline-flex items-center gap-2">
+                      {isSigningOut && <ButtonSpinner />}
+                      {isSigningOut ? 'Signing out…' : 'Sign out'}
+                    </span>
+                    {!isSigningOut && (
+                      <svg
+                        viewBox="0 0 20 20"
+                        className="size-4"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M8 4H4.75A1.75 1.75 0 0 0 3 5.75v8.5C3 15.22 3.78 16 4.75 16H8m4-3 3-3-3-3m3 3H7"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
                   </Button>
                 </MenuItem>
               </MenuItems>
@@ -1242,9 +1255,11 @@ export function OperationsDashboard({
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="h-10 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:opacity-60"
+                  aria-busy={isSubmitting}
+                  className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-wait disabled:opacity-60"
                 >
-                  Add project
+                  {isSubmitting && <ButtonSpinner tone="light" />}
+                  {isSubmitting ? 'Adding project…' : 'Add project'}
                 </Button>
               </form>
             )}
@@ -1336,9 +1351,11 @@ export function OperationsDashboard({
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="h-10 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:opacity-60 sm:col-span-2 sm:justify-self-end"
+                  aria-busy={isSubmitting}
+                  className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-wait disabled:opacity-60 sm:col-span-2 sm:justify-self-end"
                 >
-                  Add subcontractor
+                  {isSubmitting && <ButtonSpinner tone="light" />}
+                  {isSubmitting ? 'Adding subcontractor…' : 'Add subcontractor'}
                 </Button>
               </form>
             )}
@@ -1527,9 +1544,11 @@ export function OperationsDashboard({
                   disabled={
                     isSubmitting || projects.length === 0 || subcontractors.length === 0
                   }
-                  className="h-10 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:justify-self-end"
+                  aria-busy={isSubmitting}
+                  className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-4 text-sm font-bold text-white transition hover:bg-forest disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:justify-self-end"
                 >
-                  Create draft request
+                  {isSubmitting && <ButtonSpinner tone="light" />}
+                  {isSubmitting ? 'Creating draft…' : 'Create draft request'}
                 </Button>
               </form>
             )}
@@ -1768,25 +1787,47 @@ export function OperationsDashboard({
                       {request.status === 'draft' && canManagePayments && (
                         <Button
                           type="button"
-                          disabled={isSubmitting}
+                          disabled={paymentTransition !== null}
+                          aria-busy={
+                            paymentTransition?.requestId === request.id &&
+                            paymentTransition.action === 'submit'
+                          }
                           onClick={() =>
                             void transitionPaymentRequest(request.id, 'submit')
                           }
-                          className="border border-ink/15 px-3 py-2 text-xs font-bold text-ink transition hover:bg-cream disabled:opacity-50"
+                          className="inline-flex items-center justify-center gap-2 border border-ink/15 px-3 py-2 text-xs font-bold text-ink transition hover:bg-cream disabled:cursor-wait disabled:opacity-50"
                         >
-                          Submit
+                          {paymentTransition?.requestId === request.id &&
+                            paymentTransition.action === 'submit' && (
+                              <ButtonSpinner />
+                            )}
+                          {paymentTransition?.requestId === request.id &&
+                          paymentTransition.action === 'submit'
+                            ? 'Submitting…'
+                            : 'Submit'}
                         </Button>
                       )}
                       {request.status === 'submitted' && canApprovePayments && (
                         <Button
                           type="button"
-                          disabled={isSubmitting}
+                          disabled={paymentTransition !== null}
+                          aria-busy={
+                            paymentTransition?.requestId === request.id &&
+                            paymentTransition.action === 'approve'
+                          }
                           onClick={() =>
                             void transitionPaymentRequest(request.id, 'approve')
                           }
-                          className="bg-ink px-3 py-2 text-xs font-bold text-white transition hover:bg-forest disabled:opacity-50"
+                          className="inline-flex items-center justify-center gap-2 bg-ink px-3 py-2 text-xs font-bold text-white transition hover:bg-forest disabled:cursor-wait disabled:opacity-50"
                         >
-                          Approve
+                          {paymentTransition?.requestId === request.id &&
+                            paymentTransition.action === 'approve' && (
+                              <ButtonSpinner tone="light" />
+                            )}
+                          {paymentTransition?.requestId === request.id &&
+                          paymentTransition.action === 'approve'
+                            ? 'Approving…'
+                            : 'Approve'}
                         </Button>
                       )}
                       {['approved', 'checkout_created', 'failed'].includes(
@@ -1801,7 +1842,7 @@ export function OperationsDashboard({
                             className="inline-flex min-w-28 items-center justify-center gap-2 bg-forest px-3 py-2 text-xs font-bold text-white transition hover:bg-ink disabled:cursor-wait disabled:opacity-55"
                           >
                             {checkoutRequestId === request.id && (
-                              <span className="size-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                              <ButtonSpinner tone="light" />
                             )}
                             {checkoutRequestId === request.id
                               ? 'Opening…'
@@ -1829,7 +1870,7 @@ export function OperationsDashboard({
                             className="inline-flex items-center justify-center gap-2 border border-ink/15 px-3 py-2 text-xs font-bold text-ink transition hover:bg-cream disabled:cursor-wait disabled:opacity-50"
                           >
                             {reconcilingRequestId === request.id && (
-                              <span className="size-3 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
+                              <ButtonSpinner />
                             )}
                             {reconcilingRequestId === request.id
                               ? 'Checking…'
@@ -2085,8 +2126,9 @@ export function OperationsDashboard({
                     void refundPayment(refundConfirmation.id)
                   }
                 }}
-                className="h-10 bg-red-700 px-4 text-sm font-bold text-white transition hover:bg-red-800 disabled:cursor-wait disabled:opacity-55"
+                className="inline-flex h-10 items-center justify-center gap-2 bg-red-700 px-4 text-sm font-bold text-white transition hover:bg-red-800 disabled:cursor-wait disabled:opacity-55"
               >
+                {refundRequestId !== null && <ButtonSpinner tone="light" />}
                 {refundRequestId !== null
                   ? 'Refunding payment…'
                   : 'Confirm refund'}

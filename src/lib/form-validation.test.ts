@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { authCredentialsSchema } from '../features/auth/auth.schemas'
+import {
+  authCredentialsSchema,
+  passwordResetRequestSchema,
+  passwordUpdateSchema,
+} from '../features/auth/auth.schemas'
 import {
   organizationMemberFormSchema,
   paymentRequestFormSchema,
@@ -24,6 +28,24 @@ describe('form validation schemas', () => {
       authCredentialsSchema.safeParse({ email: 'invalid', password: 'short' })
         .success,
     ).toBe(false)
+  })
+
+  it('normalizes password reset email addresses', () => {
+    expect(
+      passwordResetRequestSchema.parse({ email: '  OWNER@EXAMPLE.COM ' }),
+    ).toEqual({ email: 'owner@example.com' })
+  })
+
+  it('requires matching passwords when completing recovery', () => {
+    const result = passwordUpdateSchema.safeParse({
+      password: 'correct-horse',
+      confirmPassword: 'different-horse',
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0]?.path).toEqual(['confirmPassword'])
+    }
   })
 
   it('normalizes organization onboarding values', () => {

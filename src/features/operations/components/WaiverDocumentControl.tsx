@@ -1,5 +1,6 @@
 import { Button } from '@headlessui/react'
 
+import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import type {
   PaymentRequestStatus,
   WaiverDocument,
@@ -35,6 +36,7 @@ export function WaiverDocumentControl({
         onClick={onDownload}
         className="inline-flex items-center justify-center gap-2 border border-forest/20 bg-mint/10 px-3 py-2 text-xs font-bold text-forest transition hover:bg-mint/20 disabled:cursor-wait disabled:opacity-50"
       >
+        {isBusy && <ButtonSpinner />}
         {isBusy ? 'Signing link…' : 'Download PDF'}
       </Button>
     )
@@ -68,6 +70,7 @@ export function WaiverDocumentControl({
         onClick={onGenerate}
         className="inline-flex items-center justify-center gap-2 border border-ink/15 px-3 py-2 text-xs font-bold text-ink transition hover:bg-cream disabled:cursor-wait disabled:opacity-50"
       >
+        {isBusy && <ButtonSpinner />}
         {isBusy
           ? 'Generating…'
           : waiver?.status === 'failed'

@@ -7,6 +7,7 @@ import type {
   OrganizationMembership,
   OrganizationRole,
 } from '../../../lib/database.types'
+import { ButtonSpinner } from '../../../components/ui/ButtonSpinner'
 import { supabase } from '../../../lib/supabase'
 import { OperationsDashboard } from '../../operations/components/OperationsDashboard'
 import { OrganizationOnboarding } from './OrganizationOnboarding'
@@ -25,11 +26,14 @@ export function Workspace({ session }: WorkspaceProps) {
     null,
   )
   const [isLoading, setIsLoading] = useState(true)
+  const [isRetrying, setIsRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const loadOrganizations = useCallback(
-    async (preferredOrganizationId?: string) => {
-      setIsLoading(true)
+    async (preferredOrganizationId?: string, showPageLoader = true) => {
+      if (showPageLoader) {
+        setIsLoading(true)
+      }
       setError(null)
 
       const [organizationResult, membershipResult] = await Promise.all([
@@ -100,6 +104,12 @@ export function Workspace({ session }: WorkspaceProps) {
     [organizations, selectedOrganizationId],
   )
 
+  async function retryLoadingOrganizations() {
+    setIsRetrying(true)
+    await loadOrganizations(undefined, false)
+    setIsRetrying(false)
+  }
+
   if (isLoading) {
     return (
       <div className="grid min-h-[65vh] place-items-center px-6">
@@ -119,10 +129,13 @@ export function Workspace({ session }: WorkspaceProps) {
           <p className="mt-2 text-sm leading-6">{error}</p>
           <Button
             type="button"
-            onClick={() => void loadOrganizations()}
-            className="mt-5 bg-red-900 px-4 py-2.5 text-sm font-bold text-white"
+            onClick={() => void retryLoadingOrganizations()}
+            disabled={isRetrying}
+            aria-busy={isRetrying}
+            className="mt-5 inline-flex items-center justify-center gap-2 bg-red-900 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60"
           >
-            Try again
+            {isRetrying && <ButtonSpinner tone="light" />}
+            {isRetrying ? 'Trying again…' : 'Try again'}
           </Button>
         </div>
       </section>
