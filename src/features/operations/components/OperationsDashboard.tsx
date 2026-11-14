@@ -84,6 +84,7 @@ import {
   type DirectoryEditTarget,
 } from './DirectoryEditDialog'
 import { DisputeLedger } from './DisputeLedger'
+import { FinancialReports } from './FinancialReports'
 import { OverviewCharts } from './OverviewCharts'
 import { PayoutLedger } from './PayoutLedger'
 import { PayoutReadinessControl } from './PayoutReadinessControl'
@@ -124,6 +125,7 @@ type DashboardPage =
   | 'retainage'
   | 'disputes'
   | 'payouts'
+  | 'reports'
   | 'fees'
   | 'team'
   | 'delivery'
@@ -136,6 +138,7 @@ const dashboardPathByPage: Record<DashboardPage, string> = {
   retainage: '/retainage',
   disputes: '/disputes',
   payouts: '/payouts',
+  reports: '/reports',
   fees: '/fees',
   team: '/team',
   delivery: '/delivery',
@@ -175,6 +178,11 @@ const dashboardPageDetails: Record<
     eyebrow: 'Connected money movement',
     title: 'Payout reconciliation',
     description: 'Transfers, bank payouts, reversals, and settlement evidence',
+  },
+  reports: {
+    eyebrow: 'Financial intelligence',
+    title: 'Financial reporting',
+    description: 'Period summaries and downloadable activity statements',
   },
   fees: {
     eyebrow: 'Connect monetization',
@@ -432,6 +440,12 @@ export function OperationsDashboard({
           paymentTransfers.length + connectedPayouts.length > 0
             ? String(paymentTransfers.length + connectedPayouts.length)
             : undefined,
+      },
+      canManagePayments && {
+        id: 'reports',
+        href: dashboardPathByPage.reports,
+        label: 'Reports',
+        detail: 'Summaries and statements',
       },
       canManagePayments && {
         id: 'fees',
@@ -748,7 +762,14 @@ export function OperationsDashboard({
     const handlePopState = () => {
       const nextPage = dashboardPageFromPath(window.location.pathname)
       const isAllowed =
-        (!['delivery', 'retainage', 'payouts', 'fees'].includes(nextPage) ||
+        (![
+          'delivery',
+          'retainage',
+          'disputes',
+          'payouts',
+          'reports',
+          'fees',
+        ].includes(nextPage) ||
           canManagePayments) &&
         (nextPage !== 'team' || canManageTeam)
 
@@ -1370,7 +1391,14 @@ export function OperationsDashboard({
 
     if (
       !path ||
-      (['delivery', 'payouts', 'fees'].includes(nextPage) && !canManagePayments) ||
+      ([
+        'delivery',
+        'retainage',
+        'disputes',
+        'payouts',
+        'reports',
+        'fees',
+      ].includes(nextPage) && !canManagePayments) ||
       (nextPage === 'team' && !canManageTeam)
     ) {
       return
@@ -2414,7 +2442,7 @@ export function OperationsDashboard({
       </section>
       )}
 
-      {activeNavigationId === 'payouts' && (
+      {activeNavigationId === 'payouts' && canManagePayments && (
         <PayoutLedger
           organizationId={organization.id}
           role={organization.role}
@@ -2427,6 +2455,15 @@ export function OperationsDashboard({
           auditEvents={auditEvents}
           isLoading={isLoading}
           onRefresh={loadDashboard}
+        />
+      )}
+
+      {activeNavigationId === 'reports' && canManagePayments && (
+        <FinancialReports
+          key={organization.id}
+          organizationId={organization.id}
+          organizationName={organization.name}
+          role={organization.role}
         />
       )}
 

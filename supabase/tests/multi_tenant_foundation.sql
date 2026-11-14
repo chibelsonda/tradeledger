@@ -1840,6 +1840,94 @@ set local role authenticated;
 set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000004';
 
 do $$
+declare
+    report_record record;
+    statement_count integer;
+    unsafe_reference_count integer;
+begin
+    select * into report_record
+    from public.get_organization_financial_report(
+        current_setting('test.organization_a_id')::uuid,
+        date '2026-01-01',
+        date '2026-12-31',
+        'usd'
+    );
+
+    if report_record.currency <> 'usd'
+       or report_record.collected_amount <= 0
+       or report_record.platform_fee_amount <= 0
+       or report_record.payment_count < 1
+       or report_record.transfer_count < 1
+       or report_record.payout_count < 1 then
+        raise exception 'The accountant financial summary is incomplete.';
+    end if;
+
+    select count(*), count(*) filter (
+        where reference ~ '^(acct|pi|ch|tr|po|dp)_'
+    )
+    into statement_count, unsafe_reference_count
+    from public.get_organization_financial_statement(
+        current_setting('test.organization_a_id')::uuid,
+        date '2026-01-01',
+        date '2026-12-31',
+        'usd',
+        500
+    );
+
+    if statement_count < 1 or unsafe_reference_count <> 0 then
+        raise exception 'The financial statement is empty or exposes a Stripe identifier.';
+    end if;
+
+    begin
+        perform public.get_organization_financial_report(
+            current_setting('test.organization_a_id')::uuid,
+            date '2025-01-01',
+            date '2026-12-31',
+            null
+        );
+        raise exception 'An unbounded financial report period was accepted.';
+    exception
+        when invalid_parameter_value then null;
+    end;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000006';
+
+do $$
+begin
+    begin
+        perform public.get_organization_financial_report(
+            current_setting('test.organization_a_id')::uuid,
+            date '2026-01-01',
+            date '2026-12-31',
+            null
+        );
+        raise exception 'A non-financial member generated a financial report.';
+    exception
+        when insufficient_privilege then null;
+    end;
+
+    begin
+        perform public.get_organization_financial_statement(
+            current_setting('test.organization_a_id')::uuid,
+            date '2026-01-01',
+            date '2026-12-31',
+            null,
+            500
+        );
+        raise exception 'A non-financial member generated a financial statement.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000004';
+
+do $$
 begin
     if (select count(*) from public.retainage_releases) <> 1 then
         raise exception 'The accountant cannot read the retainage release ledger.';
@@ -2018,6 +2106,18 @@ $$;
 
 do $$
 begin
+    begin
+        perform public.get_organization_financial_report(
+            current_setting('test.organization_a_id')::uuid,
+            date '2026-01-01',
+            date '2026-12-31',
+            null
+        );
+        raise exception 'Tenant B generated Tenant A financial report.';
+    exception
+        when insufficient_privilege then null;
+    end;
+
     begin
         insert into public.projects (organization_id, name, code, status)
         values (

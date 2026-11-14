@@ -28,6 +28,8 @@ export interface SupabaseMockState {
   paymentRequests: JsonRecord[]
   retainageReleases: JsonRecord[]
   paymentDisputes: JsonRecord[]
+  financialReportSummaries: JsonRecord[]
+  financialStatementRows: JsonRecord[]
   auditEvents: JsonRecord[]
   webhookFailures: JsonRecord[]
   waiverDocuments: JsonRecord[]
@@ -45,6 +47,7 @@ export interface SupabaseMockState {
   retainageRefundIds: string[]
   disputeActions: JsonRecord[]
   payoutReconciliationRequests: JsonRecord[]
+  financialReportRequests: JsonRecord[]
   payoutReconciliationError?: string
   memberUpserts: JsonRecord[]
   memberStatusChanges: JsonRecord[]
@@ -68,6 +71,8 @@ export function createSupabaseMockState(
     paymentRequests: [],
     retainageReleases: [],
     paymentDisputes: [],
+    financialReportSummaries: [],
+    financialStatementRows: [],
     auditEvents: [],
     webhookFailures: [],
     waiverDocuments: [],
@@ -85,6 +90,7 @@ export function createSupabaseMockState(
     retainageRefundIds: [],
     disputeActions: [],
     payoutReconciliationRequests: [],
+    financialReportRequests: [],
     memberUpserts: [],
     memberStatusChanges: [],
     platformFeeUpdates: [],
@@ -205,6 +211,18 @@ export async function installSupabaseMock(
           200,
           state.demoWorkspaceStatus ? [state.demoWorkspaceStatus] : [],
         )
+        return
+      }
+
+      if (rpcName === 'get_organization_financial_report') {
+        state.financialReportRequests.push({ rpcName, ...body })
+        await fulfillJson(route, 200, state.financialReportSummaries)
+        return
+      }
+
+      if (rpcName === 'get_organization_financial_statement') {
+        state.financialReportRequests.push({ rpcName, ...body })
+        await fulfillJson(route, 200, state.financialStatementRows)
         return
       }
 
@@ -635,6 +653,44 @@ export function failedConnectedPayoutRecord(): JsonRecord {
     last_synced_at: now,
     created_at: now,
     updated_at: now,
+  }
+}
+
+export function financialReportSummaryRecord(
+  overrides: JsonRecord = {},
+): JsonRecord {
+  return {
+    currency: 'usd',
+    collected_amount: 9450,
+    refunded_amount: 500,
+    platform_fee_amount: 290,
+    routed_amount: 9160,
+    reversed_amount: 500,
+    paid_out_amount: 8660,
+    failed_payout_amount: 0,
+    disputed_amount: 0,
+    payment_count: 1,
+    refund_count: 1,
+    transfer_count: 1,
+    payout_count: 1,
+    ...overrides,
+  }
+}
+
+export function financialStatementRowRecord(
+  overrides: JsonRecord = {},
+): JsonRecord {
+  return {
+    occurred_at: now,
+    entry_type: 'payment',
+    reference: '10000000-0000-4000-8000-000000000001',
+    description: 'Kitchen trim milestone',
+    project_name: 'Cedar Kitchen Remodel',
+    subcontractor_name: 'Fine Finish Carpentry',
+    amount: 9450,
+    currency: 'usd',
+    status: 'paid',
+    ...overrides,
   }
 }
 

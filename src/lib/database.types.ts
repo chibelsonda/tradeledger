@@ -437,6 +437,40 @@ export type NotificationDelivery = {
   updated_at: string
 }
 
+export type FinancialReportSummary = {
+  currency: string
+  collected_amount: number
+  refunded_amount: number
+  platform_fee_amount: number
+  routed_amount: number
+  reversed_amount: number
+  paid_out_amount: number
+  failed_payout_amount: number
+  disputed_amount: number
+  payment_count: number
+  refund_count: number
+  transfer_count: number
+  payout_count: number
+}
+
+export type FinancialStatementRow = {
+  occurred_at: string
+  entry_type:
+    | 'payment'
+    | 'refund'
+    | 'transfer'
+    | 'transfer_reversal'
+    | 'payout'
+    | 'dispute'
+  reference: string
+  description: string
+  project_name: string | null
+  subcontractor_name: string
+  amount: number
+  currency: string
+  status: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -1088,6 +1122,25 @@ export interface Database {
           storage_path: string
           file_name: string
         }[]
+      }
+      get_organization_financial_report: {
+        Args: {
+          p_organization_id: string
+          p_period_start: string
+          p_period_end: string
+          p_currency?: string | null
+        }
+        Returns: FinancialReportSummary[]
+      }
+      get_organization_financial_statement: {
+        Args: {
+          p_organization_id: string
+          p_period_start: string
+          p_period_end: string
+          p_currency?: string | null
+          p_limit?: number
+        }
+        Returns: FinancialStatementRow[]
       }
     }
     Enums: Record<string, never>
