@@ -1476,9 +1476,13 @@ do $$
 declare
     transfer_count integer;
     payout_count integer;
+    transfer_retainage_release_id uuid;
 begin
     select count(*) into transfer_count from public.payment_transfers;
     select count(*) into payout_count from public.connected_payouts;
+    select retainage_release_id into transfer_retainage_release_id
+    from public.payment_transfers
+    limit 1;
 
     if transfer_count <> 1
        or payout_count <> 1
@@ -1503,7 +1507,13 @@ $$;
 set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000004';
 
 do $$
+declare
+    transfer_retainage_release_id uuid;
 begin
+    select retainage_release_id into transfer_retainage_release_id
+    from public.payment_transfers
+    limit 1;
+
     if (select count(*) from public.payment_transfers) <> 1
        or (select count(*) from public.connected_payouts) <> 1
        or (select count(*) from public.organization_platform_fees) <> 1 then
