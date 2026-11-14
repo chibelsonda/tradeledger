@@ -251,6 +251,13 @@ export default {
           }
 
           console.error('Stripe connected account webhook failed:', result.error)
+          await context.supabaseAdmin.rpc('record_stripe_webhook_failure', {
+            p_event_id: event.id,
+            p_event_type: event.type,
+            p_object_id: account.id,
+            p_error_code: result.error.code ?? 'account_readiness_failed',
+            p_error_message: 'Connected account readiness processing failed.',
+          })
           return Response.json({ error: 'Webhook processing failed.' }, {
             status: 500,
           })
@@ -334,7 +341,7 @@ export default {
           await context.supabaseAdmin.rpc('record_stripe_webhook_failure', {
             p_event_id: event.id,
             p_event_type: event.type,
-            p_object_id: transfer.id,
+            p_object_id: stripeReference(transfer.destination) ?? transfer.id,
             p_error_code: 'transfer_ledger_failed',
             p_error_message: 'Transfer ledger processing failed.',
           })
@@ -378,7 +385,7 @@ export default {
           await context.supabaseAdmin.rpc('record_stripe_webhook_failure', {
             p_event_id: event.id,
             p_event_type: event.type,
-            p_object_id: transferId,
+            p_object_id: stripeReference(charge.payment_intent) ?? transferId,
             p_error_code: 'transfer_discovery_failed',
             p_error_message: 'Destination transfer discovery failed.',
           })
@@ -420,7 +427,7 @@ export default {
           await context.supabaseAdmin.rpc('record_stripe_webhook_failure', {
             p_event_id: event.id,
             p_event_type: event.type,
-            p_object_id: payout.id,
+            p_object_id: event.account ?? payout.id,
             p_error_code: 'payout_ledger_failed',
             p_error_message: 'Connected payout ledger processing failed.',
           })

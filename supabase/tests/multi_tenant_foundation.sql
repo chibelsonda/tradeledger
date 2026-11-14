@@ -967,6 +967,115 @@ select public.upsert_organization_member(
 );
 
 do $$
+begin
+    begin
+        perform public.prepare_webhook_failure_recovery(
+            (
+                select id
+                from public.stripe_webhook_failures
+                where event_id = 'evt_tradeledger_failure_unresolved_001'
+            ),
+            '00000000-0000-4000-8000-000000000001'
+        );
+        raise exception 'Authenticated clients must not execute recovery coordinator RPCs.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+reset role;
+set local role service_role;
+
+do $$
+declare
+    failure_id bigint;
+    recovery_plan jsonb;
+    failure_record public.stripe_webhook_failures%rowtype;
+    requested_audit_count integer;
+    completed_audit_count integer;
+begin
+    select id into failure_id
+    from public.stripe_webhook_failures
+    where event_id = 'evt_tradeledger_failure_unresolved_001';
+
+    begin
+        perform public.prepare_webhook_failure_recovery(
+            failure_id,
+            '00000000-0000-4000-8000-000000000002'
+        );
+        raise exception 'A cross-tenant user prepared webhook recovery.';
+    exception
+        when insufficient_privilege then null;
+    end;
+
+    recovery_plan := public.prepare_webhook_failure_recovery(
+        failure_id,
+        '00000000-0000-4000-8000-000000000001'
+    );
+
+    if recovery_plan ->> 'recovery_kind' <> 'payment'
+       or (recovery_plan ->> 'target_id')::uuid <>
+          current_setting('test.payment_request_a_id')::uuid then
+        raise exception 'Webhook recovery selected an unsafe or incorrect target: %.',
+            recovery_plan;
+    end if;
+
+    select * into failure_record
+    from public.stripe_webhook_failures
+    where id = failure_id;
+
+    if failure_record.recovery_status <> 'retrying'
+       or failure_record.recovery_attempts <> 1
+       or failure_record.last_recovery_requested_by <>
+          '00000000-0000-4000-8000-000000000001'::uuid then
+        raise exception 'Webhook recovery preparation was not tracked correctly.';
+    end if;
+
+    select count(*) into requested_audit_count
+    from public.audit_events
+    where organization_id = current_setting('test.organization_a_id')::uuid
+      and action = 'webhook_failure.recovery_requested'
+      and (metadata ->> 'failure_id')::bigint = failure_id;
+
+    if requested_audit_count <> 1 then
+        raise exception 'Webhook recovery request audit evidence is missing.';
+    end if;
+
+    perform public.complete_webhook_failure_recovery(
+        failure_id,
+        '00000000-0000-4000-8000-000000000001',
+        true,
+        null
+    );
+
+    select * into failure_record
+    from public.stripe_webhook_failures
+    where id = failure_id;
+
+    if failure_record.recovery_status <> 'resolved'
+       or failure_record.resolved_at is null
+       or failure_record.resolution <> 'operator_reconciliation' then
+        raise exception 'Successful webhook recovery was not resolved correctly.';
+    end if;
+
+    select count(*) into completed_audit_count
+    from public.audit_events
+    where organization_id = current_setting('test.organization_a_id')::uuid
+      and action = 'webhook_failure.recovery_completed'
+      and (metadata ->> 'failure_id')::bigint = failure_id;
+
+    if completed_audit_count <> 1 then
+        raise exception 'Webhook recovery completion audit evidence is missing.';
+    end if;
+end;
+$$;
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+do $$
 declare
     member_count integer;
 begin

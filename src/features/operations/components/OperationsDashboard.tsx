@@ -92,6 +92,7 @@ import { PlatformFeeSettings } from './PlatformFeeSettings'
 import { RetainageReleaseWorkflow } from './RetainageReleaseWorkflow'
 import { TeamManagementPanel } from './TeamManagementPanel'
 import { WaiverDocumentControl } from './WaiverDocumentControl'
+import { WebhookOperations } from './WebhookOperations'
 
 interface WorkspaceOrganization extends Organization {
   role: OrganizationRole
@@ -390,6 +391,9 @@ export function OperationsDashboard({
     const activeMemberCount = organizationMembers.filter(
       (member) => member.status === 'active',
     ).length
+    const unresolvedWebhookFailureCount = webhookFailures.filter(
+      (failure) => failure.resolved_at === null,
+    ).length
 
     return [
       {
@@ -466,7 +470,9 @@ export function OperationsDashboard({
         label: 'Webhooks',
         detail: 'Payment event health',
         badge:
-          webhookFailures.length > 0 ? String(webhookFailures.length) : undefined,
+          unresolvedWebhookFailureCount > 0
+            ? String(unresolvedWebhookFailureCount)
+            : undefined,
       },
       {
         id: 'audit',
@@ -488,7 +494,7 @@ export function OperationsDashboard({
     projects.length,
     retainageReleases.length,
     subcontractors.length,
-    webhookFailures.length,
+    webhookFailures,
   ])
 
   const loadDashboard = useCallback(async () => {
@@ -579,9 +585,8 @@ export function OperationsDashboard({
           .from('stripe_webhook_failures')
           .select('*')
           .eq('organization_id', organization.id)
-          .is('resolved_at', null)
           .order('last_failed_at', { ascending: false })
-          .limit(6),
+          .limit(100),
         supabase
           .from('waiver_documents')
           .select('*')
@@ -2542,79 +2547,11 @@ export function OperationsDashboard({
       )}
 
       {activeNavigationId === 'delivery' && canManagePayments && (
-        <section
-          className={
-            'border p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)] ' +
-            (webhookFailures.length > 0
-              ? 'border-amber-950/15 bg-amber-950/[0.035]'
-              : 'border-forest/15 bg-forest/[0.035]')
-          }
-        >
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div>
-              <p
-                className={
-                  'text-[10px] font-bold uppercase tracking-[0.17em] ' +
-                  (webhookFailures.length > 0
-                    ? 'text-amber-950/65'
-                    : 'text-forest/75')
-                }
-              >
-                Payment operations
-              </p>
-              <h2 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">
-                {webhookFailures.length > 0
-                  ? 'Webhook attention queue'
-                  : 'Webhook delivery healthy'}
-              </h2>
-            </div>
-            <span
-              className={
-                'border px-3 py-1.5 text-xs font-extrabold ' +
-                (webhookFailures.length > 0
-                  ? 'border-amber-950/15 bg-white/80 text-amber-950'
-                  : 'border-forest/15 bg-white/80 text-forest')
-              }
-            >
-              {webhookFailures.length > 0
-                ? `${webhookFailures.length} unresolved`
-                : '0 unresolved'}
-            </span>
-          </div>
-
-          {webhookFailures.length === 0 ? (
-            <p className="mt-4 text-sm leading-6 text-ink/80">
-              Signed payment events are processing without unresolved ledger errors.
-            </p>
-          ) : (
-            <div className="mt-5 grid gap-3 lg:grid-cols-2">
-              {webhookFailures.map((failure) => (
-                <article key={failure.id} className="border border-amber-200 bg-white p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="truncate font-mono text-xs font-bold text-amber-900">
-                        {failure.event_type}
-                      </p>
-                      <p className="mt-1 font-mono text-[10px] text-ink/70">
-                        {failure.event_id}
-                      </p>
-                    </div>
-                    <span className="shrink-0 border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">
-                      {failure.attempts} {failure.attempts === 1 ? 'attempt' : 'attempts'}
-                    </span>
-                  </div>
-                  <p className="mt-3 break-words text-sm leading-5 text-red-800">
-                    {failure.error_message}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-ink/8 pt-3 text-[11px] text-ink/75">
-                    <span>{failure.error_code ?? 'processing_error'}</span>
-                    <time>{shortDate(failure.last_failed_at)}</time>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+        <WebhookOperations
+          failures={webhookFailures}
+          isLoading={isLoading}
+          onRefresh={loadDashboard}
+        />
       )}
 
       {activeNavigationId === 'audit' && (

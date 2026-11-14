@@ -389,6 +389,10 @@ export type StripeWebhookFailure = {
   last_failed_at: string
   resolved_at: string | null
   resolution: string | null
+  recovery_status: 'pending' | 'retrying' | 'failed' | 'resolved'
+  recovery_attempts: number
+  last_recovery_requested_at: string | null
+  last_recovery_requested_by: string | null
 }
 
 export type WaiverDocument = {
@@ -948,6 +952,19 @@ export interface Database {
       }
       resolve_stripe_webhook_failure: {
         Args: { p_event_id: string; p_resolution?: string }
+        Returns: boolean
+      }
+      prepare_webhook_failure_recovery: {
+        Args: { p_failure_id: number; p_user_id: string }
+        Returns: Json
+      }
+      complete_webhook_failure_recovery: {
+        Args: {
+          p_failure_id: number
+          p_user_id: string
+          p_succeeded: boolean
+          p_failure_code?: string | null
+        }
         Returns: boolean
       }
       process_stripe_refund_webhook: {

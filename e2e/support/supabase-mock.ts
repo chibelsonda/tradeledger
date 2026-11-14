@@ -48,6 +48,7 @@ export interface SupabaseMockState {
   disputeActions: JsonRecord[]
   payoutReconciliationRequests: JsonRecord[]
   financialReportRequests: JsonRecord[]
+  webhookRecoveryRequests: JsonRecord[]
   payoutReconciliationError?: string
   memberUpserts: JsonRecord[]
   memberStatusChanges: JsonRecord[]
@@ -91,6 +92,7 @@ export function createSupabaseMockState(
     disputeActions: [],
     payoutReconciliationRequests: [],
     financialReportRequests: [],
+    webhookRecoveryRequests: [],
     memberUpserts: [],
     memberStatusChanges: [],
     platformFeeUpdates: [],
@@ -400,6 +402,29 @@ export async function installSupabaseMock(
       return
     }
 
+    if (
+      url.pathname === '/functions/v1/recover-webhook-failure' &&
+      request.method() === 'POST'
+    ) {
+      const body = request.postDataJSON() as JsonRecord
+      state.webhookRecoveryRequests.push(body)
+      state.webhookFailures = state.webhookFailures.map((failure) =>
+        failure.id === body.failureId
+          ? {
+              ...failure,
+              recovery_status: 'resolved',
+              recovery_attempts: Number(failure.recovery_attempts ?? 0) + 1,
+              last_recovery_requested_at: now,
+              last_recovery_requested_by: TEST_USER_ID,
+              resolved_at: now,
+              resolution: 'operator_reconciliation',
+            }
+          : failure,
+      )
+      await fulfillJson(route, 200, { status: 'resolved' })
+      return
+    }
+
     state.unexpectedRequests.push(requestLabel)
     await route.abort('failed')
   })
@@ -653,6 +678,28 @@ export function failedConnectedPayoutRecord(): JsonRecord {
     last_synced_at: now,
     created_at: now,
     updated_at: now,
+  }
+}
+
+export function webhookFailureRecord(overrides: JsonRecord = {}): JsonRecord {
+  return {
+    id: 8001,
+    organization_id: TEST_ORGANIZATION_ID,
+    event_id: 'evt_browser_failure_001',
+    event_type: 'refund.updated',
+    object_id: 're_browser_test_001',
+    error_code: 'ledger_write_failed',
+    error_message: 'Internal failure for acct_sensitive_001.',
+    attempts: 5,
+    first_failed_at: now,
+    last_failed_at: now,
+    resolved_at: null,
+    resolution: null,
+    recovery_status: 'pending',
+    recovery_attempts: 0,
+    last_recovery_requested_at: null,
+    last_recovery_requested_by: null,
+    ...overrides,
   }
 }
 
