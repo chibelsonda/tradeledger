@@ -8,6 +8,7 @@ import {
 import {
   organizationMemberFormSchema,
   paymentRequestFormSchema,
+  platformFeeFormSchema,
   projectFormSchema,
   subcontractorFormSchema,
 } from '@/features/operations/operations.schemas'
@@ -119,6 +120,26 @@ describe('form validation schemas', () => {
       organizationMemberFormSchema.safeParse({
         email: 'owner@example.com',
         role: 'owner',
+      }).success,
+    ).toBe(false)
+  })
+
+  it('converts a valid platform fee policy to server units', () => {
+    expect(
+      platformFeeFormSchema.parse({
+        enabled: true,
+        percentage: '2.75',
+        fixedAmount: '0.30',
+      }),
+    ).toEqual({ enabled: true, percentage: 275, fixedAmount: 30 })
+  })
+
+  it('rejects an enabled platform fee without a fee component', () => {
+    expect(
+      platformFeeFormSchema.safeParse({
+        enabled: true,
+        percentage: '0',
+        fixedAmount: '0.00',
       }).success,
     ).toBe(false)
   })

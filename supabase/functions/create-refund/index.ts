@@ -19,6 +19,7 @@ interface PreparedRefund {
   currency: string
   refund_status: string
   destination_charge: boolean
+  refund_application_fee: boolean
 }
 
 function requiredEnvironment(name: string): string {
@@ -124,6 +125,7 @@ export default {
               amount: prepared.amount,
               reason: 'requested_by_customer',
               reverse_transfer: prepared.destination_charge,
+              refund_application_fee: prepared.refund_application_fee,
               metadata: {
                 refund_reference: prepared.refund_reference,
                 payment_reference: prepared.payment_reference,

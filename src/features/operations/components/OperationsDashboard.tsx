@@ -27,6 +27,7 @@ import type {
   ConnectedPayout,
   Organization,
   OrganizationMember,
+  OrganizationPlatformFee,
   OrganizationRole,
   PaymentRequest,
   PaymentTransfer,
@@ -83,6 +84,7 @@ import {
 import { OverviewCharts } from './OverviewCharts'
 import { PayoutLedger } from './PayoutLedger'
 import { PayoutReadinessControl } from './PayoutReadinessControl'
+import { PlatformFeeSettings } from './PlatformFeeSettings'
 import { TeamManagementPanel } from './TeamManagementPanel'
 import { WaiverDocumentControl } from './WaiverDocumentControl'
 
@@ -116,6 +118,7 @@ type DashboardPage =
   | 'directory'
   | 'payments'
   | 'payouts'
+  | 'fees'
   | 'team'
   | 'delivery'
   | 'audit'
@@ -125,6 +128,7 @@ const dashboardPathByPage: Record<DashboardPage, string> = {
   directory: '/directory',
   payments: '/payments',
   payouts: '/payouts',
+  fees: '/fees',
   team: '/team',
   delivery: '/delivery',
   audit: '/audit',
@@ -153,6 +157,11 @@ const dashboardPageDetails: Record<
     eyebrow: 'Connected money movement',
     title: 'Payout reconciliation',
     description: 'Transfers, bank payouts, reversals, and settlement evidence',
+  },
+  fees: {
+    eyebrow: 'Connect monetization',
+    title: 'Platform fees',
+    description: 'Server-owned pricing for connected destination charges',
   },
   team: {
     eyebrow: 'Access governance',
@@ -274,6 +283,7 @@ export function OperationsDashboard({
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
   const [paymentTransfers, setPaymentTransfers] = useState<PaymentTransfer[]>([])
   const [connectedPayouts, setConnectedPayouts] = useState<ConnectedPayout[]>([])
+  const [platformFees, setPlatformFees] = useState<OrganizationPlatformFee[]>([])
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
   const [webhookFailures, setWebhookFailures] = useState<StripeWebhookFailure[]>([])
   const [waiverDocuments, setWaiverDocuments] = useState<WaiverDocument[]>([])
@@ -385,6 +395,12 @@ export function OperationsDashboard({
             ? String(paymentTransfers.length + connectedPayouts.length)
             : undefined,
       },
+      canManagePayments && {
+        id: 'fees',
+        href: dashboardPathByPage.fees,
+        label: 'Platform fees',
+        detail: 'Destination charge pricing',
+      },
       canManageTeam && {
         id: 'team',
         href: dashboardPathByPage.team,
@@ -433,6 +449,7 @@ export function OperationsDashboard({
       requestResult,
       transferResult,
       connectedPayoutResult,
+      platformFeeResult,
       auditResult,
       failureResult,
       waiverResult,
@@ -473,6 +490,13 @@ export function OperationsDashboard({
           .eq('organization_id', organization.id)
           .order('stripe_created_at', { ascending: false })
           .limit(100),
+        canManagePayments
+          ? supabase
+              .from('organization_platform_fees')
+              .select('*')
+              .eq('organization_id', organization.id)
+              .order('currency')
+          : Promise.resolve({ data: [] as OrganizationPlatformFee[], error: null }),
         supabase
           .from('audit_events')
           .select('*')
@@ -514,6 +538,7 @@ export function OperationsDashboard({
       requestResult.error ??
       transferResult.error ??
       connectedPayoutResult.error ??
+      platformFeeResult.error ??
       auditResult.error ??
       failureResult.error ??
       waiverResult.error ??
@@ -540,6 +565,7 @@ export function OperationsDashboard({
     setPaymentRequests(requestResult.data ?? [])
     setPaymentTransfers(transferResult.data ?? [])
     setConnectedPayouts(connectedPayoutResult.data ?? [])
+    setPlatformFees(platformFeeResult.data ?? [])
     setAuditEvents(auditResult.data ?? [])
     setWebhookFailures(failureResult.data ?? [])
     setWaiverDocuments(waiverResult.data ?? [])
@@ -558,7 +584,7 @@ export function OperationsDashboard({
         : nextSubcontractors[0]?.id ?? '',
     )
     setIsLoading(false)
-  }, [canManageTeam, organization.id, organization.role])
+  }, [canManagePayments, canManageTeam, organization.id, organization.role])
 
   useEffect(() => {
     if (connectReturnHandled.current || !canManageProjects) return
@@ -660,7 +686,7 @@ export function OperationsDashboard({
     const handlePopState = () => {
       const nextPage = dashboardPageFromPath(window.location.pathname)
       const isAllowed =
-        (!['delivery', 'payouts'].includes(nextPage) || canManagePayments) &&
+        (!['delivery', 'payouts', 'fees'].includes(nextPage) || canManagePayments) &&
         (nextPage !== 'team' || canManageTeam)
 
       if (!isAllowed) {
@@ -1281,7 +1307,7 @@ export function OperationsDashboard({
 
     if (
       !path ||
-      (['delivery', 'payouts'].includes(nextPage) && !canManagePayments) ||
+      (['delivery', 'payouts', 'fees'].includes(nextPage) && !canManagePayments) ||
       (nextPage === 'team' && !canManageTeam)
     ) {
       return
@@ -2337,6 +2363,17 @@ export function OperationsDashboard({
           auditEvents={auditEvents}
           isLoading={isLoading}
           onRefresh={loadDashboard}
+        />
+      )}
+
+      {activeNavigationId === 'fees' && canManagePayments && (
+        <PlatformFeeSettings
+          key={organization.id}
+          organizationId={organization.id}
+          role={organization.role}
+          fees={platformFees}
+          isLoading={isLoading}
+          onSaved={loadDashboard}
         />
       )}
 

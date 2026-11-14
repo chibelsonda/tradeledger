@@ -92,6 +92,18 @@ export type OrganizationMember = {
   updated_at: string
 }
 
+export type OrganizationPlatformFee = {
+  organization_id: string
+  currency: string
+  enabled: boolean
+  percentage_basis_points: number
+  fixed_amount: number
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
 export type Project = {
   id: string
   organization_id: string
@@ -198,6 +210,10 @@ export type Payment = {
   amount_refunded: number
   refunded_at: string | null
   destination_charge: boolean
+  platform_fee_basis_points: number
+  platform_fee_fixed_amount: number
+  platform_fee_amount: number
+  platform_fee_configured_at: string | null
   created_at: string
   updated_at: string
 }
@@ -339,6 +355,12 @@ export interface Database {
         Row: OrganizationMembership
         Insert: OrganizationMembership
         Update: Partial<OrganizationMembership>
+        Relationships: []
+      }
+      organization_platform_fees: {
+        Row: OrganizationPlatformFee
+        Insert: Record<string, never>
+        Update: Record<string, never>
         Relationships: []
       }
       projects: {
@@ -528,6 +550,16 @@ export interface Database {
         }
         Returns: boolean
       }
+      set_organization_platform_fee: {
+        Args: {
+          p_organization_id: string
+          p_currency: string
+          p_percentage_basis_points: number
+          p_fixed_amount: number
+          p_enabled: boolean
+        }
+        Returns: OrganizationPlatformFee
+      }
       prepare_subcontractor_payout_onboarding: {
         Args: {
           p_subcontractor_id: string
@@ -591,6 +623,8 @@ export interface Database {
           stripe_checkout_session_id: string | null
           stripe_destination_account_id: string
           destination_charge: boolean
+          platform_fee_amount: number
+          subcontractor_transfer_amount: number
         }[]
       }
       attach_payment_checkout_session: {
@@ -638,6 +672,7 @@ export interface Database {
           currency: string
           refund_status: RefundStatus
           destination_charge: boolean
+          refund_application_fee: boolean
         }[]
       }
       apply_payment_refund_status: {

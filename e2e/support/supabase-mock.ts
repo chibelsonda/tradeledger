@@ -20,6 +20,7 @@ export interface SupabaseMockState {
   projects: JsonRecord[]
   subcontractors: JsonRecord[]
   payoutAccounts: JsonRecord[]
+  platformFees: JsonRecord[]
   paymentTransfers: JsonRecord[]
   connectedPayouts: JsonRecord[]
   paymentRequests: JsonRecord[]
@@ -38,6 +39,7 @@ export interface SupabaseMockState {
   payoutReconciliationError?: string
   memberUpserts: JsonRecord[]
   memberStatusChanges: JsonRecord[]
+  platformFeeUpdates: JsonRecord[]
   demoRemovalPayloads: JsonRecord[]
   unexpectedRequests: string[]
 }
@@ -51,6 +53,7 @@ export function createSupabaseMockState(
     projects: [],
     subcontractors: [],
     payoutAccounts: [],
+    platformFees: [],
     paymentTransfers: [],
     connectedPayouts: [],
     paymentRequests: [],
@@ -68,6 +71,7 @@ export function createSupabaseMockState(
     payoutReconciliationRequests: [],
     memberUpserts: [],
     memberStatusChanges: [],
+    platformFeeUpdates: [],
     demoRemovalPayloads: [],
     unexpectedRequests: [],
     ...overrides,
@@ -188,6 +192,18 @@ export async function installSupabaseMock(
         await fulfillJson(route, 200, true)
         return
       }
+
+      if (rpcName === 'set_organization_platform_fee') {
+        state.platformFeeUpdates.push(body)
+        const record = platformFeeRecord({
+          enabled: body.p_enabled,
+          percentage_basis_points: body.p_percentage_basis_points,
+          fixed_amount: body.p_fixed_amount,
+        })
+        state.platformFees = [record]
+        await fulfillJson(route, 200, record)
+        return
+      }
     }
 
     if (url.pathname.startsWith('/rest/v1/') && request.method() === 'GET') {
@@ -204,6 +220,7 @@ export async function installSupabaseMock(
         projects: state.projects,
         subcontractors: state.subcontractors,
         subcontractor_payout_accounts: state.payoutAccounts,
+        organization_platform_fees: state.platformFees,
         payment_transfers: state.paymentTransfers,
         connected_payouts: state.connectedPayouts,
         payment_requests: state.paymentRequests,
@@ -374,6 +391,10 @@ export function paidPaymentRecord(): JsonRecord {
     amount_refunded: 0,
     refunded_at: null,
     destination_charge: true,
+    platform_fee_basis_points: 0,
+    platform_fee_fixed_amount: 0,
+    platform_fee_amount: 0,
+    platform_fee_configured_at: now,
     created_at: now,
     updated_at: now,
   }
@@ -418,6 +439,21 @@ export function failedConnectedPayoutRecord(): JsonRecord {
     last_synced_at: now,
     created_at: now,
     updated_at: now,
+  }
+}
+
+export function platformFeeRecord(overrides: JsonRecord = {}): JsonRecord {
+  return {
+    organization_id: TEST_ORGANIZATION_ID,
+    currency: 'usd',
+    enabled: true,
+    percentage_basis_points: 250,
+    fixed_amount: 30,
+    created_by: TEST_USER_ID,
+    updated_by: TEST_USER_ID,
+    created_at: now,
+    updated_at: now,
+    ...overrides,
   }
 }
 

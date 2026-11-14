@@ -140,6 +140,14 @@ begin
 end;
 $$;
 
+select public.set_organization_platform_fee(
+    :'organization_a_id',
+    'usd',
+    275,
+    30,
+    true
+);
+
 reset role;
 
 -- Reproduce the legacy production schema where Stripe session identifiers were
@@ -184,7 +192,9 @@ select
     payment_reference as checkout_payment_reference,
     amount_total as checkout_amount_total,
     stripe_destination_account_id as checkout_destination_id,
-    destination_charge as checkout_destination_charge
+    destination_charge as checkout_destination_charge,
+    platform_fee_amount as checkout_platform_fee_amount,
+    subcontractor_transfer_amount as checkout_transfer_amount
 from public.prepare_payment_request_checkout(
     :'payment_request_a_id',
     '00000000-0000-4000-8000-000000000001',
@@ -198,6 +208,12 @@ select set_config(
     :'checkout_destination_charge',
     true
 );
+select set_config(
+    'test.checkout_platform_fee_amount',
+    :'checkout_platform_fee_amount',
+    true
+);
+select set_config('test.checkout_transfer_amount', :'checkout_transfer_amount', true);
 
 do $$
 declare
@@ -222,6 +238,11 @@ begin
         raise exception 'Expected database-owned checkout amount 9450, received %.', ledger_amount;
     end if;
 
+    if current_setting('test.checkout_platform_fee_amount')::bigint <> 290
+       or current_setting('test.checkout_transfer_amount')::bigint <> 9160 then
+        raise exception 'Checkout did not snapshot the configured platform fee split.';
+    end if;
+
     if current_setting('test.checkout_destination_id') <> 'acct_TradeLedgerTest001'
        or not current_setting('test.checkout_destination_charge')::boolean then
         raise exception 'Checkout was not prepared as a connected destination charge.';
@@ -234,6 +255,13 @@ select public.attach_payment_checkout_session(
     'cs_test_tradeledger_001'
 ) as attached
 \gset
+
+reset role;
+update public.organization_platform_fees
+set percentage_basis_points = 500, fixed_amount = 0
+where organization_id = :'organization_a_id'
+  and currency = 'usd';
+set local role service_role;
 
 select public.attach_payment_checkout_session(
     :'checkout_payment_reference',
@@ -248,7 +276,8 @@ select public.mark_payment_checkout_failed(
 \gset
 
 select
-    payment_reference as retry_payment_reference
+    payment_reference as retry_payment_reference,
+    platform_fee_amount as retry_platform_fee_amount
 from public.prepare_payment_request_checkout(
     :'payment_request_a_id',
     '00000000-0000-4000-8000-000000000001',
@@ -265,6 +294,11 @@ select public.attach_payment_checkout_session(
 select set_config('test.checkout_reattached', :'reattached', true);
 select set_config('test.checkout_failed', :'checkout_failed', true);
 select set_config('test.retry_attached', :'retry_attached', true);
+select set_config(
+    'test.retry_platform_fee_amount',
+    :'retry_platform_fee_amount',
+    true
+);
 
 select set_config(
     'test.rate_limit_first',
@@ -306,6 +340,10 @@ begin
     if not current_setting('test.checkout_failed')::boolean
        or not current_setting('test.retry_attached')::boolean then
         raise exception 'A failed Checkout Session must support a replacement session.';
+    end if;
+
+    if current_setting('test.retry_platform_fee_amount')::bigint <> 290 then
+        raise exception 'A checkout retry replaced the immutable platform fee snapshot.';
     end if;
 
     if not current_setting('test.rate_limit_first')::boolean
@@ -379,8 +417,8 @@ begin
         raise exception 'Expected one idempotent Stripe event, received %.', event_count;
     end if;
 
-    if audit_count <> 13 then
-        raise exception 'Expected 13 audit events after payout setup and checkout retry, received %.', audit_count;
+    if audit_count <> 14 then
+        raise exception 'Expected 14 audit events after fee setup, payout setup, and checkout retry, received %.', audit_count;
     end if;
 
     if notification_count <> 2 then
@@ -709,7 +747,8 @@ $$;
 select
     refund_reference as prepared_refund_reference,
     amount as prepared_refund_amount,
-    destination_charge as refund_destination_charge
+    destination_charge as refund_destination_charge,
+    refund_application_fee as refund_application_fee
 from public.prepare_payment_refund(
     :'payment_request_a_id',
     '00000000-0000-4000-8000-000000000001',
@@ -723,6 +762,7 @@ select set_config(
     :'refund_destination_charge',
     true
 );
+select set_config('test.refund_application_fee', :'refund_application_fee', true);
 
 do $$
 begin
@@ -733,6 +773,10 @@ begin
 
     if not current_setting('test.refund_destination_charge')::boolean then
         raise exception 'Destination-charge refunds must reverse the transfer.';
+    end if;
+
+    if not current_setting('test.refund_application_fee')::boolean then
+        raise exception 'A fee-bearing refund must return the application fee.';
     end if;
 end;
 $$;
@@ -1250,7 +1294,7 @@ select public.apply_stripe_transfer_ledger_event(
     'tr_TradeLedgerTransfer001',
     'acct_TradeLedgerTest001',
     'pi_TradeLedgerPayment001',
-    9450,
+    9160,
     'usd',
     'succeeded',
     0,
@@ -1267,7 +1311,7 @@ select public.apply_stripe_transfer_ledger_event(
     'tr_TradeLedgerTransfer001',
     'acct_TradeLedgerTest001',
     'pi_TradeLedgerPayment001',
-    9450,
+    9160,
     'usd',
     'succeeded',
     0,
@@ -1287,10 +1331,10 @@ select public.apply_stripe_transfer_ledger_event(
     'tr_TradeLedgerTransfer001',
     'acct_TradeLedgerTest001',
     'pi_TradeLedgerPayment001',
-    9450,
+    9160,
     'usd',
     'reversed',
-    9450,
+    9160,
     'ch_TradeLedgerCharge001',
     'ch_TradeLedgerCharge001',
     '2026-11-14T02:00:00Z',
@@ -1379,7 +1423,7 @@ begin
        or transfer_record.payment_request_id <> current_setting('test.payment_request_a_id')::uuid
        or transfer_record.subcontractor_id <> current_setting('test.subcontractor_a_id')::uuid
        or transfer_record.status <> 'reversed'
-       or transfer_record.reversed_amount <> 9450 then
+       or transfer_record.reversed_amount <> 9160 then
         raise exception 'Destination-charge transfer was not reconciled to its verified payment.';
     end if;
 
@@ -1388,10 +1432,10 @@ begin
     end if;
 
     if transfer_record.reversed_amount <> (
-        select amount_refunded from public.payments
+        select amount_refunded - platform_fee_amount from public.payments
         where id = transfer_record.payment_id
     ) then
-        raise exception 'Refund and transfer reversal amounts are not reconciled.';
+        raise exception 'Refund, application fee, and transfer reversal amounts are not reconciled.';
     end if;
 
     if discovered_events <> 2 or reversed_events <> 1 then
@@ -1436,7 +1480,9 @@ begin
     select count(*) into transfer_count from public.payment_transfers;
     select count(*) into payout_count from public.connected_payouts;
 
-    if transfer_count <> 1 or payout_count <> 1 then
+    if transfer_count <> 1
+       or payout_count <> 1
+       or (select count(*) from public.organization_platform_fees) <> 1 then
         raise exception 'The financial owner cannot read the payout ledger.';
     end if;
 
@@ -1459,9 +1505,23 @@ set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000004';
 do $$
 begin
     if (select count(*) from public.payment_transfers) <> 1
-       or (select count(*) from public.connected_payouts) <> 1 then
-        raise exception 'The accountant cannot read the payout ledger.';
+       or (select count(*) from public.connected_payouts) <> 1
+       or (select count(*) from public.organization_platform_fees) <> 1 then
+        raise exception 'The accountant cannot read financial configuration.';
     end if;
+
+    begin
+        perform public.set_organization_platform_fee(
+            current_setting('test.organization_a_id')::uuid,
+            'usd',
+            300,
+            0,
+            true
+        );
+        raise exception 'An accountant must not update platform fee configuration.';
+    exception
+        when insufficient_privilege then null;
+    end;
 end;
 $$;
 
@@ -1470,8 +1530,9 @@ set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000003';
 do $$
 begin
     if (select count(*) from public.payment_transfers) <> 1
-       or (select count(*) from public.connected_payouts) <> 1 then
-        raise exception 'The administrator cannot read the payout ledger.';
+       or (select count(*) from public.connected_payouts) <> 1
+       or (select count(*) from public.organization_platform_fees) <> 1 then
+        raise exception 'The administrator cannot read financial configuration.';
     end if;
 end;
 $$;
@@ -1481,8 +1542,9 @@ set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000006';
 do $$
 begin
     if (select count(*) from public.payment_transfers) <> 0
-       or (select count(*) from public.connected_payouts) <> 0 then
-        raise exception 'A non-financial role can read the payout ledger.';
+       or (select count(*) from public.connected_payouts) <> 0
+       or (select count(*) from public.organization_platform_fees) <> 0 then
+        raise exception 'A non-financial role can read financial configuration.';
     end if;
 end;
 $$;
@@ -1506,6 +1568,7 @@ declare
     visible_notifications integer;
     visible_transfers integer;
     visible_connected_payouts integer;
+    visible_platform_fees integer;
     visible_private_files integer;
 begin
     select count(*) into visible_organizations from public.organizations;
@@ -1522,6 +1585,7 @@ begin
     select count(*) into visible_notifications from public.notification_deliveries;
     select count(*) into visible_transfers from public.payment_transfers;
     select count(*) into visible_connected_payouts from public.connected_payouts;
+    select count(*) into visible_platform_fees from public.organization_platform_fees;
     select count(*) into visible_private_files
     from storage.objects
     where bucket_id = 'waiver-documents';
@@ -1539,6 +1603,7 @@ begin
        or visible_notifications <> 0
        or visible_transfers <> 0
        or visible_connected_payouts <> 0
+       or visible_platform_fees <> 0
        or visible_private_files <> 0 then
         raise exception 'Tenant B could see Tenant A data.';
     end if;

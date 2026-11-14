@@ -1,6 +1,10 @@
 import { z } from 'zod'
 
 import { dollarsToMinorUnits } from '@/lib/payment-calculations'
+import {
+  nonNegativeDecimalToMinorUnits,
+  percentageToBasisPoints,
+} from '@/features/operations/platform-fees'
 
 const optionalEmailSchema = z
   .string()
@@ -76,9 +80,37 @@ export const organizationMemberFormSchema = z.object({
   }),
 })
 
+export const platformFeeFormSchema = z
+  .object({
+    enabled: z.boolean(),
+    percentage: z
+      .string()
+      .refine(
+        (value) => percentageToBasisPoints(value) !== null,
+        'Enter a percentage from 0% to 99% with no more than 2 decimal places.',
+      )
+      .transform((value) => percentageToBasisPoints(value) as number),
+    fixedAmount: z
+      .string()
+      .refine(
+        (value) => nonNegativeDecimalToMinorUnits(value) !== null,
+        'Enter a non-negative USD amount with no more than 2 decimal places.',
+      )
+      .transform((value) => nonNegativeDecimalToMinorUnits(value) as number),
+  })
+  .refine(
+    (values) =>
+      !values.enabled || values.percentage > 0 || values.fixedAmount > 0,
+    {
+      message: 'Enter a percentage or fixed amount before enabling the fee.',
+      path: ['percentage'],
+    },
+  )
+
 export type ProjectFormValues = z.infer<typeof projectFormSchema>
 export type SubcontractorFormValues = z.infer<typeof subcontractorFormSchema>
 export type PaymentRequestFormValues = z.infer<typeof paymentRequestFormSchema>
 export type OrganizationMemberFormValues = z.infer<
   typeof organizationMemberFormSchema
 >
+export type PlatformFeeFormValues = z.infer<typeof platformFeeFormSchema>

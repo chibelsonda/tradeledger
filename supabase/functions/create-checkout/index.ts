@@ -23,6 +23,8 @@ interface PreparedPaymentRequest {
   stripe_checkout_session_id: string | null
   stripe_destination_account_id: string
   destination_charge: boolean
+  platform_fee_amount: number
+  subcontractor_transfer_amount: number
 }
 
 function requiredEnvironment(name: string): string {
@@ -216,10 +218,17 @@ export default {
               },
               mode: 'payment',
               payment_intent_data: {
+                application_fee_amount: prepared.platform_fee_amount > 0
+                  ? prepared.platform_fee_amount
+                  : undefined,
                 metadata: {
                   payment_reference: prepared.payment_reference,
                   payment_request_id: prepared.payment_request_id,
                   organization_id: prepared.organization_id,
+                  platform_fee_amount: String(prepared.platform_fee_amount),
+                  subcontractor_transfer_amount: String(
+                    prepared.subcontractor_transfer_amount,
+                  ),
                 },
                 transfer_data: {
                   destination: prepared.stripe_destination_account_id,
