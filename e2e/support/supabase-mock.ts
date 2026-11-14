@@ -7,6 +7,7 @@ export const TEST_SUBCONTRACTOR_ID = '30000000-0000-4000-8000-000000000001'
 export const TEST_PAYOUT_ACCOUNT_ID = '35000000-0000-4000-8000-000000000001'
 export const TEST_PAYMENT_REQUEST_ID = '40000000-0000-4000-8000-000000000001'
 export const TEST_RETAINAGE_RELEASE_ID = '45000000-0000-4000-8000-000000000001'
+export const TEST_DISPUTE_ID = '65000000-0000-4000-8000-000000000001'
 export const TEST_MEMBER_USER_ID = '00000000-0000-4000-8000-000000000002'
 
 const supabaseOrigin = 'https://test-project.supabase.co'
@@ -26,6 +27,7 @@ export interface SupabaseMockState {
   connectedPayouts: JsonRecord[]
   paymentRequests: JsonRecord[]
   retainageReleases: JsonRecord[]
+  paymentDisputes: JsonRecord[]
   auditEvents: JsonRecord[]
   webhookFailures: JsonRecord[]
   waiverDocuments: JsonRecord[]
@@ -41,6 +43,7 @@ export interface SupabaseMockState {
   approvedRetainageReleaseIds: string[]
   retainageCheckoutIds: string[]
   retainageRefundIds: string[]
+  disputeActions: JsonRecord[]
   payoutReconciliationRequests: JsonRecord[]
   payoutReconciliationError?: string
   memberUpserts: JsonRecord[]
@@ -64,6 +67,7 @@ export function createSupabaseMockState(
     connectedPayouts: [],
     paymentRequests: [],
     retainageReleases: [],
+    paymentDisputes: [],
     auditEvents: [],
     webhookFailures: [],
     waiverDocuments: [],
@@ -79,6 +83,7 @@ export function createSupabaseMockState(
     approvedRetainageReleaseIds: [],
     retainageCheckoutIds: [],
     retainageRefundIds: [],
+    disputeActions: [],
     payoutReconciliationRequests: [],
     memberUpserts: [],
     memberStatusChanges: [],
@@ -276,6 +281,7 @@ export async function installSupabaseMock(
         connected_payouts: state.connectedPayouts,
         payment_requests: state.paymentRequests,
         retainage_releases: state.retainageReleases,
+        payment_disputes: state.paymentDisputes,
         audit_events: state.auditEvents,
         stripe_webhook_failures: state.webhookFailures,
         waiver_documents: state.waiverDocuments,
@@ -286,6 +292,30 @@ export async function installSupabaseMock(
         await fulfillJson(route, 200, tableData[table])
         return
       }
+    }
+
+    if (
+      url.pathname === '/functions/v1/manage-dispute' &&
+      request.method() === 'POST'
+    ) {
+      const body = request.postDataJSON() as JsonRecord
+      state.disputeActions.push(body)
+      state.paymentDisputes = state.paymentDisputes.map((dispute) =>
+        dispute.id === body.disputeId
+          ? {
+              ...dispute,
+              has_evidence: body.action === 'submit_evidence' || dispute.has_evidence,
+              evidence_submitted_at:
+                body.action === 'submit_evidence' ? now : dispute.evidence_submitted_at,
+              recovery_status:
+                body.action === 'recover' ? 'reversed' : dispute.recovery_status,
+              recovery_amount:
+                body.action === 'recover' ? dispute.amount : dispute.recovery_amount,
+            }
+          : dispute,
+      )
+      await fulfillJson(route, 200, { status: 'confirmed' })
+      return
     }
 
     if (
@@ -545,6 +575,46 @@ export function paymentTransferRecord(): JsonRecord {
     last_synced_at: now,
     created_at: now,
     updated_at: now,
+  }
+}
+
+export function paymentDisputeRecord(overrides: JsonRecord = {}): JsonRecord {
+  return {
+    id: TEST_DISPUTE_ID,
+    organization_id: TEST_ORGANIZATION_ID,
+    payment_id: 1,
+    payment_request_id: TEST_PAYMENT_REQUEST_ID,
+    retainage_release_id: null,
+    payment_transfer_id: '60000000-0000-4000-8000-000000000001',
+    stripe_dispute_id: 'dp_browser_test_001',
+    stripe_charge_id: 'ch_browser_test_001',
+    stripe_payment_intent_id: 'pi_test_browser_001',
+    amount: 9450,
+    currency: 'usd',
+    reason: 'product_not_received',
+    status: 'needs_response',
+    livemode: false,
+    evidence_due_at: '2026-11-18T06:00:00.000Z',
+    has_evidence: false,
+    evidence_past_due: false,
+    evidence_submission_count: 0,
+    evidence_product_description: null,
+    evidence_service_date: null,
+    evidence_customer_email: null,
+    evidence_uncategorized_text: null,
+    evidence_saved_at: null,
+    evidence_submitted_at: null,
+    funds_withdrawn_at: now,
+    funds_reinstated_at: null,
+    recovery_status: 'deferred',
+    recovery_amount: 0,
+    stripe_transfer_reversal_id: null,
+    accepted_at: null,
+    closed_at: null,
+    last_synced_at: now,
+    created_at: now,
+    updated_at: now,
+    ...overrides,
   }
 }
 

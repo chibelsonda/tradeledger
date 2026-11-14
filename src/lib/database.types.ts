@@ -68,6 +68,27 @@ export type RetainageReleaseStatus =
   | 'partially_refunded'
   | 'refunded'
 
+export type DisputeStatus =
+  | 'warning_needs_response'
+  | 'warning_under_review'
+  | 'warning_closed'
+  | 'needs_response'
+  | 'under_review'
+  | 'won'
+  | 'lost'
+  | 'prevented'
+  | 'appealable'
+  | 'appeal_under_review'
+  | 'appeal_won'
+  | 'appeal_lost'
+
+export type DisputeRecoveryStatus =
+  | 'not_required'
+  | 'pending'
+  | 'deferred'
+  | 'reversed'
+  | 'failed'
+
 export type WaiverDocumentStatus = 'generating' | 'ready' | 'failed' | 'voided'
 export type NotificationDeliveryStatus =
   | 'pending'
@@ -300,6 +321,43 @@ export type PaymentTransfer = {
   updated_at: string
 }
 
+export type PaymentDispute = {
+  id: string
+  organization_id: string
+  payment_id: number
+  payment_request_id: string
+  retainage_release_id: string | null
+  payment_transfer_id: string | null
+  stripe_dispute_id: string
+  stripe_charge_id: string
+  stripe_payment_intent_id: string
+  amount: number
+  currency: string
+  reason: string
+  status: DisputeStatus
+  livemode: boolean
+  evidence_due_at: string | null
+  has_evidence: boolean
+  evidence_past_due: boolean
+  evidence_submission_count: number
+  evidence_product_description: string | null
+  evidence_service_date: string | null
+  evidence_customer_email: string | null
+  evidence_uncategorized_text: string | null
+  evidence_saved_at: string | null
+  evidence_submitted_at: string | null
+  funds_withdrawn_at: string | null
+  funds_reinstated_at: string | null
+  recovery_status: DisputeRecoveryStatus
+  recovery_amount: number
+  stripe_transfer_reversal_id: string | null
+  accepted_at: string | null
+  closed_at: string | null
+  last_synced_at: string
+  created_at: string
+  updated_at: string
+}
+
 export type ConnectedPayout = {
   id: string
   organization_id: string
@@ -513,6 +571,12 @@ export interface Database {
       }
       payment_transfers: {
         Row: PaymentTransfer
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
+      payment_disputes: {
+        Row: PaymentDispute
         Insert: Record<string, never>
         Update: Record<string, never>
         Relationships: []

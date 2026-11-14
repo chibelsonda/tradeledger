@@ -1848,6 +1848,98 @@ end;
 $$;
 
 reset role;
+set local role service_role;
+
+select public.apply_stripe_dispute_event(
+    'evt_dispute_created_001', 'charge.dispute.created',
+    'dp_TradeLedgerDispute001', 'ch_TradeLedgerCharge001',
+    'pi_TradeLedgerPayment001', 1000, 'usd', 'product_not_received',
+    'needs_response', false, '2026-11-20T00:00:00Z', false, false, 0, null
+) as dispute_created
+\gset
+
+select public.apply_stripe_dispute_event(
+    'evt_dispute_created_001', 'charge.dispute.created',
+    'dp_TradeLedgerDispute001', 'ch_TradeLedgerCharge001',
+    'pi_TradeLedgerPayment001', 1000, 'usd', 'product_not_received',
+    'needs_response', false, '2026-11-20T00:00:00Z', false, false, 0, null
+) as dispute_duplicate
+\gset
+
+select public.apply_stripe_dispute_event(
+    'evt_dispute_created_002', 'charge.dispute.created',
+    'dp_TradeLedgerDispute002', 'ch_TradeLedgerCharge001',
+    'pi_TradeLedgerPayment001', 500, 'usd', 'general',
+    'under_review', false, null, true, false, 1, null
+);
+
+select public.apply_stripe_dispute_event(
+    'evt_dispute_closed_001', 'charge.dispute.closed',
+    'dp_TradeLedgerDispute001', 'ch_TradeLedgerCharge001',
+    'pi_TradeLedgerPayment001', 1000, 'usd', 'product_not_received',
+    'lost', false, '2026-11-20T00:00:00Z', true, false, 1, null
+);
+
+select public.apply_stripe_dispute_event(
+    'evt_dispute_late_001', 'charge.dispute.updated',
+    'dp_TradeLedgerDispute001', 'ch_TradeLedgerCharge001',
+    'pi_TradeLedgerPayment001', 1000, 'usd', 'product_not_received',
+    'needs_response', false, '2026-11-20T00:00:00Z', false, false, 0, null
+);
+
+select set_config('test.dispute_created', :'dispute_created', true);
+select set_config('test.dispute_duplicate', :'dispute_duplicate', true);
+
+do $$
+declare dispute_record public.payment_disputes%rowtype;
+begin
+    select * into dispute_record from public.payment_disputes
+    where stripe_dispute_id = 'dp_TradeLedgerDispute001';
+
+    if not current_setting('test.dispute_created')::boolean
+       or current_setting('test.dispute_duplicate')::boolean
+       or (select count(*) from public.payment_disputes) <> 2
+       or dispute_record.status <> 'lost'
+       or dispute_record.evidence_submission_count <> 1 then
+        raise exception 'Dispute idempotency, multiplicity, or terminal-state protection failed.';
+    end if;
+end;
+$$;
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000004';
+
+do $$
+begin
+    if (select count(*) from public.payment_disputes) <> 2 then
+        raise exception 'The accountant cannot read the dispute ledger.';
+    end if;
+
+    begin
+        perform public.prepare_dispute_action(
+            (select id from public.payment_disputes limit 1),
+            '00000000-0000-4000-8000-000000000004',
+            'sync'
+        );
+        raise exception 'A browser role invoked a service-only dispute RPC.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000006';
+
+do $$
+begin
+    if (select count(*) from public.payment_disputes) <> 0 then
+        raise exception 'A non-financial member can read payment disputes.';
+    end if;
+end;
+$$;
+
+reset role;
 set local role authenticated;
 set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000002';
 
@@ -1868,6 +1960,7 @@ declare
     visible_connected_payouts integer;
     visible_platform_fees integer;
     visible_retainage_releases integer;
+    visible_disputes integer;
     visible_private_files integer;
 begin
     select count(*) into visible_organizations from public.organizations;
@@ -1886,6 +1979,7 @@ begin
     select count(*) into visible_connected_payouts from public.connected_payouts;
     select count(*) into visible_platform_fees from public.organization_platform_fees;
     select count(*) into visible_retainage_releases from public.retainage_releases;
+    select count(*) into visible_disputes from public.payment_disputes;
     select count(*) into visible_private_files
     from storage.objects
     where bucket_id = 'waiver-documents';
@@ -1905,6 +1999,7 @@ begin
        or visible_connected_payouts <> 0
        or visible_platform_fees <> 0
        or visible_retainage_releases <> 0
+       or visible_disputes <> 0
        or visible_private_files <> 0 then
         raise exception 'Tenant B could see Tenant A data.';
     end if;

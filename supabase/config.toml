@@ -29,6 +29,9 @@ verify_jwt = true
 [functions.create-retainage-refund]
 verify_jwt = true
 
+[functions.manage-dispute]
+verify_jwt = true
+
 [functions.reconcile-payment]
 verify_jwt = true
 

@@ -127,6 +127,41 @@ async function applyPayoutEvent(
   })
 }
 
+async function applyDisputeEvent(
+  stripe: Stripe,
+  supabaseAdmin: AdminClient,
+  event: Stripe.Event,
+  dispute: Stripe.Dispute,
+) {
+  const charge = typeof dispute.charge === 'string'
+    ? await stripe.charges.retrieve(dispute.charge)
+    : dispute.charge
+  const paymentIntentId = stripeReference(dispute.payment_intent) ??
+    stripeReference(charge.payment_intent)
+
+  if (!paymentIntentId) {
+    throw new Error('The dispute payment reference is unavailable.')
+  }
+
+  return await supabaseAdmin.rpc('apply_stripe_dispute_event', {
+    p_event_id: event.id,
+    p_event_type: event.type,
+    p_stripe_dispute_id: dispute.id,
+    p_stripe_charge_id: charge.id,
+    p_stripe_payment_intent_id: paymentIntentId,
+    p_amount: dispute.amount,
+    p_currency: dispute.currency,
+    p_reason: dispute.reason,
+    p_status: dispute.status,
+    p_livemode: dispute.livemode,
+    p_evidence_due_at: stripeTimestamp(dispute.evidence_details?.due_by),
+    p_has_evidence: dispute.evidence_details?.has_evidence ?? false,
+    p_evidence_past_due: dispute.evidence_details?.past_due ?? false,
+    p_evidence_submission_count: dispute.evidence_details?.submission_count ?? 0,
+    p_actor_user_id: null,
+  })
+}
+
 async function constructVerifiedEvent(
   stripe: Stripe,
   payload: string,
@@ -225,6 +260,48 @@ export default {
           received: true,
           duplicate: result.data === false,
         })
+      }
+
+      if (
+        event.type === 'charge.dispute.created' ||
+        event.type === 'charge.dispute.updated' ||
+        event.type === 'charge.dispute.closed' ||
+        event.type === 'charge.dispute.funds_withdrawn' ||
+        event.type === 'charge.dispute.funds_reinstated'
+      ) {
+        const dispute = event.data.object as Stripe.Dispute
+
+        try {
+          const result = await applyDisputeEvent(
+            stripe,
+            context.supabaseAdmin,
+            event,
+            dispute,
+          )
+
+          if (result.error?.code === 'P0002') {
+            return Response.json({ received: true, ignored: true })
+          }
+          if (result.error) throw result.error
+
+          return Response.json({
+            received: true,
+            duplicate: result.data === false,
+          })
+        } catch (error) {
+          console.error('Stripe dispute webhook failed:', error)
+          await context.supabaseAdmin.rpc('record_stripe_webhook_failure', {
+            p_event_id: event.id,
+            p_event_type: event.type,
+            p_object_id: dispute.id,
+            p_error_code: 'dispute_ledger_failed',
+            p_error_message: 'Dispute ledger processing failed.',
+          })
+
+          return Response.json({ error: 'Webhook processing failed.' }, {
+            status: 500,
+          })
+        }
       }
 
       if (

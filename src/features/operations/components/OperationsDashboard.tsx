@@ -29,6 +29,7 @@ import type {
   OrganizationMember,
   OrganizationPlatformFee,
   OrganizationRole,
+  PaymentDispute,
   PaymentRequest,
   PaymentTransfer,
   Project,
@@ -82,6 +83,7 @@ import {
   DirectoryEditDialog,
   type DirectoryEditTarget,
 } from './DirectoryEditDialog'
+import { DisputeLedger } from './DisputeLedger'
 import { OverviewCharts } from './OverviewCharts'
 import { PayoutLedger } from './PayoutLedger'
 import { PayoutReadinessControl } from './PayoutReadinessControl'
@@ -120,6 +122,7 @@ type DashboardPage =
   | 'directory'
   | 'payments'
   | 'retainage'
+  | 'disputes'
   | 'payouts'
   | 'fees'
   | 'team'
@@ -131,6 +134,7 @@ const dashboardPathByPage: Record<DashboardPage, string> = {
   directory: '/directory',
   payments: '/payments',
   retainage: '/retainage',
+  disputes: '/disputes',
   payouts: '/payouts',
   fees: '/fees',
   team: '/team',
@@ -161,6 +165,11 @@ const dashboardPageDetails: Record<
     eyebrow: 'Held-funds lifecycle',
     title: 'Retainage releases',
     description: 'Controlled approvals, settlement, fees, and reversals',
+  },
+  disputes: {
+    eyebrow: 'Chargeback response',
+    title: 'Disputes and recovery',
+    description: 'Evidence deadlines, outcomes, and transfer recovery',
   },
   payouts: {
     eyebrow: 'Connected money movement',
@@ -291,6 +300,7 @@ export function OperationsDashboard({
   >([])
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
   const [retainageReleases, setRetainageReleases] = useState<RetainageRelease[]>([])
+  const [paymentDisputes, setPaymentDisputes] = useState<PaymentDispute[]>([])
   const [paymentTransfers, setPaymentTransfers] = useState<PaymentTransfer[]>([])
   const [connectedPayouts, setConnectedPayouts] = useState<ConnectedPayout[]>([])
   const [platformFees, setPlatformFees] = useState<OrganizationPlatformFee[]>([])
@@ -406,6 +416,14 @@ export function OperationsDashboard({
             : undefined,
       },
       canManagePayments && {
+        id: 'disputes',
+        href: dashboardPathByPage.disputes,
+        label: 'Disputes',
+        detail: 'Chargebacks and evidence',
+        badge:
+          paymentDisputes.length > 0 ? String(paymentDisputes.length) : undefined,
+      },
+      canManagePayments && {
         id: 'payouts',
         href: dashboardPathByPage.payouts,
         label: 'Payouts',
@@ -450,6 +468,7 @@ export function OperationsDashboard({
     canManageTeam,
     connectedPayouts.length,
     organizationMembers,
+    paymentDisputes.length,
     paymentRequests.length,
     paymentTransfers.length,
     projects.length,
@@ -469,6 +488,7 @@ export function OperationsDashboard({
       payoutAccountResult,
       requestResult,
       retainageReleaseResult,
+      disputeResult,
       transferResult,
       connectedPayoutResult,
       platformFeeResult,
@@ -508,6 +528,14 @@ export function OperationsDashboard({
               .order('created_at', { ascending: false })
               .limit(100)
           : Promise.resolve({ data: [] as RetainageRelease[], error: null }),
+        canManagePayments
+          ? supabase
+              .from('payment_disputes')
+              .select('*')
+              .eq('organization_id', organization.id)
+              .order('created_at', { ascending: false })
+              .limit(100)
+          : Promise.resolve({ data: [] as PaymentDispute[], error: null }),
         supabase
           .from('payment_transfers')
           .select('*')
@@ -567,6 +595,7 @@ export function OperationsDashboard({
       payoutAccountResult.error ??
       requestResult.error ??
       retainageReleaseResult.error ??
+      disputeResult.error ??
       transferResult.error ??
       connectedPayoutResult.error ??
       platformFeeResult.error ??
@@ -595,6 +624,7 @@ export function OperationsDashboard({
     setPayoutAccounts(payoutAccountResult.data ?? [])
     setPaymentRequests(requestResult.data ?? [])
     setRetainageReleases(retainageReleaseResult.data ?? [])
+    setPaymentDisputes(disputeResult.data ?? [])
     setPaymentTransfers(transferResult.data ?? [])
     setConnectedPayouts(connectedPayoutResult.data ?? [])
     setPlatformFees(platformFeeResult.data ?? [])
@@ -2404,6 +2434,18 @@ export function OperationsDashboard({
         <RetainageReleaseWorkflow
           role={organization.role}
           releases={retainageReleases}
+          paymentRequests={paymentRequests}
+          projects={projects}
+          subcontractors={subcontractors}
+          isLoading={isLoading}
+          onRefresh={loadDashboard}
+        />
+      )}
+
+      {activeNavigationId === 'disputes' && canManagePayments && (
+        <DisputeLedger
+          role={organization.role}
+          disputes={paymentDisputes}
           paymentRequests={paymentRequests}
           projects={projects}
           subcontractors={subcontractors}
