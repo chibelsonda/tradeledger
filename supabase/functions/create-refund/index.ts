@@ -18,6 +18,7 @@ interface PreparedRefund {
   amount: number
   currency: string
   refund_status: string
+  destination_charge: boolean
 }
 
 function requiredEnvironment(name: string): string {
@@ -122,6 +123,7 @@ export default {
               payment_intent: prepared.stripe_payment_intent_id,
               amount: prepared.amount,
               reason: 'requested_by_customer',
+              reverse_transfer: prepared.destination_charge,
               metadata: {
                 refund_reference: prepared.refund_reference,
                 payment_reference: prepared.payment_reference,

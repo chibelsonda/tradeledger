@@ -21,6 +21,8 @@ interface PreparedPaymentRequest {
   currency: string
   customer_email: string | null
   stripe_checkout_session_id: string | null
+  stripe_destination_account_id: string
+  destination_charge: boolean
 }
 
 function requiredEnvironment(name: string): string {
@@ -139,6 +141,32 @@ export default {
               prepared.stripe_checkout_session_id,
             )
 
+            if (!prepared.destination_charge) {
+              if (existingSession.status === 'open') {
+                await stripe.checkout.sessions.expire(existingSession.id)
+                await context.supabaseAdmin.rpc('mark_payment_checkout_failed', {
+                  p_reference: prepared.payment_reference,
+                  p_reason: 'legacy_platform_checkout_replaced',
+                })
+
+                return Response.json(
+                  {
+                    error:
+                      'The previous checkout was replaced with subcontractor payout routing. Please try again.',
+                  },
+                  { status: 409 },
+                )
+              }
+
+              return Response.json(
+                {
+                  error:
+                    'The previous payment is being finalized. Refresh before starting another checkout.',
+                },
+                { status: 409 },
+              )
+            }
+
             if (existingSession.status === 'open' && existingSession.url) {
               return Response.json({ url: existingSession.url, resumed: true })
             }
@@ -192,6 +220,9 @@ export default {
                   payment_reference: prepared.payment_reference,
                   payment_request_id: prepared.payment_request_id,
                   organization_id: prepared.organization_id,
+                },
+                transfer_data: {
+                  destination: prepared.stripe_destination_account_id,
                 },
               },
               success_url: siteUrl +

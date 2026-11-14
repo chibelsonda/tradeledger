@@ -152,15 +152,52 @@ alter table public.payments
 
 set local role service_role;
 
+select payout_account_id as payout_account_a_id
+from public.prepare_subcontractor_payout_onboarding(
+    :'subcontractor_a_id',
+    '00000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select public.attach_subcontractor_stripe_account(
+    :'payout_account_a_id',
+    '00000000-0000-4000-8000-000000000001',
+    'acct_TradeLedgerTest001',
+    'full'
+);
+
+select public.sync_subcontractor_stripe_account(
+    'acct_TradeLedgerTest001',
+    'evt_tradeledger_account_checkout_ready',
+    'account.updated',
+    false,
+    true,
+    false,
+    true,
+    array[]::text[],
+    array[]::text[],
+    array[]::text[],
+    null
+);
+
 select
     payment_reference as checkout_payment_reference,
-    amount_total as checkout_amount_total
+    amount_total as checkout_amount_total,
+    stripe_destination_account_id as checkout_destination_id,
+    destination_charge as checkout_destination_charge
 from public.prepare_payment_request_checkout(
     :'payment_request_a_id',
     '00000000-0000-4000-8000-000000000001',
     '10000000-0000-4000-8000-000000000001'
 )
 \gset
+
+select set_config('test.checkout_destination_id', :'checkout_destination_id', true);
+select set_config(
+    'test.checkout_destination_charge',
+    :'checkout_destination_charge',
+    true
+);
 
 do $$
 declare
@@ -183,6 +220,11 @@ begin
 
     if ledger_amount <> 9450 then
         raise exception 'Expected database-owned checkout amount 9450, received %.', ledger_amount;
+    end if;
+
+    if current_setting('test.checkout_destination_id') <> 'acct_TradeLedgerTest001'
+       or not current_setting('test.checkout_destination_charge')::boolean then
+        raise exception 'Checkout was not prepared as a connected destination charge.';
     end if;
 end;
 $$;
@@ -337,8 +379,8 @@ begin
         raise exception 'Expected one idempotent Stripe event, received %.', event_count;
     end if;
 
-    if audit_count <> 10 then
-        raise exception 'Expected 10 audit events after checkout retry, received %.', audit_count;
+    if audit_count <> 13 then
+        raise exception 'Expected 13 audit events after payout setup and checkout retry, received %.', audit_count;
     end if;
 
     if notification_count <> 2 then
@@ -666,7 +708,8 @@ $$;
 
 select
     refund_reference as prepared_refund_reference,
-    amount as prepared_refund_amount
+    amount as prepared_refund_amount,
+    destination_charge as refund_destination_charge
 from public.prepare_payment_refund(
     :'payment_request_a_id',
     '00000000-0000-4000-8000-000000000001',
@@ -675,12 +718,21 @@ from public.prepare_payment_refund(
 \gset
 
 select set_config('test.prepared_refund_amount', :'prepared_refund_amount', true);
+select set_config(
+    'test.refund_destination_charge',
+    :'refund_destination_charge',
+    true
+);
 
 do $$
 begin
     if current_setting('test.prepared_refund_amount')::bigint <> 9450 then
         raise exception 'Expected database-owned refund amount 9450, received %.',
             current_setting('test.prepared_refund_amount');
+    end if;
+
+    if not current_setting('test.refund_destination_charge')::boolean then
+        raise exception 'Destination-charge refunds must reverse the transfer.';
     end if;
 end;
 $$;

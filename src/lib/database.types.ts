@@ -183,6 +183,7 @@ export type Payment = {
   paid_at: string | null
   amount_refunded: number
   refunded_at: string | null
+  destination_charge: boolean
   created_at: string
   updated_at: string
 }
@@ -524,6 +525,8 @@ export interface Database {
           currency: string
           customer_email: string | null
           stripe_checkout_session_id: string | null
+          stripe_destination_account_id: string
+          destination_charge: boolean
         }[]
       }
       attach_payment_checkout_session: {
@@ -570,6 +573,7 @@ export interface Database {
           amount: number
           currency: string
           refund_status: RefundStatus
+          destination_charge: boolean
         }[]
       }
       apply_payment_refund_status: {

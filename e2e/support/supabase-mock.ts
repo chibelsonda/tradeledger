@@ -348,6 +348,7 @@ export function paidPaymentRecord(): JsonRecord {
     paid_at: now,
     amount_refunded: 0,
     refunded_at: null,
+    destination_charge: true,
     created_at: now,
     updated_at: now,
   }
