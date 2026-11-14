@@ -6,6 +6,7 @@ export const TEST_PROJECT_ID = '20000000-0000-4000-8000-000000000001'
 export const TEST_SUBCONTRACTOR_ID = '30000000-0000-4000-8000-000000000001'
 export const TEST_PAYOUT_ACCOUNT_ID = '35000000-0000-4000-8000-000000000001'
 export const TEST_PAYMENT_REQUEST_ID = '40000000-0000-4000-8000-000000000001'
+export const TEST_RETAINAGE_RELEASE_ID = '45000000-0000-4000-8000-000000000001'
 export const TEST_MEMBER_USER_ID = '00000000-0000-4000-8000-000000000002'
 
 const supabaseOrigin = 'https://test-project.supabase.co'
@@ -24,6 +25,7 @@ export interface SupabaseMockState {
   paymentTransfers: JsonRecord[]
   connectedPayouts: JsonRecord[]
   paymentRequests: JsonRecord[]
+  retainageReleases: JsonRecord[]
   auditEvents: JsonRecord[]
   webhookFailures: JsonRecord[]
   waiverDocuments: JsonRecord[]
@@ -35,6 +37,10 @@ export interface SupabaseMockState {
   createdOrganizationPayloads: JsonRecord[]
   approvedRequestIds: string[]
   checkoutRequestIds: string[]
+  retainageReleaseRequests: JsonRecord[]
+  approvedRetainageReleaseIds: string[]
+  retainageCheckoutIds: string[]
+  retainageRefundIds: string[]
   payoutReconciliationRequests: JsonRecord[]
   payoutReconciliationError?: string
   memberUpserts: JsonRecord[]
@@ -57,6 +63,7 @@ export function createSupabaseMockState(
     paymentTransfers: [],
     connectedPayouts: [],
     paymentRequests: [],
+    retainageReleases: [],
     auditEvents: [],
     webhookFailures: [],
     waiverDocuments: [],
@@ -68,6 +75,10 @@ export function createSupabaseMockState(
     createdOrganizationPayloads: [],
     approvedRequestIds: [],
     checkoutRequestIds: [],
+    retainageReleaseRequests: [],
+    approvedRetainageReleaseIds: [],
+    retainageCheckoutIds: [],
+    retainageRefundIds: [],
     payoutReconciliationRequests: [],
     memberUpserts: [],
     memberStatusChanges: [],
@@ -133,6 +144,46 @@ export async function installSupabaseMock(
                 updated_at: now,
               }
             : paymentRequest,
+        )
+        await fulfillJson(route, 200, true)
+        return
+      }
+
+      if (rpcName === 'create_retainage_release') {
+        state.retainageReleaseRequests.push(body)
+        state.retainageReleases.unshift(
+          retainageReleaseRecord({
+            amount: body.p_amount,
+            reason: body.p_reason,
+          }),
+        )
+        await fulfillJson(route, 200, TEST_RETAINAGE_RELEASE_ID)
+        return
+      }
+
+      if (rpcName === 'approve_retainage_release') {
+        const releaseId = String(body.p_retainage_release_id)
+        state.approvedRetainageReleaseIds.push(releaseId)
+        state.retainageReleases = state.retainageReleases.map((release) =>
+          release.id === releaseId
+            ? {
+                ...release,
+                status: 'approved',
+                approved_by: TEST_USER_ID,
+                approved_at: now,
+              }
+            : release,
+        )
+        await fulfillJson(route, 200, true)
+        return
+      }
+
+      if (rpcName === 'cancel_retainage_release') {
+        const releaseId = String(body.p_retainage_release_id)
+        state.retainageReleases = state.retainageReleases.map((release) =>
+          release.id === releaseId
+            ? { ...release, status: 'canceled', canceled_at: now }
+            : release,
         )
         await fulfillJson(route, 200, true)
         return
@@ -224,6 +275,7 @@ export async function installSupabaseMock(
         payment_transfers: state.paymentTransfers,
         connected_payouts: state.connectedPayouts,
         payment_requests: state.paymentRequests,
+        retainage_releases: state.retainageReleases,
         audit_events: state.auditEvents,
         stripe_webhook_failures: state.webhookFailures,
         waiver_documents: state.waiverDocuments,
@@ -251,6 +303,36 @@ export async function installSupabaseMock(
       const body = request.postDataJSON() as JsonRecord
       state.checkoutRequestIds.push(String(body.paymentRequestId))
       await fulfillJson(route, 200, { url: state.checkoutUrl })
+      return
+    }
+
+    if (
+      url.pathname === '/functions/v1/create-retainage-checkout' &&
+      request.method() === 'POST'
+    ) {
+      const body = request.postDataJSON() as JsonRecord
+      state.retainageCheckoutIds.push(String(body.retainageReleaseId))
+      await fulfillJson(route, 200, { url: state.checkoutUrl })
+      return
+    }
+
+    if (
+      url.pathname === '/functions/v1/create-retainage-refund' &&
+      request.method() === 'POST'
+    ) {
+      const body = request.postDataJSON() as JsonRecord
+      state.retainageRefundIds.push(String(body.retainageReleaseId))
+      state.retainageReleases = state.retainageReleases.map((release) =>
+        release.id === body.retainageReleaseId
+          ? {
+              ...release,
+              status: 'refunded',
+              amount_refunded: release.amount,
+              refunded_at: now,
+            }
+          : release,
+      )
+      await fulfillJson(route, 200, { status: 'succeeded' })
       return
     }
 
@@ -368,6 +450,50 @@ export function submittedPaymentRequestRecord(): JsonRecord {
     refunded_at: null,
     created_at: now,
     updated_at: now,
+  }
+}
+
+export function paidRetainagePaymentRequestRecord(): JsonRecord {
+  return {
+    ...submittedPaymentRequestRecord(),
+    status: 'paid',
+    approved_by: TEST_USER_ID,
+    approved_at: now,
+    checkout_started_at: now,
+    paid_at: now,
+  }
+}
+
+export function retainageReleaseRecord(overrides: JsonRecord = {}): JsonRecord {
+  return {
+    id: TEST_RETAINAGE_RELEASE_ID,
+    organization_id: TEST_ORGANIZATION_ID,
+    payment_request_id: TEST_PAYMENT_REQUEST_ID,
+    project_id: TEST_PROJECT_ID,
+    subcontractor_id: TEST_SUBCONTRACTOR_ID,
+    payout_account_id: TEST_PAYOUT_ACCOUNT_ID,
+    requested_by: TEST_USER_ID,
+    approved_by: null,
+    reference: '45500000-0000-4000-8000-000000000001',
+    reason: 'Completed punch-list work',
+    amount: 500,
+    currency: 'usd',
+    status: 'requested',
+    platform_fee_basis_points: 0,
+    platform_fee_fixed_amount: 0,
+    platform_fee_amount: 0,
+    platform_fee_configured_at: null,
+    amount_refunded: 0,
+    requested_at: now,
+    approved_at: null,
+    checkout_started_at: null,
+    paid_at: null,
+    failed_at: null,
+    canceled_at: null,
+    refunded_at: null,
+    created_at: now,
+    updated_at: now,
+    ...overrides,
   }
 }
 

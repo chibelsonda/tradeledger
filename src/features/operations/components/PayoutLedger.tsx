@@ -20,6 +20,7 @@ import type {
   PaymentRequest,
   PaymentTransfer,
   Project,
+  RetainageRelease,
   Subcontractor,
 } from '@/lib/database.types'
 import { formatCurrency, formatStatus } from '@/lib/format'
@@ -31,6 +32,7 @@ interface PayoutLedgerProps {
   transfers: PaymentTransfer[]
   payouts: ConnectedPayout[]
   paymentRequests: PaymentRequest[]
+  retainageReleases: RetainageRelease[]
   projects: Project[]
   subcontractors: Subcontractor[]
   auditEvents: AuditEvent[]
@@ -170,6 +172,7 @@ export function PayoutLedger({
   transfers,
   payouts,
   paymentRequests,
+  retainageReleases,
   projects,
   subcontractors,
   auditEvents,
@@ -194,6 +197,10 @@ export function PayoutLedger({
     () => new Map(paymentRequests.map((request) => [request.id, request])),
     [paymentRequests],
   )
+  const retainageReleaseById = useMemo(
+    () => new Map(retainageReleases.map((release) => [release.id, release])),
+    [retainageReleases],
+  )
   const subcontractorById = useMemo(
     () => new Map(subcontractors.map((item) => [item.id, item])),
     [subcontractors],
@@ -204,9 +211,14 @@ export function PayoutLedger({
       const request = requestById.get(transfer.payment_request_id)
       const project = request ? projectById.get(request.project_id) : undefined
       const subcontractor = subcontractorById.get(transfer.subcontractor_id)
+      const retainageRelease = transfer.retainage_release_id
+        ? retainageReleaseById.get(transfer.retainage_release_id)
+        : undefined
       const subcontractorName = subcontractor?.company_name ?? 'Unknown subcontractor'
       const projectName = project?.name ?? 'Unknown project'
-      const requestDescription = request?.description ?? 'Payment request'
+      const requestDescription = retainageRelease
+        ? `Retainage release · ${retainageRelease.reason}`
+        : request?.description ?? 'Payment request'
 
       return {
         ...transfer,
@@ -225,7 +237,13 @@ export function PayoutLedger({
         ].filter(Boolean).join(' '),
       }
     }),
-    [projectById, requestById, subcontractorById, transfers],
+    [
+      projectById,
+      requestById,
+      retainageReleaseById,
+      subcontractorById,
+      transfers,
+    ],
   )
 
   const payoutViews = useMemo<PayoutView[]>(

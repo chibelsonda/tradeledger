@@ -23,6 +23,12 @@ verify_jwt = true
 [functions.create-refund]
 verify_jwt = true
 
+[functions.create-retainage-checkout]
+verify_jwt = true
+
+[functions.create-retainage-refund]
+verify_jwt = true
+
 [functions.reconcile-payment]
 verify_jwt = true
 

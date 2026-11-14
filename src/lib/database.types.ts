@@ -57,6 +57,17 @@ export type ConnectedPayoutStatus =
   | 'failed'
   | 'canceled'
 
+export type RetainageReleaseStatus =
+  | 'requested'
+  | 'approved'
+  | 'checkout_created'
+  | 'processing'
+  | 'paid'
+  | 'failed'
+  | 'canceled'
+  | 'partially_refunded'
+  | 'refunded'
+
 export type WaiverDocumentStatus = 'generating' | 'ready' | 'failed' | 'voided'
 export type NotificationDeliveryStatus =
   | 'pending'
@@ -191,11 +202,42 @@ export type AuditEvent = {
   created_at: string
 }
 
+export type RetainageRelease = {
+  id: string
+  organization_id: string
+  payment_request_id: string
+  project_id: string
+  subcontractor_id: string
+  payout_account_id: string | null
+  requested_by: string
+  approved_by: string | null
+  reference: string
+  reason: string
+  amount: number
+  currency: string
+  status: RetainageReleaseStatus
+  platform_fee_basis_points: number
+  platform_fee_fixed_amount: number
+  platform_fee_amount: number
+  platform_fee_configured_at: string | null
+  amount_refunded: number
+  requested_at: string
+  approved_at: string | null
+  checkout_started_at: string | null
+  paid_at: string | null
+  failed_at: string | null
+  canceled_at: string | null
+  refunded_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type Payment = {
   id: number
   user_id: string | null
   organization_id: string | null
   payment_request_id: string | null
+  retainage_release_id: string | null
   reference: string
   product_name: string
   unit_amount: number
@@ -223,6 +265,7 @@ export type PaymentRefund = {
   organization_id: string
   payment_id: number
   payment_request_id: string
+  retainage_release_id: string | null
   reference: string
   stripe_refund_id: string | null
   amount: number
@@ -241,6 +284,7 @@ export type PaymentTransfer = {
   organization_id: string
   payment_id: number
   payment_request_id: string
+  retainage_release_id: string | null
   subcontractor_id: string
   payout_account_id: string
   stripe_transfer_id: string
@@ -419,6 +463,12 @@ export interface Database {
         Update: Record<string, never>
         Relationships: []
       }
+      retainage_releases: {
+        Row: RetainageRelease
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
       audit_events: {
         Row: AuditEvent
         Insert: Record<string, never>
@@ -592,6 +642,109 @@ export interface Database {
       }
       approve_payment_request: {
         Args: { p_payment_request_id: string }
+        Returns: boolean
+      }
+      create_retainage_release: {
+        Args: {
+          p_payment_request_id: string
+          p_amount: number
+          p_reason: string
+        }
+        Returns: string
+      }
+      approve_retainage_release: {
+        Args: { p_retainage_release_id: string }
+        Returns: boolean
+      }
+      cancel_retainage_release: {
+        Args: { p_retainage_release_id: string }
+        Returns: boolean
+      }
+      prepare_retainage_release_checkout: {
+        Args: {
+          p_retainage_release_id: string
+          p_user_id: string
+          p_payment_reference: string
+        }
+        Returns: {
+          retainage_release_id: string
+          release_reference: string
+          payment_reference: string
+          organization_id: string
+          payment_request_id: string
+          project_name: string
+          subcontractor_name: string
+          release_reason: string
+          amount_total: number
+          currency: string
+          customer_email: string | null
+          stripe_checkout_session_id: string | null
+          stripe_destination_account_id: string
+          platform_fee_amount: number
+          subcontractor_transfer_amount: number
+        }[]
+      }
+      attach_retainage_release_checkout_session: {
+        Args: { p_payment_reference: string; p_session_id: string }
+        Returns: boolean
+      }
+      mark_retainage_release_checkout_failed: {
+        Args: { p_payment_reference: string; p_reason?: string | null }
+        Returns: boolean
+      }
+      process_retainage_release_checkout_webhook: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_session_id: string
+          p_payment_status: string | null
+          p_payment_intent_id: string | null
+          p_release_reference: string
+        }
+        Returns: boolean
+      }
+      prepare_retainage_release_refund: {
+        Args: {
+          p_retainage_release_id: string
+          p_user_id: string
+          p_reference: string
+        }
+        Returns: {
+          refund_reference: string
+          organization_id: string
+          retainage_release_id: string
+          payment_request_id: string
+          payment_reference: string
+          stripe_payment_intent_id: string
+          stripe_refund_id: string | null
+          amount: number
+          currency: string
+          refund_status: RefundStatus
+          refund_application_fee: boolean
+        }[]
+      }
+      apply_retainage_release_refund_status: {
+        Args: {
+          p_refund_reference: string
+          p_stripe_refund_id: string | null
+          p_status: RefundStatus
+          p_failure_reason?: string | null
+          p_actor_user_id?: string | null
+        }
+        Returns: boolean
+      }
+      process_retainage_release_refund_webhook: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_stripe_refund_id: string
+          p_refund_reference: string
+          p_payment_intent_id: string
+          p_amount: number
+          p_currency: string
+          p_status: RefundStatus
+          p_failure_reason: string | null
+        }
         Returns: boolean
       }
       transition_payment_request_status: {

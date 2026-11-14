@@ -32,6 +32,7 @@ import type {
   PaymentRequest,
   PaymentTransfer,
   Project,
+  RetainageRelease,
   StripeWebhookFailure,
   Subcontractor,
   SubcontractorPayoutAccount,
@@ -85,6 +86,7 @@ import { OverviewCharts } from './OverviewCharts'
 import { PayoutLedger } from './PayoutLedger'
 import { PayoutReadinessControl } from './PayoutReadinessControl'
 import { PlatformFeeSettings } from './PlatformFeeSettings'
+import { RetainageReleaseWorkflow } from './RetainageReleaseWorkflow'
 import { TeamManagementPanel } from './TeamManagementPanel'
 import { WaiverDocumentControl } from './WaiverDocumentControl'
 
@@ -117,6 +119,7 @@ type DashboardPage =
   | 'overview'
   | 'directory'
   | 'payments'
+  | 'retainage'
   | 'payouts'
   | 'fees'
   | 'team'
@@ -127,6 +130,7 @@ const dashboardPathByPage: Record<DashboardPage, string> = {
   overview: '/dashboard',
   directory: '/directory',
   payments: '/payments',
+  retainage: '/retainage',
   payouts: '/payouts',
   fees: '/fees',
   team: '/team',
@@ -152,6 +156,11 @@ const dashboardPageDetails: Record<
     eyebrow: 'Financial workflow',
     title: 'Payment operations',
     description: 'Requests, approvals, checkout, waivers, and refunds',
+  },
+  retainage: {
+    eyebrow: 'Held-funds lifecycle',
+    title: 'Retainage releases',
+    description: 'Controlled approvals, settlement, fees, and reversals',
   },
   payouts: {
     eyebrow: 'Connected money movement',
@@ -281,6 +290,7 @@ export function OperationsDashboard({
     SubcontractorPayoutAccount[]
   >([])
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
+  const [retainageReleases, setRetainageReleases] = useState<RetainageRelease[]>([])
   const [paymentTransfers, setPaymentTransfers] = useState<PaymentTransfer[]>([])
   const [connectedPayouts, setConnectedPayouts] = useState<ConnectedPayout[]>([])
   const [platformFees, setPlatformFees] = useState<OrganizationPlatformFee[]>([])
@@ -386,6 +396,16 @@ export function OperationsDashboard({
           paymentRequests.length > 0 ? String(paymentRequests.length) : undefined,
       },
       canManagePayments && {
+        id: 'retainage',
+        href: dashboardPathByPage.retainage,
+        label: 'Retainage',
+        detail: 'Held-fund releases and refunds',
+        badge:
+          retainageReleases.length > 0
+            ? String(retainageReleases.length)
+            : undefined,
+      },
+      canManagePayments && {
         id: 'payouts',
         href: dashboardPathByPage.payouts,
         label: 'Payouts',
@@ -433,6 +453,7 @@ export function OperationsDashboard({
     paymentRequests.length,
     paymentTransfers.length,
     projects.length,
+    retainageReleases.length,
     subcontractors.length,
     webhookFailures.length,
   ])
@@ -447,6 +468,7 @@ export function OperationsDashboard({
       subcontractorResult,
       payoutAccountResult,
       requestResult,
+      retainageReleaseResult,
       transferResult,
       connectedPayoutResult,
       platformFeeResult,
@@ -478,6 +500,14 @@ export function OperationsDashboard({
           .select('*')
           .eq('organization_id', organization.id)
           .order('created_at', { ascending: false }),
+        canManagePayments
+          ? supabase
+              .from('retainage_releases')
+              .select('*')
+              .eq('organization_id', organization.id)
+              .order('created_at', { ascending: false })
+              .limit(100)
+          : Promise.resolve({ data: [] as RetainageRelease[], error: null }),
         supabase
           .from('payment_transfers')
           .select('*')
@@ -536,6 +566,7 @@ export function OperationsDashboard({
       subcontractorResult.error ??
       payoutAccountResult.error ??
       requestResult.error ??
+      retainageReleaseResult.error ??
       transferResult.error ??
       connectedPayoutResult.error ??
       platformFeeResult.error ??
@@ -563,6 +594,7 @@ export function OperationsDashboard({
     setSubcontractors(nextSubcontractors)
     setPayoutAccounts(payoutAccountResult.data ?? [])
     setPaymentRequests(requestResult.data ?? [])
+    setRetainageReleases(retainageReleaseResult.data ?? [])
     setPaymentTransfers(transferResult.data ?? [])
     setConnectedPayouts(connectedPayoutResult.data ?? [])
     setPlatformFees(platformFeeResult.data ?? [])
@@ -686,7 +718,8 @@ export function OperationsDashboard({
     const handlePopState = () => {
       const nextPage = dashboardPageFromPath(window.location.pathname)
       const isAllowed =
-        (!['delivery', 'payouts', 'fees'].includes(nextPage) || canManagePayments) &&
+        (!['delivery', 'retainage', 'payouts', 'fees'].includes(nextPage) ||
+          canManagePayments) &&
         (nextPage !== 'team' || canManageTeam)
 
       if (!isAllowed) {
@@ -2358,9 +2391,22 @@ export function OperationsDashboard({
           transfers={paymentTransfers}
           payouts={connectedPayouts}
           paymentRequests={paymentRequests}
+          retainageReleases={retainageReleases}
           projects={projects}
           subcontractors={subcontractors}
           auditEvents={auditEvents}
+          isLoading={isLoading}
+          onRefresh={loadDashboard}
+        />
+      )}
+
+      {activeNavigationId === 'retainage' && canManagePayments && (
+        <RetainageReleaseWorkflow
+          role={organization.role}
+          releases={retainageReleases}
+          paymentRequests={paymentRequests}
+          projects={projects}
+          subcontractors={subcontractors}
           isLoading={isLoading}
           onRefresh={loadDashboard}
         />

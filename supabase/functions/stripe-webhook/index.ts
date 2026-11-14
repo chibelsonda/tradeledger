@@ -364,6 +364,16 @@ export default {
       if (!checkoutSession && !refund) {
         return Response.json({ received: true, ignored: true })
       }
+
+      const retainageReleaseReference = checkoutSession
+        ? uuidOrNull(checkoutSession.metadata?.retainage_release_reference)
+        : null
+      const retainageRefundReference = refund
+        ? uuidOrNull(refund.metadata?.refund_reference)
+        : null
+      const retainageReleaseId = refund
+        ? uuidOrNull(refund.metadata?.retainage_release_id)
+        : null
       const checkoutPaymentIntent = checkoutSession?.payment_intent
       const checkoutPaymentIntentId = typeof checkoutPaymentIntent === 'string'
         ? checkoutPaymentIntent
@@ -374,7 +384,34 @@ export default {
         : refundPaymentIntent?.id ?? null
       const objectId = checkoutSession?.id ?? refund?.id ?? null
 
-      const result = refund
+      const result = checkoutSession && retainageReleaseReference
+        ? await context.supabaseAdmin.rpc(
+          'process_retainage_release_checkout_webhook',
+          {
+            p_event_id: event.id,
+            p_event_type: event.type,
+            p_session_id: checkoutSession.id,
+            p_payment_status: checkoutSession.payment_status ?? null,
+            p_payment_intent_id: checkoutPaymentIntentId,
+            p_release_reference: retainageReleaseReference,
+          },
+        )
+        : refund && retainageRefundReference && retainageReleaseId
+        ? await context.supabaseAdmin.rpc(
+          'process_retainage_release_refund_webhook',
+          {
+            p_event_id: event.id,
+            p_event_type: event.type,
+            p_stripe_refund_id: refund.id,
+            p_refund_reference: retainageRefundReference,
+            p_payment_intent_id: refundPaymentIntentId,
+            p_amount: refund.amount,
+            p_currency: refund.currency,
+            p_status: refund.status ?? 'pending',
+            p_failure_reason: refund.failure_reason ?? null,
+          },
+        )
+        : refund
         ? await context.supabaseAdmin.rpc('process_stripe_refund_webhook', {
           p_event_id: event.id,
           p_event_type: event.type,

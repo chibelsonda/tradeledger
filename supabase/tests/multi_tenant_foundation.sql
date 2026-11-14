@@ -1549,6 +1549,304 @@ begin
 end;
 $$;
 
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+select public.create_payment_request(
+    :'organization_a_id',
+    :'project_a_id',
+    :'subcontractor_a_id',
+    'Final completion retainage source',
+    20000,
+    1000,
+    'usd'
+) as retainage_source_request_id
+\gset
+
+select set_config(
+    'test.retainage_source_request_id',
+    :'retainage_source_request_id',
+    true
+);
+
+select public.submit_payment_request(:'retainage_source_request_id');
+select public.approve_payment_request(:'retainage_source_request_id');
+
+reset role;
+set local role service_role;
+
+select payment_reference as retainage_source_payment_reference
+from public.prepare_payment_request_checkout(
+    :'retainage_source_request_id',
+    '00000000-0000-4000-8000-000000000001',
+    '11000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select public.attach_payment_checkout_session(
+    :'retainage_source_payment_reference',
+    'cs_test_retainagesource001'
+);
+
+select public.process_stripe_webhook(
+    'evt_retainage_source_paid_001',
+    'checkout.session.completed',
+    'cs_test_retainagesource001',
+    'paid',
+    'pi_RetainageSource001',
+    'owner-a@example.test'
+);
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+select public.create_retainage_release(
+    :'retainage_source_request_id',
+    1000,
+    'Completed final inspection and accepted punch list'
+) as retainage_release_id
+\gset
+
+select set_config('test.retainage_release_id', :'retainage_release_id', true);
+
+select reference as retainage_release_reference
+from public.retainage_releases
+where id = :'retainage_release_id'
+\gset
+
+do $$
+begin
+    begin
+        perform public.create_retainage_release(
+            current_setting('test.retainage_source_request_id')::uuid,
+            1500,
+            'Attempt to exceed the remaining retained balance'
+        );
+        raise exception 'A retainage release exceeded the remaining balance.';
+    exception
+        when invalid_parameter_value then null;
+    end;
+
+    begin
+        perform * from public.prepare_retainage_release_checkout(
+            current_setting('test.retainage_release_id')::uuid,
+            '00000000-0000-4000-8000-000000000001',
+            '12000000-0000-4000-8000-000000000001'
+        );
+        raise exception 'A browser role invoked the service-only retainage checkout RPC.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+select public.approve_retainage_release(:'retainage_release_id');
+
+reset role;
+set local role service_role;
+
+select
+    payment_reference as retainage_payment_reference,
+    platform_fee_amount as retainage_platform_fee_amount,
+    subcontractor_transfer_amount as retainage_transfer_amount
+from public.prepare_retainage_release_checkout(
+    :'retainage_release_id',
+    '00000000-0000-4000-8000-000000000001',
+    '12000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select set_config(
+    'test.retainage_platform_fee_amount',
+    :'retainage_platform_fee_amount',
+    true
+);
+select set_config('test.retainage_transfer_amount', :'retainage_transfer_amount', true);
+
+select public.attach_retainage_release_checkout_session(
+    :'retainage_payment_reference',
+    'cs_test_retainagerelease001'
+);
+
+select public.process_retainage_release_checkout_webhook(
+    'evt_retainage_release_paid_001',
+    'checkout.session.completed',
+    'cs_test_retainagerelease001',
+    'paid',
+    'pi_RetainageRelease001',
+    :'retainage_release_reference'
+) as retainage_release_webhook_processed
+\gset
+
+select public.process_retainage_release_checkout_webhook(
+    'evt_retainage_release_paid_001',
+    'checkout.session.completed',
+    'cs_test_retainagerelease001',
+    'paid',
+    'pi_RetainageRelease001',
+    :'retainage_release_reference'
+) as retainage_release_webhook_duplicate
+\gset
+
+select set_config(
+    'test.retainage_release_webhook_processed',
+    :'retainage_release_webhook_processed',
+    true
+);
+select set_config(
+    'test.retainage_release_webhook_duplicate',
+    :'retainage_release_webhook_duplicate',
+    true
+);
+
+select public.apply_stripe_transfer_ledger_event(
+    'evt_retainage_transfer_created_001',
+    'transfer.created',
+    'tr_RetainageRelease001',
+    'acct_TradeLedgerTest001',
+    'pi_RetainageRelease001',
+    950,
+    'usd',
+    'succeeded',
+    0,
+    'ch_RetainageRelease001',
+    'ch_RetainageRelease001',
+    '2026-11-14T05:00:00Z',
+    null
+);
+
+select
+    refund_reference as retainage_refund_reference,
+    amount as retainage_refund_amount,
+    refund_application_fee as retainage_refund_application_fee
+from public.prepare_retainage_release_refund(
+    :'retainage_release_id',
+    '00000000-0000-4000-8000-000000000001',
+    '13000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select set_config('test.retainage_refund_amount', :'retainage_refund_amount', true);
+select set_config(
+    'test.retainage_refund_application_fee',
+    :'retainage_refund_application_fee',
+    true
+);
+
+select public.process_retainage_release_refund_webhook(
+    'evt_retainage_refund_succeeded_001',
+    'refund.updated',
+    're_RetainageRelease001',
+    :'retainage_refund_reference',
+    'pi_RetainageRelease001',
+    1000,
+    'usd',
+    'succeeded',
+    null
+) as retainage_refund_processed
+\gset
+
+select public.process_retainage_release_refund_webhook(
+    'evt_retainage_refund_succeeded_001',
+    'refund.updated',
+    're_RetainageRelease001',
+    :'retainage_refund_reference',
+    'pi_RetainageRelease001',
+    1000,
+    'usd',
+    'succeeded',
+    null
+) as retainage_refund_duplicate
+\gset
+
+select set_config(
+    'test.retainage_refund_processed',
+    :'retainage_refund_processed',
+    true
+);
+select set_config(
+    'test.retainage_refund_duplicate',
+    :'retainage_refund_duplicate',
+    true
+);
+
+select public.apply_stripe_transfer_ledger_event(
+    'evt_retainage_transfer_reversed_001',
+    'transfer.reversed',
+    'tr_RetainageRelease001',
+    'acct_TradeLedgerTest001',
+    'pi_RetainageRelease001',
+    950,
+    'usd',
+    'reversed',
+    950,
+    'ch_RetainageRelease001',
+    'ch_RetainageRelease001',
+    '2026-11-14T05:00:00Z',
+    null
+);
+
+do $$
+declare
+    release_record public.retainage_releases%rowtype;
+    transfer_record public.payment_transfers%rowtype;
+begin
+    select * into release_record
+    from public.retainage_releases
+    where id = current_setting('test.retainage_release_id')::uuid;
+
+    select * into transfer_record
+    from public.payment_transfers
+    where retainage_release_id = release_record.id;
+
+    if current_setting('test.retainage_platform_fee_amount')::bigint <> 50
+       or current_setting('test.retainage_transfer_amount')::bigint <> 950 then
+        raise exception 'Retainage checkout did not snapshot the configured fee split.';
+    end if;
+
+    if not current_setting('test.retainage_release_webhook_processed')::boolean
+       or current_setting('test.retainage_release_webhook_duplicate')::boolean
+       or not current_setting('test.retainage_refund_processed')::boolean
+       or current_setting('test.retainage_refund_duplicate')::boolean then
+        raise exception 'Retainage webhook idempotency did not hold.';
+    end if;
+
+    if current_setting('test.retainage_refund_amount')::bigint <> 1000
+       or not current_setting('test.retainage_refund_application_fee')::boolean then
+        raise exception 'Retainage refund did not include the release and application fee.';
+    end if;
+
+    if release_record.status <> 'refunded'
+       or release_record.amount_refunded <> 1000
+       or transfer_record.status <> 'reversed'
+       or transfer_record.reversed_amount <> 950 then
+        raise exception 'Retainage release, refund, and transfer reversal did not reconcile.';
+    end if;
+end;
+$$;
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000004';
+
+do $$
+begin
+    if (select count(*) from public.retainage_releases) <> 1 then
+        raise exception 'The accountant cannot read the retainage release ledger.';
+    end if;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000006';
+
+do $$
+begin
+    if (select count(*) from public.retainage_releases) <> 0 then
+        raise exception 'A non-financial member can read retainage releases.';
+    end if;
+end;
+$$;
+
 reset role;
 set local role authenticated;
 set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000002';
@@ -1569,6 +1867,7 @@ declare
     visible_transfers integer;
     visible_connected_payouts integer;
     visible_platform_fees integer;
+    visible_retainage_releases integer;
     visible_private_files integer;
 begin
     select count(*) into visible_organizations from public.organizations;
@@ -1586,6 +1885,7 @@ begin
     select count(*) into visible_transfers from public.payment_transfers;
     select count(*) into visible_connected_payouts from public.connected_payouts;
     select count(*) into visible_platform_fees from public.organization_platform_fees;
+    select count(*) into visible_retainage_releases from public.retainage_releases;
     select count(*) into visible_private_files
     from storage.objects
     where bucket_id = 'waiver-documents';
@@ -1604,6 +1904,7 @@ begin
        or visible_transfers <> 0
        or visible_connected_payouts <> 0
        or visible_platform_fees <> 0
+       or visible_retainage_releases <> 0
        or visible_private_files <> 0 then
         raise exception 'Tenant B could see Tenant A data.';
     end if;
