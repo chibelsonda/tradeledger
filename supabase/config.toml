@@ -14,6 +14,12 @@ verify_jwt = true
 [functions.stripe-webhook]
 verify_jwt = false
 
+[functions.create-connect-onboarding-link]
+verify_jwt = true
+
+[functions.refresh-connect-account]
+verify_jwt = true
+
 [functions.create-refund]
 verify_jwt = true
 

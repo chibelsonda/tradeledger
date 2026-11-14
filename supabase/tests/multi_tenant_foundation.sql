@@ -1127,6 +1127,65 @@ end;
 $$;
 
 reset role;
+set local role service_role;
+
+select payout_account_id as payout_account_a_id
+from public.prepare_subcontractor_payout_onboarding(
+    :'subcontractor_a_id',
+    '00000000-0000-4000-8000-000000000001'
+)
+\gset
+
+select public.attach_subcontractor_stripe_account(
+    :'payout_account_a_id',
+    '00000000-0000-4000-8000-000000000001',
+    'acct_TradeLedgerTest001',
+    'full'
+);
+
+select public.sync_subcontractor_stripe_account(
+    'acct_TradeLedgerTest001',
+    'evt_tradeledger_account_001',
+    'account.updated',
+    false,
+    true,
+    false,
+    true,
+    array[]::text[],
+    array[]::text[],
+    array[]::text[],
+    null
+);
+
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+do $$
+declare
+    payout_status text;
+begin
+    select onboarding_status
+    into payout_status
+    from public.subcontractor_payout_accounts
+    where subcontractor_id = current_setting('test.subcontractor_a_id')::uuid;
+
+    if payout_status <> 'ready' then
+        raise exception 'Expected ready payout status, received %.', payout_status;
+    end if;
+
+    begin
+        perform stripe_account_id
+        from public.subcontractor_payout_accounts
+        where subcontractor_id = current_setting('test.subcontractor_a_id')::uuid;
+
+        raise exception 'Browser roles must not be able to read Stripe account IDs.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+reset role;
 set local role authenticated;
 set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000002';
 
@@ -1135,6 +1194,7 @@ declare
     visible_organizations integer;
     visible_projects integer;
     visible_subcontractors integer;
+    visible_payout_accounts integer;
     visible_requests integer;
     visible_events integer;
     visible_payments integer;
@@ -1147,6 +1207,8 @@ begin
     select count(*) into visible_organizations from public.organizations;
     select count(*) into visible_projects from public.projects;
     select count(*) into visible_subcontractors from public.subcontractors;
+    select count(*) into visible_payout_accounts
+    from public.subcontractor_payout_accounts;
     select count(*) into visible_requests from public.payment_requests;
     select count(*) into visible_events from public.audit_events;
     select count(*) into visible_payments from public.payments;
@@ -1161,6 +1223,7 @@ begin
     if visible_organizations <> 0
        or visible_projects <> 0
        or visible_subcontractors <> 0
+       or visible_payout_accounts <> 0
        or visible_requests <> 0
        or visible_events <> 0
        or visible_payments <> 0

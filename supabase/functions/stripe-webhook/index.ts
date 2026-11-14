@@ -2,6 +2,7 @@ import { withSupabase } from '@supabase/server'
 import Stripe from 'stripe'
 
 import { withObservability } from '../_shared/observability.ts'
+import { syncStripeAccountReadiness } from '../_shared/stripe-connect.ts'
 
 function requiredEnvironment(name: string): string {
   const value = Deno.env.get(name)
@@ -24,6 +25,35 @@ function uuidOrNull(value: string | undefined): string | null {
 
 const cryptoProvider = Stripe.createSubtleCryptoProvider()
 
+async function constructVerifiedEvent(
+  stripe: Stripe,
+  payload: string,
+  signature: string,
+): Promise<Stripe.Event> {
+  const webhookSecrets = [
+    requiredEnvironment('STRIPE_WEBHOOK_SECRET'),
+    Deno.env.get('STRIPE_CONNECT_WEBHOOK_SECRET'),
+  ].filter((secret): secret is string => Boolean(secret))
+
+  let verificationError: unknown
+
+  for (const secret of webhookSecrets) {
+    try {
+      return await stripe.webhooks.constructEventAsync(
+        payload,
+        signature,
+        secret,
+        undefined,
+        cryptoProvider,
+      )
+    } catch (error) {
+      verificationError = error
+    }
+  }
+
+  throw verificationError ?? new Error('No Stripe webhook secret is configured.')
+}
+
 export default {
   fetch: withObservability(
     'stripe-webhook',
@@ -39,16 +69,35 @@ export default {
       let event: Stripe.Event
 
       try {
-        event = await stripe.webhooks.constructEventAsync(
-          payload,
-          signature,
-          requiredEnvironment('STRIPE_WEBHOOK_SECRET'),
-          undefined,
-          cryptoProvider,
-        )
+        event = await constructVerifiedEvent(stripe, payload, signature)
       } catch (error) {
         console.error('Stripe signature verification failed:', error)
         return Response.json({ error: 'Invalid webhook signature.' }, { status: 400 })
+      }
+
+      if (event.type === 'account.updated') {
+        const account = event.data.object as Stripe.Account
+        const result = await syncStripeAccountReadiness(
+          context.supabaseAdmin,
+          account,
+          { id: event.id, type: event.type },
+        )
+
+        if (result.error) {
+          if (result.error.code === 'P0002') {
+            return Response.json({ received: true, ignored: true })
+          }
+
+          console.error('Stripe connected account webhook failed:', result.error)
+          return Response.json({ error: 'Webhook processing failed.' }, {
+            status: 500,
+          })
+        }
+
+        return Response.json({
+          received: true,
+          duplicate: result.data === false,
+        })
       }
 
       const checkoutSession = event.type.startsWith('checkout.session.')
@@ -57,6 +106,10 @@ export default {
       const refund = event.type.startsWith('refund.')
         ? (event.data.object as Stripe.Refund)
         : null
+
+      if (!checkoutSession && !refund) {
+        return Response.json({ received: true, ignored: true })
+      }
       const checkoutPaymentIntent = checkoutSession?.payment_intent
       const checkoutPaymentIntentId = typeof checkoutPaymentIntent === 'string'
         ? checkoutPaymentIntent

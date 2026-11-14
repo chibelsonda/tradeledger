@@ -1,4 +1,5 @@
 const stripeCheckoutHosts = new Set(['checkout.stripe.com'])
+const stripeConnectHosts = new Set(['connect.stripe.com'])
 const stripeCheckoutSessionPattern = /^cs_(?:test|live)_[A-Za-z0-9_]{8,200}$/
 
 function secureUrl(value: unknown): URL | null {
@@ -26,6 +27,14 @@ export function trustedStripeCheckoutUrl(value: unknown): string | null {
   const url = secureUrl(value)
 
   if (!url || !stripeCheckoutHosts.has(url.hostname)) return null
+
+  return url.toString()
+}
+
+export function trustedStripeConnectUrl(value: unknown): string | null {
+  const url = secureUrl(value)
+
+  if (!url || !stripeConnectHosts.has(url.hostname)) return null
 
   return url.toString()
 }

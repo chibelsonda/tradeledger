@@ -4,6 +4,7 @@ export const TEST_USER_ID = '00000000-0000-4000-8000-000000000001'
 export const TEST_ORGANIZATION_ID = '10000000-0000-4000-8000-000000000001'
 export const TEST_PROJECT_ID = '20000000-0000-4000-8000-000000000001'
 export const TEST_SUBCONTRACTOR_ID = '30000000-0000-4000-8000-000000000001'
+export const TEST_PAYOUT_ACCOUNT_ID = '35000000-0000-4000-8000-000000000001'
 export const TEST_PAYMENT_REQUEST_ID = '40000000-0000-4000-8000-000000000001'
 export const TEST_MEMBER_USER_ID = '00000000-0000-4000-8000-000000000002'
 
@@ -18,6 +19,7 @@ export interface SupabaseMockState {
   memberships: JsonRecord[]
   projects: JsonRecord[]
   subcontractors: JsonRecord[]
+  payoutAccounts: JsonRecord[]
   paymentRequests: JsonRecord[]
   auditEvents: JsonRecord[]
   webhookFailures: JsonRecord[]
@@ -44,6 +46,7 @@ export function createSupabaseMockState(
     memberships: [],
     projects: [],
     subcontractors: [],
+    payoutAccounts: [],
     paymentRequests: [],
     auditEvents: [],
     webhookFailures: [],
@@ -142,6 +145,7 @@ export async function installSupabaseMock(
         state.demoRemovalPayloads.push(body)
         state.projects = []
         state.subcontractors = []
+        state.payoutAccounts = []
         state.paymentRequests = []
         state.notificationDeliveries = []
         state.demoWorkspaceStatus = null
@@ -192,6 +196,7 @@ export async function installSupabaseMock(
         organization_memberships: state.memberships,
         projects: state.projects,
         subcontractors: state.subcontractors,
+        subcontractor_payout_accounts: state.payoutAccounts,
         payment_requests: state.paymentRequests,
         audit_events: state.auditEvents,
         stripe_webhook_failures: state.webhookFailures,
@@ -271,6 +276,27 @@ export function subcontractorRecord(): JsonRecord {
     email: 'hector@example.test',
     status: 'active',
     created_by: TEST_USER_ID,
+    created_at: now,
+    updated_at: now,
+  }
+}
+
+export function payoutAccountRecord(): JsonRecord {
+  return {
+    id: TEST_PAYOUT_ACCOUNT_ID,
+    organization_id: TEST_ORGANIZATION_ID,
+    subcontractor_id: TEST_SUBCONTRACTOR_ID,
+    dashboard_type: 'full',
+    onboarding_status: 'ready',
+    livemode: false,
+    details_submitted: true,
+    charges_enabled: false,
+    payouts_enabled: true,
+    requirements_currently_due: [],
+    requirements_eventually_due: [],
+    requirements_past_due: [],
+    disabled_reason: null,
+    last_synced_at: now,
     created_at: now,
     updated_at: now,
   }

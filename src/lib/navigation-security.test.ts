@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   trustedStripeCheckoutSessionId,
   trustedStripeCheckoutUrl,
+  trustedStripeConnectUrl,
   trustedSupabaseWaiverUrl,
 } from './navigation-security'
 
@@ -23,6 +24,25 @@ describe('trustedStripeCheckoutUrl', () => {
     expect(
       trustedStripeCheckoutUrl('javascript:alert(document.domain)'),
     ).toBeNull()
+  })
+})
+
+describe('trustedStripeConnectUrl', () => {
+  it('accepts only single-use onboarding links on the Stripe Connect host', () => {
+    expect(
+      trustedStripeConnectUrl(
+        'https://connect.stripe.com/setup/c/acct_12345678/onboarding-token',
+      ),
+    ).toBe(
+      'https://connect.stripe.com/setup/c/acct_12345678/onboarding-token',
+    )
+    expect(
+      trustedStripeConnectUrl('https://connect.stripe.com.evil.test/setup'),
+    ).toBeNull()
+    expect(
+      trustedStripeConnectUrl('https://user@connect.stripe.com/setup'),
+    ).toBeNull()
+    expect(trustedStripeConnectUrl('javascript:alert(1)')).toBeNull()
   })
 })
 

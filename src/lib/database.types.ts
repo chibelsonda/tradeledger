@@ -15,6 +15,7 @@ export type OrganizationRole =
 
 export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived'
 export type SubcontractorStatus = 'active' | 'inactive' | 'blocked'
+export type PayoutOnboardingStatus = 'pending' | 'restricted' | 'ready'
 export type PaymentRequestStatus =
   | 'draft'
   | 'submitted'
@@ -97,6 +98,25 @@ export type Subcontractor = {
   email: string | null
   status: SubcontractorStatus
   created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export type SubcontractorPayoutAccount = {
+  id: string
+  organization_id: string
+  subcontractor_id: string
+  dashboard_type: 'express' | 'full' | 'none'
+  onboarding_status: PayoutOnboardingStatus
+  livemode: boolean
+  details_submitted: boolean
+  charges_enabled: boolean
+  payouts_enabled: boolean
+  requirements_currently_due: string[]
+  requirements_eventually_due: string[]
+  requirements_past_due: string[]
+  disabled_reason: string | null
+  last_synced_at: string | null
   created_at: string
   updated_at: string
 }
@@ -300,6 +320,12 @@ export interface Database {
         Update: Partial<Subcontractor>
         Relationships: []
       }
+      subcontractor_payout_accounts: {
+        Row: SubcontractorPayoutAccount
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
       project_subcontractors: {
         Row: ProjectSubcontractor
         Insert: {
@@ -436,6 +462,20 @@ export interface Database {
           p_status: 'active' | 'suspended'
         }
         Returns: boolean
+      }
+      prepare_subcontractor_payout_onboarding: {
+        Args: {
+          p_subcontractor_id: string
+          p_user_id: string
+        }
+        Returns: {
+          payout_account_id: string
+          organization_id: string
+          subcontractor_id: string
+          company_name: string
+          contact_email: string | null
+          stripe_account_id: string | null
+        }[]
       }
       create_payment_request: {
         Args: {

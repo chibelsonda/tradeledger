@@ -31,6 +31,7 @@ import type {
   Project,
   StripeWebhookFailure,
   Subcontractor,
+  SubcontractorPayoutAccount,
   WaiverDocument,
 } from '@/lib/database.types'
 import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
@@ -39,6 +40,7 @@ import { NotificationBanner } from '@/components/ui/NotificationBanner'
 import { formatCurrency, formatStatus } from '@/lib/format'
 import {
   trustedStripeCheckoutUrl,
+  trustedStripeConnectUrl,
   trustedSupabaseWaiverUrl,
 } from '@/lib/navigation-security'
 import { safeDatabaseErrorMessage } from '@/lib/public-errors'
@@ -77,6 +79,7 @@ import {
   type DirectoryEditTarget,
 } from './DirectoryEditDialog'
 import { OverviewCharts } from './OverviewCharts'
+import { PayoutReadinessControl } from './PayoutReadinessControl'
 import { TeamManagementPanel } from './TeamManagementPanel'
 import { WaiverDocumentControl } from './WaiverDocumentControl'
 
@@ -255,6 +258,9 @@ export function OperationsDashboard({
 }: OperationsDashboardProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([])
+  const [payoutAccounts, setPayoutAccounts] = useState<
+    SubcontractorPayoutAccount[]
+  >([])
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
   const [webhookFailures, setWebhookFailures] = useState<StripeWebhookFailure[]>([])
@@ -304,7 +310,11 @@ export function OperationsDashboard({
     null,
   )
   const [isSavingDirectoryRecord, setIsSavingDirectoryRecord] = useState(false)
+  const [payoutActionSubcontractorId, setPayoutActionSubcontractorId] = useState<
+    string | null
+  >(null)
   const dashboardLoadSequence = useRef(0)
+  const connectReturnHandled = useRef(false)
 
   const [requestProjectId, setRequestProjectId] = useState('')
   const [requestSubcontractorId, setRequestSubcontractorId] = useState('')
@@ -395,6 +405,7 @@ export function OperationsDashboard({
     const [
       projectResult,
       subcontractorResult,
+      payoutAccountResult,
       requestResult,
       auditResult,
       failureResult,
@@ -413,6 +424,12 @@ export function OperationsDashboard({
           .select('*')
           .eq('organization_id', organization.id)
           .order('company_name'),
+        supabase
+          .from('subcontractor_payout_accounts')
+          .select(
+            'id, organization_id, subcontractor_id, dashboard_type, onboarding_status, livemode, details_submitted, charges_enabled, payouts_enabled, requirements_currently_due, requirements_eventually_due, requirements_past_due, disabled_reason, last_synced_at, created_at, updated_at',
+          )
+          .eq('organization_id', organization.id),
         supabase
           .from('payment_requests')
           .select('*')
@@ -455,6 +472,7 @@ export function OperationsDashboard({
     const firstError =
       projectResult.error ??
       subcontractorResult.error ??
+      payoutAccountResult.error ??
       requestResult.error ??
       auditResult.error ??
       failureResult.error ??
@@ -478,6 +496,7 @@ export function OperationsDashboard({
 
     setProjects(nextProjects)
     setSubcontractors(nextSubcontractors)
+    setPayoutAccounts(payoutAccountResult.data ?? [])
     setPaymentRequests(requestResult.data ?? [])
     setAuditEvents(auditResult.data ?? [])
     setWebhookFailures(failureResult.data ?? [])
@@ -498,6 +517,84 @@ export function OperationsDashboard({
     )
     setIsLoading(false)
   }, [canManageTeam, organization.id, organization.role])
+
+  useEffect(() => {
+    if (connectReturnHandled.current || !canManageProjects) return
+
+    const parameters = new URLSearchParams(window.location.search)
+    const connectState = parameters.get('connect')
+    const subcontractorId = parameters.get('subcontractor_id')
+
+    if (
+      !['refresh', 'return'].includes(connectState ?? '') ||
+      !subcontractorId ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        subcontractorId,
+      )
+    ) {
+      return
+    }
+
+    connectReturnHandled.current = true
+    window.history.replaceState(null, '', dashboardPathByPage.directory)
+
+    const completeConnectReturn = async () => {
+      await Promise.resolve()
+      setActiveNavigationId('directory')
+      setPayoutActionSubcontractorId(subcontractorId)
+
+      if (connectState === 'refresh') {
+        const { data, error: onboardingError } = await supabase.functions.invoke(
+          'create-connect-onboarding-link',
+          { body: { subcontractorId } },
+        )
+
+        if (onboardingError) {
+          setError(
+            await edgeFunctionErrorMessage(
+              onboardingError,
+              'Unable to continue payout onboarding. Please try again.',
+            ),
+          )
+          setPayoutActionSubcontractorId(null)
+          return
+        }
+
+        const onboardingUrl = trustedStripeConnectUrl(data?.url)
+
+        if (!onboardingUrl) {
+          setError('Stripe returned an invalid onboarding destination.')
+          setPayoutActionSubcontractorId(null)
+          return
+        }
+
+        window.location.assign(onboardingUrl)
+        return
+      }
+
+      const { error: refreshError } = await supabase.functions.invoke(
+        'refresh-connect-account',
+        { body: { subcontractorId } },
+      )
+
+      setPayoutActionSubcontractorId(null)
+
+      if (refreshError) {
+        setError(
+          await edgeFunctionErrorMessage(
+            refreshError,
+            'Unable to refresh payout readiness. Please try again.',
+          ),
+        )
+        return
+      }
+
+      setNotice('Stripe payout readiness synchronized successfully.')
+      await loadDashboard()
+    }
+
+    void completeConnectReturn()
+  }, [canManageProjects, loadDashboard])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -597,6 +694,14 @@ export function OperationsDashboard({
         waiverDocuments.map((document) => [document.payment_request_id, document]),
       ),
     [waiverDocuments],
+  )
+
+  const payoutAccountBySubcontractorId = useMemo(
+    () =>
+      new Map(
+        payoutAccounts.map((account) => [account.subcontractor_id, account]),
+      ),
+    [payoutAccounts],
   )
 
   const requestPreview = useMemo(() => {
@@ -740,6 +845,64 @@ export function OperationsDashboard({
 
     setDirectoryEditTarget(null)
     setNotice('Subcontractor details updated successfully.')
+    await loadDashboard()
+  }
+
+  async function startPayoutOnboarding(subcontractorId: string) {
+    setError(null)
+    setNotice(null)
+    setPayoutActionSubcontractorId(subcontractorId)
+
+    const { data, error: onboardingError } = await supabase.functions.invoke(
+      'create-connect-onboarding-link',
+      { body: { subcontractorId } },
+    )
+
+    if (onboardingError) {
+      setError(
+        await edgeFunctionErrorMessage(
+          onboardingError,
+          'Unable to start payout onboarding. Please try again.',
+        ),
+      )
+      setPayoutActionSubcontractorId(null)
+      return
+    }
+
+    const onboardingUrl = trustedStripeConnectUrl(data?.url)
+
+    if (!onboardingUrl) {
+      setError('Stripe returned an invalid onboarding destination.')
+      setPayoutActionSubcontractorId(null)
+      return
+    }
+
+    window.location.assign(onboardingUrl)
+  }
+
+  async function refreshPayoutReadiness(subcontractorId: string) {
+    setError(null)
+    setNotice(null)
+    setPayoutActionSubcontractorId(subcontractorId)
+
+    const { error: refreshError } = await supabase.functions.invoke(
+      'refresh-connect-account',
+      { body: { subcontractorId } },
+    )
+
+    setPayoutActionSubcontractorId(null)
+
+    if (refreshError) {
+      setError(
+        await edgeFunctionErrorMessage(
+          refreshError,
+          'Unable to refresh payout readiness. Please try again.',
+        ),
+      )
+      return
+    }
+
+    setNotice('Stripe payout readiness synchronized successfully.')
     await loadDashboard()
   }
 
@@ -1780,7 +1943,7 @@ export function OperationsDashboard({
 
             <TabPanel className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-forest/25">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] border-collapse text-left">
+                <table className="w-full min-w-[980px] border-collapse text-left">
                   <thead className="bg-cream/70">
                     <tr className="border-b border-ink/10">
                       <th scope="col" className="w-1/3 px-6 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
@@ -1795,6 +1958,9 @@ export function OperationsDashboard({
                       <th scope="col" className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
                         Status
                       </th>
+                      <th scope="col" className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
+                        Payout readiness
+                      </th>
                       {canManageProjects && (
                         <th scope="col" className="w-20 px-6 py-3 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-ink/70">
                           Edit
@@ -1806,7 +1972,7 @@ export function OperationsDashboard({
                     {subcontractors.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={canManageProjects ? 5 : 4}
+                          colSpan={canManageProjects ? 6 : 5}
                           className="px-6 py-8 text-sm font-medium text-ink/75"
                         >
                           No subcontractors yet. Add one before creating a payment request.
@@ -1836,6 +2002,23 @@ export function OperationsDashboard({
                             >
                               {formatStatus(subcontractor.status)}
                             </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <PayoutReadinessControl
+                              account={payoutAccountBySubcontractorId.get(
+                                subcontractor.id,
+                              )}
+                              canManage={canManageProjects}
+                              isBusy={
+                                payoutActionSubcontractorId === subcontractor.id
+                              }
+                              onRefresh={() => {
+                                void refreshPayoutReadiness(subcontractor.id)
+                              }}
+                              onStartOnboarding={() => {
+                                void startPayoutOnboarding(subcontractor.id)
+                              }}
+                            />
                           </td>
                           {canManageProjects && (
                             <td className="px-6 py-4 text-center">
