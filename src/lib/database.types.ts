@@ -43,6 +43,20 @@ export type RefundStatus =
   | 'failed'
   | 'canceled'
 
+export type TransferStatus =
+  | 'pending'
+  | 'succeeded'
+  | 'partially_reversed'
+  | 'reversed'
+  | 'failed'
+
+export type ConnectedPayoutStatus =
+  | 'pending'
+  | 'in_transit'
+  | 'paid'
+  | 'failed'
+  | 'canceled'
+
 export type WaiverDocumentStatus = 'generating' | 'ready' | 'failed' | 'voided'
 export type NotificationDeliveryStatus =
   | 'pending'
@@ -202,6 +216,44 @@ export type PaymentRefund = {
   requested_by: string | null
   failure_reason: string | null
   completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type PaymentTransfer = {
+  id: string
+  organization_id: string
+  payment_id: number
+  payment_request_id: string
+  subcontractor_id: string
+  payout_account_id: string
+  stripe_transfer_id: string
+  amount: number
+  currency: string
+  status: TransferStatus
+  reversed_amount: number
+  source_transaction_id: string | null
+  stripe_charge_id: string | null
+  stripe_created_at: string
+  last_synced_at: string
+  created_at: string
+  updated_at: string
+}
+
+export type ConnectedPayout = {
+  id: string
+  organization_id: string
+  subcontractor_id: string
+  payout_account_id: string
+  stripe_payout_id: string
+  amount: number
+  currency: string
+  status: ConnectedPayoutStatus
+  expected_arrival_at: string | null
+  failure_code: string | null
+  failure_message: string | null
+  stripe_created_at: string
+  last_synced_at: string
   created_at: string
   updated_at: string
 }
@@ -383,6 +435,18 @@ export interface Database {
       }
       payment_refunds: {
         Row: PaymentRefund
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
+      payment_transfers: {
+        Row: PaymentTransfer
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
+      connected_payouts: {
+        Row: ConnectedPayout
         Insert: Record<string, never>
         Update: Record<string, never>
         Relationships: []
@@ -634,6 +698,63 @@ export interface Database {
           p_refunds?: Json
         }
         Returns: PaymentStatus
+      }
+      prepare_payout_reconciliation: {
+        Args: {
+          p_organization_id: string
+          p_user_id: string
+          p_target_type?: 'organization' | 'subcontractor' | 'payment' | 'payout'
+          p_target_id?: string | null
+        }
+        Returns: Json
+      }
+      apply_stripe_transfer_ledger_event: {
+        Args: {
+          p_event_id: string | null
+          p_event_type: string
+          p_stripe_transfer_id: string
+          p_stripe_account_id: string
+          p_payment_intent_id: string
+          p_amount: number
+          p_currency: string
+          p_status: TransferStatus
+          p_reversed_amount: number
+          p_source_transaction_id: string | null
+          p_stripe_charge_id: string | null
+          p_stripe_created_at: string
+          p_actor_user_id?: string | null
+        }
+        Returns: boolean
+      }
+      apply_stripe_payout_ledger_event: {
+        Args: {
+          p_event_id: string | null
+          p_event_type: string
+          p_stripe_account_id: string
+          p_stripe_payout_id: string
+          p_amount: number
+          p_currency: string
+          p_status: ConnectedPayoutStatus
+          p_expected_arrival_at: string | null
+          p_failure_code: string | null
+          p_failure_message: string | null
+          p_stripe_created_at: string
+          p_actor_user_id?: string | null
+        }
+        Returns: boolean
+      }
+      record_payout_reconciliation_result: {
+        Args: {
+          p_organization_id: string
+          p_user_id: string
+          p_target_type: 'organization' | 'subcontractor' | 'payment' | 'payout'
+          p_target_id: string
+          p_succeeded: boolean
+          p_transfer_count?: number
+          p_payout_count?: number
+          p_failure_code?: string | null
+        }
+        Returns: boolean
       }
       claim_notification_delivery: {
         Args: { p_payment_request_id: string; p_user_id?: string | null }

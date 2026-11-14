@@ -20,6 +20,8 @@ export interface SupabaseMockState {
   projects: JsonRecord[]
   subcontractors: JsonRecord[]
   payoutAccounts: JsonRecord[]
+  paymentTransfers: JsonRecord[]
+  connectedPayouts: JsonRecord[]
   paymentRequests: JsonRecord[]
   auditEvents: JsonRecord[]
   webhookFailures: JsonRecord[]
@@ -32,6 +34,8 @@ export interface SupabaseMockState {
   createdOrganizationPayloads: JsonRecord[]
   approvedRequestIds: string[]
   checkoutRequestIds: string[]
+  payoutReconciliationRequests: JsonRecord[]
+  payoutReconciliationError?: string
   memberUpserts: JsonRecord[]
   memberStatusChanges: JsonRecord[]
   demoRemovalPayloads: JsonRecord[]
@@ -47,6 +51,8 @@ export function createSupabaseMockState(
     projects: [],
     subcontractors: [],
     payoutAccounts: [],
+    paymentTransfers: [],
+    connectedPayouts: [],
     paymentRequests: [],
     auditEvents: [],
     webhookFailures: [],
@@ -59,6 +65,7 @@ export function createSupabaseMockState(
     createdOrganizationPayloads: [],
     approvedRequestIds: [],
     checkoutRequestIds: [],
+    payoutReconciliationRequests: [],
     memberUpserts: [],
     memberStatusChanges: [],
     demoRemovalPayloads: [],
@@ -197,6 +204,8 @@ export async function installSupabaseMock(
         projects: state.projects,
         subcontractors: state.subcontractors,
         subcontractor_payout_accounts: state.payoutAccounts,
+        payment_transfers: state.paymentTransfers,
+        connected_payouts: state.connectedPayouts,
         payment_requests: state.paymentRequests,
         audit_events: state.auditEvents,
         stripe_webhook_failures: state.webhookFailures,
@@ -225,6 +234,22 @@ export async function installSupabaseMock(
       const body = request.postDataJSON() as JsonRecord
       state.checkoutRequestIds.push(String(body.paymentRequestId))
       await fulfillJson(route, 200, { url: state.checkoutUrl })
+      return
+    }
+
+    if (
+      url.pathname === '/functions/v1/reconcile-payouts' &&
+      request.method() === 'POST'
+    ) {
+      const body = request.postDataJSON() as JsonRecord
+      state.payoutReconciliationRequests.push(body)
+
+      if (state.payoutReconciliationError) {
+        await fulfillJson(route, 502, { error: state.payoutReconciliationError })
+        return
+      }
+
+      await fulfillJson(route, 200, { status: 'reconciled', transferCount: 1, payoutCount: 1 })
       return
     }
 
@@ -349,6 +374,48 @@ export function paidPaymentRecord(): JsonRecord {
     amount_refunded: 0,
     refunded_at: null,
     destination_charge: true,
+    created_at: now,
+    updated_at: now,
+  }
+}
+
+export function paymentTransferRecord(): JsonRecord {
+  return {
+    id: '60000000-0000-4000-8000-000000000001',
+    organization_id: TEST_ORGANIZATION_ID,
+    payment_id: 1,
+    payment_request_id: TEST_PAYMENT_REQUEST_ID,
+    subcontractor_id: TEST_SUBCONTRACTOR_ID,
+    payout_account_id: TEST_PAYOUT_ACCOUNT_ID,
+    stripe_transfer_id: 'tr_browser_test_001',
+    amount: 9450,
+    currency: 'usd',
+    status: 'succeeded',
+    reversed_amount: 0,
+    source_transaction_id: 'ch_browser_test_001',
+    stripe_charge_id: 'ch_browser_test_001',
+    stripe_created_at: now,
+    last_synced_at: now,
+    created_at: now,
+    updated_at: now,
+  }
+}
+
+export function failedConnectedPayoutRecord(): JsonRecord {
+  return {
+    id: '70000000-0000-4000-8000-000000000001',
+    organization_id: TEST_ORGANIZATION_ID,
+    subcontractor_id: TEST_SUBCONTRACTOR_ID,
+    payout_account_id: TEST_PAYOUT_ACCOUNT_ID,
+    stripe_payout_id: 'po_browser_test_001',
+    amount: 9000,
+    currency: 'usd',
+    status: 'failed',
+    expected_arrival_at: '2026-11-15T06:00:00.000Z',
+    failure_code: 'account_closed',
+    failure_message: 'The destination account is closed.',
+    stripe_created_at: now,
+    last_synced_at: now,
     created_at: now,
     updated_at: now,
   }

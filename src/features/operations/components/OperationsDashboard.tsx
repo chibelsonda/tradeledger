@@ -24,10 +24,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
   AuditEvent,
+  ConnectedPayout,
   Organization,
   OrganizationMember,
   OrganizationRole,
   PaymentRequest,
+  PaymentTransfer,
   Project,
   StripeWebhookFailure,
   Subcontractor,
@@ -79,6 +81,7 @@ import {
   type DirectoryEditTarget,
 } from './DirectoryEditDialog'
 import { OverviewCharts } from './OverviewCharts'
+import { PayoutLedger } from './PayoutLedger'
 import { PayoutReadinessControl } from './PayoutReadinessControl'
 import { TeamManagementPanel } from './TeamManagementPanel'
 import { WaiverDocumentControl } from './WaiverDocumentControl'
@@ -112,6 +115,7 @@ type DashboardPage =
   | 'overview'
   | 'directory'
   | 'payments'
+  | 'payouts'
   | 'team'
   | 'delivery'
   | 'audit'
@@ -120,6 +124,7 @@ const dashboardPathByPage: Record<DashboardPage, string> = {
   overview: '/dashboard',
   directory: '/directory',
   payments: '/payments',
+  payouts: '/payouts',
   team: '/team',
   delivery: '/delivery',
   audit: '/audit',
@@ -143,6 +148,11 @@ const dashboardPageDetails: Record<
     eyebrow: 'Financial workflow',
     title: 'Payment operations',
     description: 'Requests, approvals, checkout, waivers, and refunds',
+  },
+  payouts: {
+    eyebrow: 'Connected money movement',
+    title: 'Payout reconciliation',
+    description: 'Transfers, bank payouts, reversals, and settlement evidence',
   },
   team: {
     eyebrow: 'Access governance',
@@ -262,6 +272,8 @@ export function OperationsDashboard({
     SubcontractorPayoutAccount[]
   >([])
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
+  const [paymentTransfers, setPaymentTransfers] = useState<PaymentTransfer[]>([])
+  const [connectedPayouts, setConnectedPayouts] = useState<ConnectedPayout[]>([])
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
   const [webhookFailures, setWebhookFailures] = useState<StripeWebhookFailure[]>([])
   const [waiverDocuments, setWaiverDocuments] = useState<WaiverDocument[]>([])
@@ -363,6 +375,16 @@ export function OperationsDashboard({
         badge:
           paymentRequests.length > 0 ? String(paymentRequests.length) : undefined,
       },
+      canManagePayments && {
+        id: 'payouts',
+        href: dashboardPathByPage.payouts,
+        label: 'Payouts',
+        detail: 'Transfers and bank settlement',
+        badge:
+          paymentTransfers.length + connectedPayouts.length > 0
+            ? String(paymentTransfers.length + connectedPayouts.length)
+            : undefined,
+      },
       canManageTeam && {
         id: 'team',
         href: dashboardPathByPage.team,
@@ -390,8 +412,10 @@ export function OperationsDashboard({
     auditEvents.length,
     canManagePayments,
     canManageTeam,
+    connectedPayouts.length,
     organizationMembers,
     paymentRequests.length,
+    paymentTransfers.length,
     projects.length,
     subcontractors.length,
     webhookFailures.length,
@@ -407,6 +431,8 @@ export function OperationsDashboard({
       subcontractorResult,
       payoutAccountResult,
       requestResult,
+      transferResult,
+      connectedPayoutResult,
       auditResult,
       failureResult,
       waiverResult,
@@ -436,11 +462,23 @@ export function OperationsDashboard({
           .eq('organization_id', organization.id)
           .order('created_at', { ascending: false }),
         supabase
+          .from('payment_transfers')
+          .select('*')
+          .eq('organization_id', organization.id)
+          .order('stripe_created_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('connected_payouts')
+          .select('*')
+          .eq('organization_id', organization.id)
+          .order('stripe_created_at', { ascending: false })
+          .limit(100),
+        supabase
           .from('audit_events')
           .select('*')
           .eq('organization_id', organization.id)
           .order('created_at', { ascending: false })
-          .limit(8),
+          .limit(100),
         supabase
           .from('stripe_webhook_failures')
           .select('*')
@@ -474,6 +512,8 @@ export function OperationsDashboard({
       subcontractorResult.error ??
       payoutAccountResult.error ??
       requestResult.error ??
+      transferResult.error ??
+      connectedPayoutResult.error ??
       auditResult.error ??
       failureResult.error ??
       waiverResult.error ??
@@ -498,6 +538,8 @@ export function OperationsDashboard({
     setSubcontractors(nextSubcontractors)
     setPayoutAccounts(payoutAccountResult.data ?? [])
     setPaymentRequests(requestResult.data ?? [])
+    setPaymentTransfers(transferResult.data ?? [])
+    setConnectedPayouts(connectedPayoutResult.data ?? [])
     setAuditEvents(auditResult.data ?? [])
     setWebhookFailures(failureResult.data ?? [])
     setWaiverDocuments(waiverResult.data ?? [])
@@ -618,7 +660,7 @@ export function OperationsDashboard({
     const handlePopState = () => {
       const nextPage = dashboardPageFromPath(window.location.pathname)
       const isAllowed =
-        (nextPage !== 'delivery' || canManagePayments) &&
+        (!['delivery', 'payouts'].includes(nextPage) || canManagePayments) &&
         (nextPage !== 'team' || canManageTeam)
 
       if (!isAllowed) {
@@ -1239,7 +1281,7 @@ export function OperationsDashboard({
 
     if (
       !path ||
-      (nextPage === 'delivery' && !canManagePayments) ||
+      (['delivery', 'payouts'].includes(nextPage) && !canManagePayments) ||
       (nextPage === 'team' && !canManageTeam)
     ) {
       return
@@ -2281,6 +2323,21 @@ export function OperationsDashboard({
           </div>
         )}
       </section>
+      )}
+
+      {activeNavigationId === 'payouts' && (
+        <PayoutLedger
+          organizationId={organization.id}
+          role={organization.role}
+          transfers={paymentTransfers}
+          payouts={connectedPayouts}
+          paymentRequests={paymentRequests}
+          projects={projects}
+          subcontractors={subcontractors}
+          auditEvents={auditEvents}
+          isLoading={isLoading}
+          onRefresh={loadDashboard}
+        />
       )}
 
       {activeNavigationId === 'team' && canManageTeam && (

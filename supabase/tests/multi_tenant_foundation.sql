@@ -1238,6 +1238,256 @@ end;
 $$;
 
 reset role;
+set local role service_role;
+
+update public.payments
+set stripe_payment_intent_id = 'pi_TradeLedgerPayment001'
+where payment_request_id = current_setting('test.payment_request_a_id')::uuid;
+
+select public.apply_stripe_transfer_ledger_event(
+    'evt_tradeledger_transfer_created_001',
+    'transfer.created',
+    'tr_TradeLedgerTransfer001',
+    'acct_TradeLedgerTest001',
+    'pi_TradeLedgerPayment001',
+    9450,
+    'usd',
+    'succeeded',
+    0,
+    'ch_TradeLedgerCharge001',
+    'ch_TradeLedgerCharge001',
+    '2026-11-14T02:00:00Z',
+    null
+) as transfer_created
+\gset
+
+select public.apply_stripe_transfer_ledger_event(
+    'evt_tradeledger_transfer_created_001',
+    'transfer.created',
+    'tr_TradeLedgerTransfer001',
+    'acct_TradeLedgerTest001',
+    'pi_TradeLedgerPayment001',
+    9450,
+    'usd',
+    'succeeded',
+    0,
+    'ch_TradeLedgerCharge001',
+    'ch_TradeLedgerCharge001',
+    '2026-11-14T02:00:00Z',
+    null
+) as transfer_duplicate
+\gset
+
+select set_config('test.transfer_created', :'transfer_created', true);
+select set_config('test.transfer_duplicate', :'transfer_duplicate', true);
+
+select public.apply_stripe_transfer_ledger_event(
+    'evt_tradeledger_transfer_reversed_001',
+    'transfer.reversed',
+    'tr_TradeLedgerTransfer001',
+    'acct_TradeLedgerTest001',
+    'pi_TradeLedgerPayment001',
+    9450,
+    'usd',
+    'reversed',
+    9450,
+    'ch_TradeLedgerCharge001',
+    'ch_TradeLedgerCharge001',
+    '2026-11-14T02:00:00Z',
+    null
+) as transfer_reversed
+\gset
+
+select public.apply_stripe_payout_ledger_event(
+    'evt_tradeledger_payout_created_001',
+    'payout.created',
+    'acct_TradeLedgerTest001',
+    'po_TradeLedgerPayout001',
+    9000,
+    'usd',
+    'pending',
+    '2026-11-16T00:00:00Z',
+    null,
+    null,
+    '2026-11-14T03:00:00Z',
+    null
+) as payout_created
+\gset
+
+select public.apply_stripe_payout_ledger_event(
+    'evt_tradeledger_payout_paid_001',
+    'payout.paid',
+    'acct_TradeLedgerTest001',
+    'po_TradeLedgerPayout001',
+    9000,
+    'usd',
+    'paid',
+    '2026-11-16T00:00:00Z',
+    null,
+    null,
+    '2026-11-14T03:00:00Z',
+    null
+) as payout_paid
+\gset
+
+select public.apply_stripe_payout_ledger_event(
+    'evt_tradeledger_payout_stale_001',
+    'payout.updated',
+    'acct_TradeLedgerTest001',
+    'po_TradeLedgerPayout001',
+    9000,
+    'usd',
+    'pending',
+    '2026-11-16T00:00:00Z',
+    null,
+    null,
+    '2026-11-14T03:00:00Z',
+    null
+) as stale_payout_processed
+\gset
+
+do $$
+declare
+    transfer_record public.payment_transfers%rowtype;
+    payout_record public.connected_payouts%rowtype;
+    discovered_events integer;
+    reversed_events integer;
+begin
+    select * into transfer_record
+    from public.payment_transfers
+    where stripe_transfer_id = 'tr_TradeLedgerTransfer001';
+
+    select * into payout_record
+    from public.connected_payouts
+    where stripe_payout_id = 'po_TradeLedgerPayout001';
+
+    select count(*) into discovered_events
+    from public.audit_events
+    where action in ('transfer.discovered', 'payout.discovered');
+
+    select count(*) into reversed_events
+    from public.audit_events
+    where action = 'transfer.reversed'
+      and entity_id = transfer_record.id;
+
+    if not current_setting('test.transfer_created')::boolean
+       or current_setting('test.transfer_duplicate')::boolean then
+        raise exception 'Transfer webhook idempotency did not hold.';
+    end if;
+
+    if transfer_record.organization_id <> current_setting('test.organization_a_id')::uuid
+       or transfer_record.payment_request_id <> current_setting('test.payment_request_a_id')::uuid
+       or transfer_record.subcontractor_id <> current_setting('test.subcontractor_a_id')::uuid
+       or transfer_record.status <> 'reversed'
+       or transfer_record.reversed_amount <> 9450 then
+        raise exception 'Destination-charge transfer was not reconciled to its verified payment.';
+    end if;
+
+    if payout_record.status <> 'paid' then
+        raise exception 'A stale payout event regressed the terminal paid status.';
+    end if;
+
+    if transfer_record.reversed_amount <> (
+        select amount_refunded from public.payments
+        where id = transfer_record.payment_id
+    ) then
+        raise exception 'Refund and transfer reversal amounts are not reconciled.';
+    end if;
+
+    if discovered_events <> 2 or reversed_events <> 1 then
+        raise exception 'Ledger audit events were duplicated or omitted.';
+    end if;
+
+    begin
+        update public.payment_transfers set reversed_amount = amount + 1
+        where id = transfer_record.id;
+        raise exception 'A reversal exceeded its transfer amount.';
+    exception
+        when check_violation then null;
+    end;
+
+    begin
+        update public.connected_payouts set currency = 'US'
+        where id = payout_record.id;
+        raise exception 'An invalid payout currency was accepted.';
+    exception
+        when check_violation then null;
+    end;
+
+    begin
+        update public.connected_payouts set status = 'unknown'
+        where id = payout_record.id;
+        raise exception 'An invalid payout status was accepted.';
+    exception
+        when check_violation then null;
+    end;
+end;
+$$;
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+do $$
+declare
+    transfer_count integer;
+    payout_count integer;
+begin
+    select count(*) into transfer_count from public.payment_transfers;
+    select count(*) into payout_count from public.connected_payouts;
+
+    if transfer_count <> 1 or payout_count <> 1 then
+        raise exception 'The financial owner cannot read the payout ledger.';
+    end if;
+
+    begin
+        perform public.prepare_payout_reconciliation(
+            current_setting('test.organization_a_id')::uuid,
+            '00000000-0000-4000-8000-000000000001',
+            'organization',
+            current_setting('test.organization_a_id')::uuid
+        );
+        raise exception 'A browser role invoked a service-only reconciliation RPC.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000004';
+
+do $$
+begin
+    if (select count(*) from public.payment_transfers) <> 1
+       or (select count(*) from public.connected_payouts) <> 1 then
+        raise exception 'The accountant cannot read the payout ledger.';
+    end if;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000003';
+
+do $$
+begin
+    if (select count(*) from public.payment_transfers) <> 1
+       or (select count(*) from public.connected_payouts) <> 1 then
+        raise exception 'The administrator cannot read the payout ledger.';
+    end if;
+end;
+$$;
+
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000006';
+
+do $$
+begin
+    if (select count(*) from public.payment_transfers) <> 0
+       or (select count(*) from public.connected_payouts) <> 0 then
+        raise exception 'A non-financial role can read the payout ledger.';
+    end if;
+end;
+$$;
+
+reset role;
 set local role authenticated;
 set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000002';
 
@@ -1254,6 +1504,8 @@ declare
     visible_webhook_failures integer;
     visible_waivers integer;
     visible_notifications integer;
+    visible_transfers integer;
+    visible_connected_payouts integer;
     visible_private_files integer;
 begin
     select count(*) into visible_organizations from public.organizations;
@@ -1268,6 +1520,8 @@ begin
     select count(*) into visible_webhook_failures from public.stripe_webhook_failures;
     select count(*) into visible_waivers from public.waiver_documents;
     select count(*) into visible_notifications from public.notification_deliveries;
+    select count(*) into visible_transfers from public.payment_transfers;
+    select count(*) into visible_connected_payouts from public.connected_payouts;
     select count(*) into visible_private_files
     from storage.objects
     where bucket_id = 'waiver-documents';
@@ -1283,6 +1537,8 @@ begin
        or visible_webhook_failures <> 0
        or visible_waivers <> 0
        or visible_notifications <> 0
+       or visible_transfers <> 0
+       or visible_connected_payouts <> 0
        or visible_private_files <> 0 then
         raise exception 'Tenant B could see Tenant A data.';
     end if;

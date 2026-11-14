@@ -20,6 +20,7 @@ function NavigationIcon({ itemId }: { itemId: string }) {
     overview: 'M4 4h5v5H4V4Zm7 0h5v3h-5V4ZM4 11h5v5H4v-5Zm7-2h5v7h-5V9Z',
     directory: 'M3.5 5.25h5l1.5 1.5h6.5v8H3.5v-9.5Z',
     payments: 'M3.5 5.5h13v9h-13v-9Zm0 3h13M6 12h3',
+    payouts: 'M3.5 6.25h13v8.5h-13v-8.5Zm2.5 4.25h8m-2.5-2.25 2.5 2.25-2.5 2.25',
     team: 'M7.25 9a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Zm5.5-.75a1.75 1.75 0 1 0 0-3.5m-9.5 10.5c.2-2.6 1.54-4 4-4s3.8 1.4 4 4m.75-4c2.53.08 3.77 1.5 3.75 4',
     delivery: 'M3.5 5.25h13v9.5h-13v-9.5Zm.5.5 6 4.75 6-4.75',
     audit: 'M10 2.75 15.5 5v4.25c0 3.64-2.17 6.2-5.5 8-3.33-1.8-5.5-4.36-5.5-8V5L10 2.75Zm-2.25 7L9.3 11.3l3.1-3.1',
@@ -135,7 +136,7 @@ export function DashboardSidebar({
                 {item.badge && (
                   <span
                     className={
-                      'inline-flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] leading-none font-semibold tabular-nums ' +
+                      'inline-flex size-5 shrink-0 items-center justify-center border text-[10px] leading-none font-semibold tabular-nums ' +
                       (isActive
                         ? 'border-forest/20 bg-white text-forest'
                         : 'border-ink/15 text-ink/70')
