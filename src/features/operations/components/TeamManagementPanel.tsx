@@ -95,7 +95,7 @@ export function TeamManagementPanel({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="w-fit border border-ink/10 bg-cream px-3 py-1.5 font-mono text-xs font-bold text-ink/80">
+            <span className="w-fit rounded-lg border border-ink/10 bg-cream px-3 py-1.5 font-mono text-xs font-bold text-ink/80">
               {members.filter((member) => member.status === 'active').length} active
             </span>
             <Button
@@ -132,14 +132,14 @@ export function TeamManagementPanel({
                       )}
                     </td>
                     <td className="px-4 py-4">
-                      <span className="border border-ink/10 bg-cream px-2 py-1 text-xs font-bold text-ink/80">
+                      <span className="rounded-lg border border-ink/10 bg-cream px-2 py-1 text-xs font-bold text-ink/80">
                         {formatStatus(member.role)}
                       </span>
                     </td>
                     <td className="px-4 py-4">
                       <span
                         className={
-                          'border px-2 py-1 text-xs font-bold ' +
+                          'rounded-lg border px-2 py-1 text-xs font-bold ' +
                           (member.status === 'active'
                             ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                             : 'border-amber-200 bg-amber-50 text-amber-900')

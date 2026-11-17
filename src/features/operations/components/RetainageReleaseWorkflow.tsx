@@ -385,7 +385,7 @@ export function RetainageReleaseWorkflow({
                       </td>
                       <td className="px-5 py-4 font-semibold text-ink">{formatCurrency(release.platform_fee_amount, release.currency)}</td>
                       <td className="px-5 py-4">
-                        <span className={`inline-flex border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${statusClassName(release.status)}`}>
+                        <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${statusClassName(release.status)}`}>
                           {retainageReleaseStatusLabel(release.status)}
                         </span>
                       </td>

@@ -500,7 +500,7 @@ export function PayoutLedger({
                 className={`relative border-0 px-1 pb-3 text-sm font-bold transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest ${activeTable === kind ? 'text-forest after:bg-forest' : 'text-ink/60 hover:text-ink'}`}
               >
                 {kind === 'transfers' ? 'Transfers' : 'Payouts'}
-                <span className="ml-2 border border-current/15 px-1.5 py-0.5 text-[10px] tabular-nums">
+                <span className="ml-2 rounded-lg border border-current/15 px-1.5 py-0.5 text-[10px] tabular-nums">
                   {kind === 'transfers' ? transfers.length : payouts.length}
                 </span>
               </Button>
@@ -647,7 +647,7 @@ export function PayoutLedger({
                         <span className="ml-1 text-[9px] font-bold text-ink/50">{transfer.currency.toUpperCase()}</span>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusClassName(transfer.status)}`}>
+                        <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusClassName(transfer.status)}`}>
                           {ledgerStatusLabel('transfers', transfer.status)}
                         </span>
                       </td>
@@ -691,7 +691,7 @@ export function PayoutLedger({
                         <span className="ml-1 text-[9px] font-bold text-ink/50">{payout.currency.toUpperCase()}</span>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusClassName(payout.status)}`}>
+                        <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusClassName(payout.status)}`}>
                           {ledgerStatusLabel('payouts', payout.status)}
                         </span>
                       </td>
@@ -769,7 +769,7 @@ export function PayoutLedger({
                 {selected.subcontractorName}
               </h2>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className={`inline-flex border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusClassName(selected.status)}`}>
+                <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusClassName(selected.status)}`}>
                   {ledgerStatusLabel(selected.kind, selected.status)}
                 </span>
                 <span className="text-sm font-extrabold text-ink">

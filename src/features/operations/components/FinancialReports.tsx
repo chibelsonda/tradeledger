@@ -432,7 +432,7 @@ export function FinancialReports({
                         {formatCurrency(row.amount, row.currency)}
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusClassName(row.status)}`}>
+                        <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusClassName(row.status)}`}>
                           {formatStatus(row.status)}
                         </span>
                       </td>

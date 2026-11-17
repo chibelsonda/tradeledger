@@ -1523,7 +1523,7 @@ export function OperationsDashboard({
                 <dl className="grid gap-3 border-b border-ink/8 p-3 text-xs">
                   <div className="flex items-center justify-between gap-4">
                     <dt className="text-ink/75">Access level</dt>
-                    <dd className="border border-forest/15 bg-mint/15 px-2 py-1 font-bold text-forest">
+                    <dd className="rounded-lg border border-forest/15 bg-mint/15 px-2 py-1 font-bold text-forest">
                       {formatStatus(organization.role)}
                     </dd>
                   </div>
@@ -1579,7 +1579,7 @@ export function OperationsDashboard({
               {activePageDetails.title}
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm font-medium text-ink/85">
-              <span className="border border-forest/15 bg-white px-2.5 py-1 text-xs font-bold text-forest">
+              <span className="rounded-lg border border-forest/15 bg-white px-2.5 py-1 text-xs font-bold text-forest">
                 {formatStatus(organization.role)}
               </span>
               <span>{organization.name}</span>
@@ -2071,7 +2071,7 @@ export function OperationsDashboard({
                           <td className="px-4 py-4">
                             <span
                               className={
-                                'inline-flex border px-2.5 py-1 text-[11px] font-bold ' +
+                                'inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-bold ' +
                                 statusClassName(project.status)
                               }
                             >
@@ -2160,7 +2160,7 @@ export function OperationsDashboard({
                           <td className="px-4 py-4">
                             <span
                               className={
-                                'inline-flex border px-2.5 py-1 text-[11px] font-bold ' +
+                                'inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-bold ' +
                                 statusClassName(subcontractor.status)
                               }
                             >
@@ -2295,7 +2295,7 @@ export function OperationsDashboard({
                     <td className="px-4 py-4">
                       <span
                         className={
-                          'border px-2.5 py-1 text-[11px] font-bold ' +
+                          'rounded-lg border px-2.5 py-1 text-[11px] font-bold ' +
                           statusClassName(request.status)
                         }
                       >

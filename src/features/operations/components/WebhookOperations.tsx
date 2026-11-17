@@ -223,10 +223,10 @@ export function WebhookOperations({
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${severityClassName(alertSeverity)}`}>
+                        <span className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${severityClassName(alertSeverity)}`}>
                           {alertSeverity}
                         </span>
-                        <span className="border border-ink/10 bg-cream px-2 py-1 font-mono text-[10px] font-bold text-ink/75">
+                        <span className="rounded-lg border border-ink/10 bg-cream px-2 py-1 font-mono text-[10px] font-bold text-ink/75">
                           {failure.event_type}
                         </span>
                         <span className="text-[11px] font-bold text-ink/60">

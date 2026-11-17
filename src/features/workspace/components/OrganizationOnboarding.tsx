@@ -90,7 +90,7 @@ export function OrganizationOnboarding({
   return (
     <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-6 py-12 lg:min-h-[calc(100vh-10rem)] lg:grid-cols-[0.9fr_1.1fr] lg:px-8 lg:py-16">
       <div className="flex max-w-xl flex-col gap-6">
-        <span className="w-fit border border-forest/15 bg-white/70 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-forest">
+        <span className="w-fit rounded-lg border border-forest/15 bg-white/70 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-forest">
           Tenant-safe foundation
         </span>
         <div className="flex flex-col gap-4">

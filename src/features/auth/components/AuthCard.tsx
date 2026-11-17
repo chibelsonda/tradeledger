@@ -408,7 +408,7 @@ export function AuthCard() {
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-forest/75">
                 Secure workspace
               </p>
-              <span className="inline-flex h-8 items-center gap-2 border border-ink/10 bg-cream/65 px-3 text-[11px] font-semibold text-ink/75">
+              <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-ink/10 bg-cream/65 px-3 text-[11px] font-semibold text-ink/75">
                 <svg
                   viewBox="0 0 20 20"
                   className="size-3.5 text-forest"

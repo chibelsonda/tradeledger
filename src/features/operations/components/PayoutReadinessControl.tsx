@@ -72,7 +72,7 @@ export function PayoutReadinessControl({
     <div className="flex min-w-[150px] flex-col items-start gap-2">
       <span
         className={
-          'inline-flex border px-2.5 py-1 text-[11px] font-bold ' +
+          'inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-bold ' +
           readinessClassName(account)
         }
       >

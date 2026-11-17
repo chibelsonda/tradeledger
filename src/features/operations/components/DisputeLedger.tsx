@@ -312,7 +312,7 @@ export function DisputeLedger({
                     <tr key={dispute.id} className="hover:bg-cream/55">
                       <td className="px-5 py-4"><p className="font-bold text-ink">{dispute.projectName}</p><p className="mt-0.5 text-xs font-medium text-ink/60">{dispute.subcontractorName} · {dispute.requestDescription}</p></td>
                       <td className="px-5 py-4 font-bold text-ink">{formatCurrency(dispute.amount, dispute.currency)}</td>
-                      <td className="px-5 py-4"><span className={`inline-flex border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusClassName(dispute.status)}`}>{disputeStatusLabel(dispute.status)}</span></td>
+                      <td className="px-5 py-4"><span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusClassName(dispute.status)}`}>{disputeStatusLabel(dispute.status)}</span></td>
                       <td className={`px-5 py-4 text-xs font-semibold ${deadline === 'overdue' || deadline === 'urgent' ? 'text-red-700' : 'text-ink/65'}`}>{displayDate(dispute.evidence_due_at)}</td>
                       <td className="px-5 py-4 text-right"><Button type="button" onClick={() => selectDispute(dispute)} className="border border-ink/15 px-3 py-2 text-xs font-bold text-ink transition hover:border-forest hover:text-forest">Review</Button></td>
                     </tr>

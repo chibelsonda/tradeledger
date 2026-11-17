@@ -44,7 +44,7 @@ export function WaiverDocumentControl({
 
   if (waiver?.status === 'generating') {
     return (
-      <span className="border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800">
+      <span className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800">
         Preparing
       </span>
     )
@@ -54,7 +54,7 @@ export function WaiverDocumentControl({
     return (
       <span
         title={waiver.void_reason ?? undefined}
-        className="border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700"
+        className="rounded-lg border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700"
       >
         Waiver voided
       </span>
