@@ -497,7 +497,7 @@ export function PayoutLedger({
                   setFilters(initialFilters)
                   setPage(1)
                 }}
-                className={`relative px-1 pb-3 text-sm font-bold transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest ${activeTable === kind ? 'text-forest after:bg-forest' : 'text-ink/60 hover:text-ink'}`}
+                className={`relative border-0 px-1 pb-3 text-sm font-bold transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest ${activeTable === kind ? 'text-forest after:bg-forest' : 'text-ink/60 hover:text-ink'}`}
               >
                 {kind === 'transfers' ? 'Transfers' : 'Payouts'}
                 <span className="ml-2 border border-current/15 px-1.5 py-0.5 text-[10px] tabular-nums">

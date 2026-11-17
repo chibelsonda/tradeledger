@@ -2018,10 +2018,10 @@ export function OperationsDashboard({
               Projects and subcontractors
             </h2>
             <TabList className="mt-5 flex gap-6 overflow-x-auto" aria-label="Directory records">
-              <Tab className="relative inline-flex min-w-max px-1 pb-3 text-sm font-bold text-ink/65 outline-none transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent after:content-[''] hover:text-ink focus-visible:ring-2 focus-visible:ring-forest/25 data-selected:text-forest data-selected:after:bg-forest">
+              <Tab className="relative inline-flex min-w-max border-0 px-1 pb-3 text-sm font-bold text-ink/65 outline-none transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent after:content-[''] hover:text-ink focus-visible:ring-2 focus-visible:ring-forest/25 data-selected:text-forest data-selected:after:bg-forest">
                 Projects
               </Tab>
-              <Tab className="relative inline-flex min-w-max px-1 pb-3 text-sm font-bold text-ink/65 outline-none transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent after:content-[''] hover:text-ink focus-visible:ring-2 focus-visible:ring-forest/25 data-selected:text-forest data-selected:after:bg-forest">
+              <Tab className="relative inline-flex min-w-max border-0 px-1 pb-3 text-sm font-bold text-ink/65 outline-none transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent after:content-[''] hover:text-ink focus-visible:ring-2 focus-visible:ring-forest/25 data-selected:text-forest data-selected:after:bg-forest">
                 Subcontractors
               </Tab>
             </TabList>
