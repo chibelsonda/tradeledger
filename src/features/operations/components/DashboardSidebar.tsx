@@ -138,7 +138,10 @@ export function DashboardSidebar({
                 {item.badge && (
                   <span
                     className={
-                      'inline-flex size-5 shrink-0 items-center justify-center border text-[10px] leading-none font-semibold tabular-nums ' +
+                      'inline-flex h-5 shrink-0 items-center justify-center border text-[10px] leading-none font-semibold tabular-nums ' +
+                      (item.badge.length === 1
+                        ? 'w-5 rounded-full '
+                        : 'min-w-5 rounded-lg px-1.5 ') +
                       (isActive
                         ? 'border-forest/20 bg-white text-forest'
                         : 'border-ink/15 text-ink/70')
