@@ -118,10 +118,10 @@ export function DashboardSidebar({
                 }}
                 aria-current={isActive ? 'page' : undefined}
                 className={
-                  'group flex items-center justify-between gap-3 rounded-lg border-l-2 px-3 py-3 transition-colors ' +
+                  'group flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition-colors ' +
                   (isActive
-                    ? 'border-forest bg-mint/25 text-forest'
-                    : 'border-transparent text-ink/85 hover:border-forest/25 hover:bg-cream hover:text-ink')
+                    ? 'bg-mint/25 text-forest'
+                    : 'text-ink/85 hover:bg-cream hover:text-ink')
                 }
               >
                 <span className="flex min-w-0 items-start gap-3">
