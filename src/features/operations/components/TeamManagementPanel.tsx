@@ -82,7 +82,7 @@ export function TeamManagementPanel({
 
   return (
     <div>
-      <section className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
+      <section className="rounded-lg border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-forest/80">

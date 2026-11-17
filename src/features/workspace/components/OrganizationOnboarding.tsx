@@ -122,7 +122,7 @@ export function OrganizationOnboarding({
         noValidate
         autoComplete="off"
         onSubmit={(event) => void createOrganization(event)}
-        className="flex flex-col gap-6 border border-ink/10 bg-white p-7 shadow-[0_24px_64px_rgba(19,37,31,0.12)] sm:p-9"
+        className="rounded-lg flex flex-col gap-6 border border-ink/10 bg-white p-7 shadow-[0_24px_64px_rgba(19,37,31,0.12)] sm:p-9"
       >
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest/80">
@@ -187,7 +187,7 @@ export function OrganizationOnboarding({
           <div
             data-validation-error={Boolean(fieldErrors.slug) || undefined}
             className={
-              'flex h-10 items-center overflow-hidden border bg-white focus-within:ring-2 ' +
+              'flex h-10 items-center overflow-hidden rounded-lg border bg-white focus-within:ring-2 ' +
               (fieldErrors.slug
                 ? '!border-red-600 !ring-1 !ring-red-600/20 focus-within:!border-red-700 focus-within:!ring-2 focus-within:!ring-red-600/20'
                 : 'border-ink/15 focus-within:border-forest focus-within:ring-forest/10')
@@ -229,7 +229,7 @@ export function OrganizationOnboarding({
           type="submit"
           disabled={isSubmitting}
           aria-busy={isSubmitting}
-          className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.18)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-60"
+          className="rounded-lg inline-flex h-10 items-center justify-center gap-2 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.18)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-60"
         >
           {isSubmitting && <ButtonSpinner tone="light" />}
           {isSubmitting ? 'Creating secure workspace…' : 'Create organization'}

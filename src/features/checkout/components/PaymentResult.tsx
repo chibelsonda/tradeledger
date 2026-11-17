@@ -123,7 +123,7 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
 
   return (
     <section className="mx-auto flex min-h-[68vh] w-full max-w-4xl items-center justify-center px-6 py-12 lg:px-8">
-      <div className="w-full overflow-hidden border border-ink/10 bg-white shadow-[0_24px_64px_rgba(19,37,31,0.12)]">
+      <div className="rounded-lg w-full overflow-hidden border border-ink/10 bg-white shadow-[0_24px_64px_rgba(19,37,31,0.12)]">
         <div className="grid lg:grid-cols-[0.8fr_1.2fr]">
           <div className="relative grid min-h-72 place-items-center overflow-hidden bg-forest p-10 text-white">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_rgba(217,249,157,0.18),_transparent_42%)]" />
@@ -231,7 +231,7 @@ export function PaymentResult({ sessionId }: PaymentResultProps) {
 function ResultShell({ children }: { children: React.ReactNode }) {
   return (
     <section className="mx-auto flex min-h-[68vh] w-full max-w-2xl items-center justify-center px-6 py-12 lg:px-8">
-      <div className="flex w-full flex-col items-center gap-7 border border-ink/10 bg-white p-8 text-center text-ink shadow-[0_24px_64px_rgba(19,37,31,0.12)] sm:p-12">
+      <div className="rounded-lg flex w-full flex-col items-center gap-7 border border-ink/10 bg-white p-8 text-center text-ink shadow-[0_24px_64px_rgba(19,37,31,0.12)] sm:p-12">
         {children}
         <a
           href="/"

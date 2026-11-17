@@ -56,7 +56,7 @@ export function OverviewCharts({ paymentRequests }: OverviewChartsProps) {
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.75fr)]">
       <section
         aria-labelledby="financial-activity-title"
-        className="min-w-0 border border-ink/10 bg-white p-5 shadow-[0_14px_36px_rgba(19,37,31,0.05)] sm:p-6"
+        className="rounded-lg min-w-0 border border-ink/10 bg-white p-5 shadow-[0_14px_36px_rgba(19,37,31,0.05)] sm:p-6"
       >
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
@@ -148,7 +148,7 @@ export function OverviewCharts({ paymentRequests }: OverviewChartsProps) {
 
       <section
         aria-labelledby="workflow-status-title"
-        className="min-w-0 border border-ink/10 bg-white p-5 shadow-[0_14px_36px_rgba(19,37,31,0.05)] sm:p-6"
+        className="rounded-lg min-w-0 border border-ink/10 bg-white p-5 shadow-[0_14px_36px_rgba(19,37,31,0.05)] sm:p-6"
       >
         <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-forest/75">
           Current pipeline

@@ -144,7 +144,7 @@ function PasswordField({
       <div
         data-validation-error={Boolean(error) || undefined}
         className={
-          'flex h-10 items-center border bg-white transition focus-within:ring-2 ' +
+          'flex h-10 items-center rounded-lg border bg-white transition focus-within:ring-2 ' +
           (error
             ? '!border-red-600 !ring-1 !ring-red-600/20 focus-within:!border-red-700 focus-within:!ring-2 focus-within:!ring-red-600/20'
             : 'border-ink/18 focus-within:border-forest focus-within:ring-forest/10')
@@ -367,7 +367,7 @@ export function AuthCard() {
   return (
     <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-6 py-10 lg:min-h-[calc(100vh-9.5rem)] lg:grid-cols-[1.02fr_0.98fr] lg:px-8 lg:py-12">
       <div className="order-2 flex max-w-xl flex-col gap-7 lg:order-1">
-        <div className="inline-flex w-fit items-center gap-2 border border-forest/15 bg-white/75 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.17em] text-forest shadow-[0_6px_18px_rgba(19,37,31,0.05)] backdrop-blur">
+        <div className="rounded-lg inline-flex w-fit items-center gap-2 border border-forest/15 bg-white/75 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.17em] text-forest shadow-[0_6px_18px_rgba(19,37,31,0.05)] backdrop-blur">
           <span className="size-1.5 rounded-full bg-lime-500" />
           Multi-tenant operations
         </div>
@@ -401,7 +401,7 @@ export function AuthCard() {
         </div>
       </div>
 
-      <div className="order-1 mx-auto w-full max-w-[31rem] border border-ink/10 bg-white shadow-[0_28px_72px_rgba(19,37,31,0.14)] lg:order-2">
+      <div className="rounded-lg order-1 mx-auto w-full max-w-[31rem] border border-ink/10 bg-white shadow-[0_28px_72px_rgba(19,37,31,0.14)] lg:order-2">
         <div className="p-7 sm:p-9">
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -445,7 +445,7 @@ export function AuthCard() {
                 <div
                   data-validation-error={Boolean(fieldErrors.email) || undefined}
                   className={
-                    'flex h-10 items-center border bg-white transition focus-within:ring-2 ' +
+                    'flex h-10 items-center rounded-lg border bg-white transition focus-within:ring-2 ' +
                     (fieldErrors.email
                       ? '!border-red-600 !ring-1 !ring-red-600/20 focus-within:!border-red-700 focus-within:!ring-2 focus-within:!ring-red-600/20'
                       : 'border-ink/18 focus-within:border-forest focus-within:ring-forest/10')
@@ -565,7 +565,7 @@ export function AuthCard() {
               type="submit"
               disabled={isSubmitting}
               aria-busy={isSubmitting}
-              className="inline-flex h-10 items-center justify-center gap-2 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.18)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-60"
+              className="rounded-lg inline-flex h-10 items-center justify-center gap-2 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.18)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-60"
             >
               {isSubmitting ? (
                 <ButtonSpinner tone="light" />

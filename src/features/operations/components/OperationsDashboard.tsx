@@ -1509,7 +1509,7 @@ export function OperationsDashboard({
 
               <MenuItems
                 transition
-                className="absolute right-0 z-50 mt-2 w-72 origin-top-right border border-ink/12 bg-white p-2 shadow-[0_20px_48px_rgba(19,37,31,0.16)] transition duration-100 ease-out focus:outline-none data-closed:scale-95 data-closed:opacity-0"
+                className="rounded-lg absolute right-0 z-50 mt-2 w-72 origin-top-right border border-ink/12 bg-white p-2 shadow-[0_20px_48px_rgba(19,37,31,0.16)] transition duration-100 ease-out focus:outline-none data-closed:scale-95 data-closed:opacity-0"
               >
                 <div className="border-b border-ink/8 p-3">
                   <p className="truncate text-sm font-extrabold text-ink">
@@ -1610,7 +1610,7 @@ export function OperationsDashboard({
             ].map(([label, value]) => (
               <div
                 key={label}
-                className="group relative overflow-hidden border border-ink/10 bg-white p-5 shadow-[0_14px_36px_rgba(19,37,31,0.05)] transition-transform hover:-translate-y-0.5"
+                className="rounded-lg group relative overflow-hidden border border-ink/10 bg-white p-5 shadow-[0_14px_36px_rgba(19,37,31,0.05)] transition-transform hover:-translate-y-0.5"
               >
                 <span className="absolute inset-x-0 top-0 h-0.5 bg-forest/70" />
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink/75">
@@ -1626,7 +1626,7 @@ export function OperationsDashboard({
           <OverviewCharts paymentRequests={paymentRequests} />
 
           {demoWorkspaceStatus && (
-            <section className="grid gap-5 border border-amber-950/15 bg-amber-950/[0.035] p-6 shadow-[0_14px_36px_rgba(19,37,31,0.05)] lg:grid-cols-[1fr_auto] lg:items-center">
+            <section className="rounded-lg grid gap-5 border border-amber-950/15 bg-amber-950/[0.035] p-6 shadow-[0_14px_36px_rgba(19,37,31,0.05)] lg:grid-cols-[1fr_auto] lg:items-center">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-950/70">
                   Demonstration workspace
@@ -1663,7 +1663,7 @@ export function OperationsDashboard({
         <section
           className="grid items-start gap-6 xl:grid-cols-[1.35fr_0.65fr]"
         >
-          <div className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.06)] sm:p-7">
+          <div className="rounded-lg border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.06)] sm:p-7">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-forest/80">
@@ -1977,7 +1977,7 @@ export function OperationsDashboard({
             )}
           </div>
 
-          <aside className="flex self-start flex-col gap-4 bg-forest p-6 text-white shadow-[0_16px_40px_rgba(19,37,31,0.12)] sm:p-7">
+          <aside className="rounded-lg flex self-start flex-col gap-4 bg-forest p-6 text-white shadow-[0_16px_40px_rgba(19,37,31,0.12)] sm:p-7">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-mint/75">
                 Security evidence
@@ -2008,7 +2008,7 @@ export function OperationsDashboard({
       {activeNavigationId === 'directory' && (
         <TabGroup
           as="section"
-          className="overflow-hidden border border-ink/10 bg-white shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
+          className="rounded-lg overflow-hidden border border-ink/10 bg-white shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
         >
           <div className="border-b border-ink/10 px-6 pt-6 sm:px-7 sm:pt-7">
             <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-ink/75">
@@ -2216,7 +2216,7 @@ export function OperationsDashboard({
 
       {activeNavigationId === 'payments' && (
       <section
-        className="overflow-hidden border border-ink/10 bg-white shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
+        className="rounded-lg overflow-hidden border border-ink/10 bg-white shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
       >
         <div className="flex flex-col justify-between gap-3 border-b border-ink/10 p-6 sm:flex-row sm:items-center">
           <div>
@@ -2556,7 +2556,7 @@ export function OperationsDashboard({
 
       {activeNavigationId === 'audit' && (
         <section
-          className="border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
+          className="rounded-lg border border-ink/10 bg-white p-6 shadow-[0_16px_40px_rgba(19,37,31,0.055)]"
         >
           <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-ink/75">
             Immutable audit trail
@@ -2670,7 +2670,7 @@ export function OperationsDashboard({
       >
         <DialogBackdrop className="fixed inset-0 bg-ink/55 backdrop-blur-sm" />
         <div className="fixed inset-0 grid place-items-center overflow-y-auto p-6">
-          <DialogPanel className="w-full max-w-lg border border-red-200 bg-white p-6 shadow-[0_24px_64px_rgba(19,37,31,0.22)] sm:p-8">
+          <DialogPanel className="rounded-lg w-full max-w-lg border border-red-200 bg-white p-6 shadow-[0_24px_64px_rgba(19,37,31,0.22)] sm:p-8">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-red-700/70">
               Owner-only workspace action
             </p>
@@ -2725,7 +2725,7 @@ export function OperationsDashboard({
       >
         <DialogBackdrop className="fixed inset-0 bg-ink/55 backdrop-blur-sm" />
         <div className="fixed inset-0 grid place-items-center overflow-y-auto p-6">
-          <DialogPanel className="w-full max-w-lg border border-red-200 bg-white p-6 shadow-[0_24px_64px_rgba(19,37,31,0.22)] sm:p-8">
+          <DialogPanel className="rounded-lg w-full max-w-lg border border-red-200 bg-white p-6 shadow-[0_24px_64px_rgba(19,37,31,0.22)] sm:p-8">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-red-700/70">
               Irreversible payment action
             </p>

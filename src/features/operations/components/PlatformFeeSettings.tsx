@@ -169,7 +169,7 @@ export function PlatformFeeSettings({
         </NotificationBanner>
       )}
 
-      <div className="grid gap-px border border-ink/10 bg-ink/10 sm:grid-cols-3">
+      <div className="grid gap-px overflow-hidden rounded-lg border border-ink/10 bg-ink/10 sm:grid-cols-3">
         <article className="bg-white p-5">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink/65">
             Collection status
@@ -202,7 +202,7 @@ export function PlatformFeeSettings({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.65fr)]">
         <form
           onSubmit={(event) => void saveConfiguration(event)}
-          className="border border-ink/10 bg-white p-6 shadow-[0_14px_36px_rgba(19,37,31,0.05)] sm:p-7"
+          className="rounded-lg border border-ink/10 bg-white p-6 shadow-[0_14px_36px_rgba(19,37,31,0.05)] sm:p-7"
         >
           <div className="flex flex-col gap-4 border-b border-ink/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -305,7 +305,7 @@ export function PlatformFeeSettings({
           </div>
         </form>
 
-        <aside className="border border-forest/15 bg-forest p-6 text-white sm:p-7">
+        <aside className="rounded-lg border border-forest/15 bg-forest p-6 text-white sm:p-7">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-mint/80">
             Checkout example
           </p>

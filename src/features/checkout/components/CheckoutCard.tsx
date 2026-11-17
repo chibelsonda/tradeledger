@@ -82,7 +82,7 @@ export function CheckoutCard() {
   return (
     <section className="mx-auto grid w-full max-w-7xl items-center gap-12 px-6 py-10 lg:min-h-[calc(100vh-10rem)] lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-16">
       <div className="flex max-w-2xl flex-col gap-8">
-        <div className="inline-flex w-fit items-center gap-2 border border-forest/15 bg-white/75 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.17em] text-forest shadow-[0_6px_18px_rgba(19,37,31,0.05)] backdrop-blur">
+        <div className="rounded-lg inline-flex w-fit items-center gap-2 border border-forest/15 bg-white/75 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.17em] text-forest shadow-[0_6px_18px_rgba(19,37,31,0.05)] backdrop-blur">
           <span className="size-1.5 rounded-full bg-lime-500" />
           Built for momentum
         </div>
@@ -134,7 +134,7 @@ export function CheckoutCard() {
         <div className="absolute -top-5 -right-4 -z-10 size-36 rounded-full bg-mint blur-2xl" />
         <div className="absolute -bottom-5 -left-4 -z-10 size-40 rounded-full bg-emerald-200/50 blur-3xl" />
 
-        <div className="overflow-hidden border border-ink/10 bg-white shadow-[0_24px_64px_rgba(19,37,31,0.14)]">
+        <div className="rounded-lg overflow-hidden border border-ink/10 bg-white shadow-[0_24px_64px_rgba(19,37,31,0.14)]">
           <div className="relative overflow-hidden bg-forest p-8 text-white sm:p-9">
             <div className="absolute -top-12 -right-12 size-48 rounded-full border-[28px] border-white/5" />
             <div className="absolute right-12 -bottom-16 size-32 rotate-45 bg-mint/10" />
@@ -201,7 +201,7 @@ export function CheckoutCard() {
                 <Label htmlFor="quantity" className="text-[13px] font-bold text-ink/85">
                   Quantity
                 </Label>
-                <div className="flex items-center overflow-hidden border border-ink/15 bg-white focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/10">
+                <div className="flex items-center overflow-hidden rounded-lg border border-ink/15 bg-white focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/10">
                   <Button
                     type="button"
                     onClick={() => updateQuantity(quantity - 1)}
@@ -243,7 +243,7 @@ export function CheckoutCard() {
               onClick={() => void startCheckout()}
               disabled={isSubmitting}
               aria-busy={isSubmitting}
-              className="group inline-flex h-11 items-center justify-center gap-3 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.2)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-70"
+              className="rounded-lg group inline-flex h-11 items-center justify-center gap-3 bg-ink px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(19,37,31,0.2)] transition hover:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-wait disabled:opacity-70"
             >
               {isSubmitting && <ButtonSpinner tone="light" />}
               <span>

@@ -248,7 +248,7 @@ export function DisputeLedger({
           { label: 'Lost exposure', records: lostDisputes, detail: `${lostDisputes.length} closed against you` },
           { label: 'Transfer recovery', records: recovered, detail: `${recovered.length} completed reversals` },
         ].map((metric) => (
-          <article key={metric.label} className="border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
+          <article key={metric.label} className="rounded-lg border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
             <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-ink/65">{metric.label}</p>
             <div className="mt-3 text-lg font-extrabold tracking-[-0.025em] text-ink">
               <CurrencyTotals records={metric.records} />
@@ -261,7 +261,7 @@ export function DisputeLedger({
       {notice && <NotificationBanner tone="success">{notice}</NotificationBanner>}
       {error && <NotificationBanner tone="error">{error}</NotificationBanner>}
 
-      <div className="border border-ink/10 bg-white shadow-[0_18px_44px_rgba(19,37,31,0.055)]">
+      <div className="rounded-lg border border-ink/10 bg-white shadow-[0_18px_44px_rgba(19,37,31,0.055)]">
         <div className="flex flex-col gap-4 border-b border-ink/10 p-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-terracotta">Chargeback control</p>

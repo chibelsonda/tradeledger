@@ -105,7 +105,7 @@ export function WebhookOperations({
   return (
     <section className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-3">
-        <article className="border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
+        <article className="rounded-lg border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
           <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-ink/65">
             Open incidents
           </p>
@@ -116,7 +116,7 @@ export function WebhookOperations({
             Awaiting reconciliation
           </p>
         </article>
-        <article className="border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
+        <article className="rounded-lg border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
           <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-ink/65">
             Critical
           </p>
@@ -127,7 +127,7 @@ export function WebhookOperations({
             Repeated, stale, or failed recovery
           </p>
         </article>
-        <article className="border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
+        <article className="rounded-lg border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
           <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-ink/65">
             Resolved history
           </p>
@@ -143,7 +143,7 @@ export function WebhookOperations({
       {notice && <NotificationBanner tone="success">{notice}</NotificationBanner>}
       {error && <NotificationBanner tone="error">{error}</NotificationBanner>}
 
-      <div className="border border-ink/10 bg-white shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
+      <div className="rounded-lg border border-ink/10 bg-white shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
         <div className="flex flex-col gap-4 border-b border-ink/10 p-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-forest/75">

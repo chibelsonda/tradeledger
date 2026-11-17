@@ -9,7 +9,7 @@ export function Brand({ compact = false }: BrandProps) {
       className="group inline-flex items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest"
       aria-label="TradeLedger home"
     >
-      <span className="grid size-9 place-items-center bg-ink text-mint shadow-[0_8px_20px_rgba(19,37,31,0.16)] transition-transform duration-200 group-hover:-rotate-3">
+      <span className="rounded-lg grid size-9 place-items-center bg-ink text-mint shadow-[0_8px_20px_rgba(19,37,31,0.16)] transition-transform duration-200 group-hover:-rotate-3">
         <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
           <path
             d="M5 5.5h14M5 10h14M5 14.5h9M5 19h9"

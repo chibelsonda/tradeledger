@@ -42,7 +42,7 @@ export function NotificationBanner({
     <div
       role={isUrgent ? 'alert' : 'status'}
       aria-live={isUrgent ? 'assertive' : 'polite'}
-      className={`flex items-start gap-3 border px-4 py-3 text-sm leading-6 font-medium ${styles.container} ${className}`}
+      className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm leading-6 font-medium ${styles.container} ${className}`}
     >
       <svg
         viewBox="0 0 20 20"

@@ -44,11 +44,17 @@
     font: inherit;
   }
 
-  button,
   input,
   select,
   textarea {
-    border-radius: 0;
+    border-radius: var(--radius-lg);
+  }
+
+  button,
+  a[class~="inline-flex"],
+  article,
+  section {
+    border-radius: var(--radius-lg);
   }
 
   [data-validation-error="true"] {

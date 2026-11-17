@@ -1,7 +1,7 @@
 export function CheckoutCanceled() {
   return (
     <section className="mx-auto flex min-h-[68vh] w-full max-w-2xl items-center justify-center px-6 py-12 lg:px-8">
-      <div className="w-full border border-ink/10 bg-white p-8 text-center shadow-[0_24px_64px_rgba(19,37,31,0.11)] sm:p-12">
+      <div className="rounded-lg w-full border border-ink/10 bg-white p-8 text-center shadow-[0_24px_64px_rgba(19,37,31,0.11)] sm:p-12">
         <div className="mx-auto grid size-18 place-items-center border border-amber-200 bg-amber-50 text-amber-700">
           <svg viewBox="0 0 24 24" className="size-10" fill="none" aria-hidden="true">
             <path

@@ -130,7 +130,7 @@ function MetricCard({
   detail: string
 }) {
   return (
-    <article className="border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
+    <article className="rounded-lg border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
       <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-ink/65">
         {label}
       </p>
@@ -449,7 +449,7 @@ export function PayoutLedger({
         />
       </div>
 
-      <section className="border border-ink/10 bg-white shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
+      <section className="rounded-lg border border-ink/10 bg-white shadow-[0_16px_40px_rgba(19,37,31,0.055)]">
         <div className="flex flex-col gap-4 border-b border-ink/10 p-4 sm:p-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-forest/75">

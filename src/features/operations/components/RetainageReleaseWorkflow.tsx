@@ -264,7 +264,7 @@ export function RetainageReleaseWorkflow({
           ['Released', totalReleased, 'Paid less successful refunds'],
           ['Available', totalRemaining, 'Uncommitted retainage balance'],
         ].map(([label, value, detail]) => (
-          <article key={String(label)} className="border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
+          <article key={String(label)} className="rounded-lg border border-ink/10 bg-white p-4 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
             <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-ink/65">{label}</p>
             <p className="mt-3 text-lg font-extrabold tracking-[-0.025em] text-ink">
               {formatCurrency(Number(value), 'usd')}
@@ -274,7 +274,7 @@ export function RetainageReleaseWorkflow({
         ))}
       </section>
 
-      <section className="border border-ink/10 bg-white p-5 shadow-[0_18px_42px_rgba(19,37,31,0.055)]">
+      <section className="rounded-lg border border-ink/10 bg-white p-5 shadow-[0_18px_42px_rgba(19,37,31,0.055)]">
         <div className="flex flex-col gap-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-forest">Controlled release</p>
           <h2 className="text-lg font-extrabold tracking-[-0.025em] text-ink">Request retained funds</h2>
@@ -337,7 +337,7 @@ export function RetainageReleaseWorkflow({
         </div>
       </section>
 
-      <section className="overflow-hidden border border-ink/10 bg-white shadow-[0_18px_42px_rgba(19,37,31,0.055)]">
+      <section className="rounded-lg overflow-hidden border border-ink/10 bg-white shadow-[0_18px_42px_rgba(19,37,31,0.055)]">
         <div className="border-b border-ink/10 px-5 py-4">
           <h2 className="text-lg font-extrabold tracking-[-0.025em] text-ink">Release ledger</h2>
           <p className="mt-1 text-sm font-medium text-ink/65">Approval, Checkout, fee, payment, and refund state remain independently auditable.</p>
