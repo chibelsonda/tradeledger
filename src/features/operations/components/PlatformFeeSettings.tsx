@@ -169,8 +169,8 @@ export function PlatformFeeSettings({
         </NotificationBanner>
       )}
 
-      <div className="grid gap-px overflow-hidden rounded-lg border border-ink/10 bg-ink/10 sm:grid-cols-3">
-        <article className="bg-white p-5">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <article className="rounded-lg border border-ink/10 bg-white p-5 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink/65">
             Collection status
           </p>
@@ -179,7 +179,7 @@ export function PlatformFeeSettings({
           </p>
           <p className="mt-1 text-xs font-medium text-ink/70">USD destination charges</p>
         </article>
-        <article className="bg-white p-5">
+        <article className="rounded-lg border border-ink/10 bg-white p-5 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink/65">
             Percentage fee
           </p>
@@ -188,7 +188,7 @@ export function PlatformFeeSettings({
           </p>
           <p className="mt-1 text-xs font-medium text-ink/70">Rounded to the minor unit</p>
         </article>
-        <article className="bg-white p-5">
+        <article className="rounded-lg border border-ink/10 bg-white p-5 shadow-[0_12px_28px_rgba(19,37,31,0.045)]">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink/65">
             Fixed fee
           </p>
