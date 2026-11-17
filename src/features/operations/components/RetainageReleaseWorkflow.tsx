@@ -281,7 +281,7 @@ export function RetainageReleaseWorkflow({
           <p className="text-sm font-medium text-ink/65">Only settled requests with an available retained balance can be selected.</p>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-[1.3fr_0.7fr_1.5fr_auto] lg:items-end">
+        <div className="mt-5 grid gap-4 lg:grid-cols-[1.3fr_0.7fr_1.5fr_auto] lg:items-start">
           <Field className="flex flex-col gap-2">
             <Label className="text-xs font-bold text-ink">Payment request</Label>
             <SelectControl
@@ -329,7 +329,7 @@ export function RetainageReleaseWorkflow({
             type="button"
             disabled={isCreating || eligibleRequests.length === 0}
             onClick={() => void createRelease()}
-            className="inline-flex h-10 items-center justify-center gap-2 bg-forest px-4 text-sm font-bold text-white transition hover:bg-forest/90 focus:outline-none focus:ring-2 focus:ring-forest/30 disabled:cursor-not-allowed disabled:opacity-55"
+            className="inline-flex h-10 items-center justify-center gap-2 bg-forest px-4 text-sm font-bold text-white transition hover:bg-forest/90 focus:outline-none focus:ring-2 focus:ring-forest/30 disabled:cursor-not-allowed disabled:opacity-55 lg:mt-6"
           >
             {isCreating && <ButtonSpinner />}
             Request release

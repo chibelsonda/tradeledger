@@ -37,6 +37,21 @@ test('owner requests, approves, and starts a retainage release checkout', async 
   await page.getByRole('link', { name: /Retainage/ }).click()
   await expect(page.getByRole('heading', { name: 'Retainage releases' })).toBeVisible()
 
+  const paymentRequestInput = page.getByLabel('Payment request')
+  const releaseAmountInput = page.getByLabel('Release amount')
+  const releaseReasonInput = page.getByLabel('Release reason')
+  const paymentRequestBoxBeforeResize = await paymentRequestInput.boundingBox()
+  const releaseAmountBoxBeforeResize = await releaseAmountInput.boundingBox()
+
+  await releaseReasonInput.evaluate((element) => {
+    element.style.height = '240px'
+  })
+
+  const paymentRequestBoxAfterResize = await paymentRequestInput.boundingBox()
+  const releaseAmountBoxAfterResize = await releaseAmountInput.boundingBox()
+  expect(paymentRequestBoxAfterResize?.y).toBe(paymentRequestBoxBeforeResize?.y)
+  expect(releaseAmountBoxAfterResize?.y).toBe(releaseAmountBoxBeforeResize?.y)
+
   await page.getByLabel('Payment request').click()
   await page.getByRole('option', { name: /Kitchen trim milestone/ }).click()
   await page.getByLabel('Release amount').fill('5.00')
