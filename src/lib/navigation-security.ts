@@ -59,6 +59,26 @@ export function trustedSupabaseWaiverUrl(
   return url.toString()
 }
 
+export function trustedSupabaseInvoiceUrl(
+  value: unknown,
+  supabaseProjectUrl: string,
+): string | null {
+  const url = secureUrl(value)
+  const projectUrl = secureUrl(supabaseProjectUrl)
+
+  if (
+    !url ||
+    !projectUrl ||
+    url.origin !== projectUrl.origin ||
+    !url.pathname.startsWith('/storage/v1/object/sign/invoice-documents/') ||
+    !url.searchParams.has('token')
+  ) {
+    return null
+  }
+
+  return url.toString()
+}
+
 export function trustedStripeCheckoutSessionId(
   value: string | null,
 ): string | null {

@@ -90,6 +90,11 @@ export type DisputeRecoveryStatus =
   | 'failed'
 
 export type WaiverDocumentStatus = 'generating' | 'ready' | 'failed' | 'voided'
+export type InvoiceDocumentStatus =
+  | 'extracting'
+  | 'review_required'
+  | 'confirmed'
+  | 'failed'
 export type NotificationDeliveryStatus =
   | 'pending'
   | 'processing'
@@ -417,6 +422,52 @@ export type WaiverDocument = {
   updated_at: string
 }
 
+export type InvoiceLineItem = {
+  description: string
+  quantity: number | null
+  unit_amount_minor: number | null
+  amount_minor: number | null
+}
+
+export type InvoiceDocument = {
+  id: string
+  organization_id: string
+  project_id: string
+  subcontractor_id: string
+  payment_request_id: string | null
+  uploaded_by: string | null
+  reviewed_by: string | null
+  storage_path: string
+  file_name: string
+  mime_type: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp'
+  file_size: number
+  sha256: string
+  status: InvoiceDocumentStatus
+  extraction_provider: string | null
+  extraction_model: string | null
+  provider_response_id: string | null
+  extracted_data: Json
+  extraction_confidence: Json
+  extraction_note: string | null
+  invoice_number: string | null
+  vendor_name: string | null
+  invoice_date: string | null
+  due_date: string | null
+  project_reference: string | null
+  description: string | null
+  gross_amount: number | null
+  currency: string | null
+  retainage_basis_points: number | null
+  cost_code: string | null
+  line_items: Json
+  reviewed_data: Json | null
+  failure_reason: string | null
+  extracted_at: string | null
+  reviewed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type NotificationDelivery = {
   id: string
   organization_id: string
@@ -633,6 +684,12 @@ export interface Database {
       }
       waiver_documents: {
         Row: WaiverDocument
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
+      invoice_documents: {
+        Row: InvoiceDocument
         Insert: Record<string, never>
         Update: Record<string, never>
         Relationships: []
@@ -1134,6 +1191,66 @@ export interface Database {
       }
       prepare_waiver_download: {
         Args: { p_payment_request_id: string; p_user_id: string }
+        Returns: {
+          document_id: string
+          storage_path: string
+          file_name: string
+        }[]
+      }
+      reserve_invoice_document: {
+        Args: {
+          p_organization_id: string
+          p_project_id: string
+          p_subcontractor_id: string
+          p_user_id: string
+          p_file_name: string
+          p_mime_type: string
+          p_file_size: number
+          p_sha256: string
+        }
+        Returns: {
+          document_id: string
+          storage_path: string
+          project_name: string
+          project_code: string
+          subcontractor_name: string
+        }[]
+      }
+      complete_invoice_extraction: {
+        Args: {
+          p_document_id: string
+          p_provider: string | null
+          p_model: string | null
+          p_provider_response_id: string | null
+          p_extracted_data: Json
+          p_extraction_confidence: Json
+          p_extraction_note: string | null
+        }
+        Returns: boolean
+      }
+      fail_invoice_document: {
+        Args: { p_document_id: string; p_failure_reason: string }
+        Returns: boolean
+      }
+      confirm_invoice_document: {
+        Args: {
+          p_invoice_document_id: string
+          p_invoice_number: string
+          p_vendor_name: string
+          p_invoice_date: string | null
+          p_due_date: string | null
+          p_project_reference: string
+          p_description: string
+          p_gross_amount: number
+          p_currency: string
+          p_retainage_basis_points: number
+          p_cost_code: string
+          p_line_items: Json
+        }
+        Returns: string
+      }
+      prepare_invoice_download: {
+        Args: { p_invoice_document_id: string; p_user_id: string }
         Returns: {
           document_id: string
           storage_path: string

@@ -51,6 +51,50 @@ test('owner approves a request and starts server-priced Stripe checkout', async 
   expect(state.unexpectedRequests).toEqual([])
 })
 
+test('owner reviews an extracted invoice before creating a draft request', async ({
+  page,
+}) => {
+  const state = createSupabaseMockState({
+    organizations: [organizationRecord()],
+    memberships: [membershipRecord()],
+    projects: [projectRecord()],
+    subcontractors: [subcontractorRecord()],
+  })
+  await installSupabaseMock(page, state)
+  await signInAsOwner(page)
+  await page.getByRole('link', { name: /Payments/ }).click()
+
+  await page.getByRole('button', { name: 'Upload invoice' }).click()
+  await page.getByLabel('Invoice file').setInputFiles({
+    name: 'invoice-1042.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-browser-test'),
+  })
+  await page.getByRole('button', { name: 'Upload and extract' }).click()
+
+  await expect(
+    page.getByRole('heading', { name: 'Verify invoice details' }),
+  ).toBeVisible()
+  await expect(page.getByLabel('Invoice number')).toHaveValue('INV-1042')
+  await page.getByLabel('Payment description').fill(
+    'November framing progress — verified',
+  )
+  await page.getByRole('button', { name: 'Confirm and create draft' }).click()
+
+  await expect(page.getByText('INV-1042', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText('November framing progress — verified', { exact: true }),
+  ).toBeVisible()
+  expect(state.invoiceUploads[0]).toContain('multipart/form-data')
+  expect(state.invoiceConfirmations).toHaveLength(1)
+  expect(state.invoiceConfirmations[0]).toMatchObject({
+    p_invoice_number: 'INV-1042',
+    p_gross_amount: 528075,
+    p_retainage_basis_points: 1000,
+  })
+  expect(state.unexpectedRequests).toEqual([])
+})
+
 test('checkout refuses a non-Stripe redirect returned by the API', async ({
   page,
 }) => {

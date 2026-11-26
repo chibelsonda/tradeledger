@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   AuditEvent,
   ConnectedPayout,
+  InvoiceDocument,
   Organization,
   OrganizationMember,
   OrganizationPlatformFee,
@@ -85,6 +86,7 @@ import {
 } from './DirectoryEditDialog'
 import { DisputeLedger } from './DisputeLedger'
 import { FinancialReports } from './FinancialReports'
+import { InvoiceIntakePanel } from './InvoiceIntakePanel'
 import { OverviewCharts } from './OverviewCharts'
 import { PayoutLedger } from './PayoutLedger'
 import { PayoutReadinessControl } from './PayoutReadinessControl'
@@ -316,6 +318,7 @@ export function OperationsDashboard({
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
   const [webhookFailures, setWebhookFailures] = useState<StripeWebhookFailure[]>([])
   const [waiverDocuments, setWaiverDocuments] = useState<WaiverDocument[]>([])
+  const [invoiceDocuments, setInvoiceDocuments] = useState<InvoiceDocument[]>([])
   const [organizationMembers, setOrganizationMembers] = useState<
     OrganizationMember[]
   >([])
@@ -515,6 +518,7 @@ export function OperationsDashboard({
       auditResult,
       failureResult,
       waiverResult,
+      invoiceResult,
       memberResult,
       demoStatusResult,
     ] =
@@ -592,6 +596,14 @@ export function OperationsDashboard({
           .select('*')
           .eq('organization_id', organization.id)
           .order('created_at', { ascending: false }),
+        canManagePayments
+          ? supabase
+              .from('invoice_documents')
+              .select('*')
+              .eq('organization_id', organization.id)
+              .order('created_at', { ascending: false })
+              .limit(100)
+          : Promise.resolve({ data: [] as InvoiceDocument[], error: null }),
         canManageTeam
           ? supabase.rpc('list_organization_members', {
               p_organization_id: organization.id,
@@ -621,6 +633,7 @@ export function OperationsDashboard({
       auditResult.error ??
       failureResult.error ??
       waiverResult.error ??
+      invoiceResult.error ??
       memberResult.error ??
       demoStatusResult.error
 
@@ -650,6 +663,7 @@ export function OperationsDashboard({
     setAuditEvents(auditResult.data ?? [])
     setWebhookFailures(failureResult.data ?? [])
     setWaiverDocuments(waiverResult.data ?? [])
+    setInvoiceDocuments(invoiceResult.data ?? [])
     setOrganizationMembers(memberResult.data ?? [])
     setDemoWorkspaceStatus(demoStatusResult.data)
     setRequestProjectId((current) =>
@@ -2212,6 +2226,17 @@ export function OperationsDashboard({
             </TabPanel>
           </TabPanels>
         </TabGroup>
+      )}
+
+      {activeNavigationId === 'payments' && canManagePayments && (
+        <InvoiceIntakePanel
+          organizationId={organization.id}
+          projects={projects}
+          subcontractors={subcontractors}
+          documents={invoiceDocuments}
+          isLoading={isLoading}
+          onDataChanged={loadDashboard}
+        />
       )}
 
       {activeNavigationId === 'payments' && (

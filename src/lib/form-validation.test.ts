@@ -7,6 +7,7 @@ import {
 } from '@/features/auth/auth.schemas'
 import {
   organizationMemberFormSchema,
+  invoiceReviewSchema,
   paymentRequestFormSchema,
   platformFeeFormSchema,
   projectFormSchema,
@@ -113,6 +114,34 @@ describe('form validation schemas', () => {
 
     expect(result.grossAmount).toBe(285_050)
     expect(result.retainagePercentage).toBe(10)
+  })
+
+  it('normalizes reviewed invoice values before confirmation', () => {
+    expect(
+      invoiceReviewSchema.parse({
+        invoiceNumber: ' INV-1042 ',
+        vendorName: ' Fine Finish Carpentry ',
+        invoiceDate: '2026-11-20',
+        dueDate: '2026-12-20',
+        projectReference: ' CEDAR-01 ',
+        description: ' November framing progress ',
+        grossAmount: '5280.75',
+        currency: ' USD ',
+        retainagePercentage: '10',
+        costCode: ' 06-100 ',
+      }),
+    ).toEqual({
+      invoiceNumber: 'INV-1042',
+      vendorName: 'Fine Finish Carpentry',
+      invoiceDate: '2026-11-20',
+      dueDate: '2026-12-20',
+      projectReference: 'CEDAR-01',
+      description: 'November framing progress',
+      grossAmount: 528_075,
+      currency: 'usd',
+      retainagePercentage: 10,
+      costCode: '06-100',
+    })
   })
 
   it('validates organization membership roles and email addresses', () => {

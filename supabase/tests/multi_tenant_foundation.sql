@@ -2147,6 +2147,195 @@ end;
 $$;
 
 reset role;
+set local role service_role;
+
+select document_id as invoice_document_a_id, storage_path as invoice_storage_path_a
+from public.reserve_invoice_document(
+    current_setting('test.organization_a_id')::uuid,
+    current_setting('test.project_a_id')::uuid,
+    current_setting('test.subcontractor_a_id')::uuid,
+    '00000000-0000-4000-8000-000000000001',
+    'invoice-1042.pdf',
+    'application/pdf',
+    128,
+    repeat('a', 64)
+)
+\gset
+
+select set_config('test.invoice_document_a_id', :'invoice_document_a_id', true);
+
+insert into storage.objects (bucket_id, name)
+values ('invoice-documents', :'invoice_storage_path_a');
+
+select public.complete_invoice_extraction(
+    :'invoice_document_a_id',
+    'openai',
+    'test-model',
+    'resp_invoice_001',
+    '{"vendor_name":"Fine Finish Carpentry","invoice_number":"INV-1042","invoice_date":"2026-11-20","due_date":"2026-12-20","project_reference":"CEDAR-01","description":"November framing progress","gross_amount_minor":528075,"currency":"usd","retainage_basis_points":1000,"cost_code":"06-100","line_items":[],"field_confidence":[]}'::jsonb,
+    '{"invoice_number":0.98}'::jsonb,
+    'AI-extracted values require human review.'
+) as invoice_extracted
+\gset
+
+select set_config('test.invoice_extracted', :'invoice_extracted', true);
+
+do $$
+begin
+    if not current_setting('test.invoice_extracted')::boolean then
+        raise exception 'The invoice extraction did not complete.';
+    end if;
+
+    begin
+        perform public.reserve_invoice_document(
+            current_setting('test.organization_a_id')::uuid,
+            current_setting('test.project_a_id')::uuid,
+            current_setting('test.subcontractor_a_id')::uuid,
+            '00000000-0000-4000-8000-000000000001',
+            'duplicate-invoice.pdf',
+            'application/pdf',
+            128,
+            repeat('a', 64)
+        );
+        raise exception 'A duplicate invoice file was accepted.';
+    exception
+        when unique_violation then null;
+    end;
+end;
+$$;
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+select public.confirm_invoice_document(
+    :'invoice_document_a_id',
+    'INV-1042',
+    'Fine Finish Carpentry',
+    date '2026-11-20',
+    date '2026-12-20',
+    'CEDAR-01',
+    'November framing progress',
+    528075,
+    'usd',
+    1000,
+    '06-100',
+    '[{"description":"Framing progress","quantity":1,"unit_amount_minor":528075,"amount_minor":528075}]'::jsonb
+) as invoice_payment_request_a_id
+\gset
+
+select set_config(
+    'test.invoice_payment_request_a_id',
+    :'invoice_payment_request_a_id',
+    true
+);
+
+do $$
+declare
+    invoice_record public.invoice_documents%rowtype;
+    request_record public.payment_requests%rowtype;
+begin
+    select * into invoice_record
+    from public.invoice_documents
+    where id = current_setting('test.invoice_document_a_id')::uuid;
+
+    select * into request_record
+    from public.payment_requests
+    where id = current_setting('test.invoice_payment_request_a_id')::uuid;
+
+    if invoice_record.status <> 'confirmed'
+       or invoice_record.payment_request_id <> request_record.id
+       or invoice_record.extracted_data->>'invoice_number' <> 'INV-1042'
+       or invoice_record.reviewed_data->>'invoice_number' <> 'INV-1042'
+       or request_record.status <> 'draft'
+       or request_record.gross_amount <> 528075
+       or request_record.retainage_amount <> 52808 then
+        raise exception 'Invoice confirmation did not preserve evidence or create the draft request.';
+    end if;
+
+    if (select count(*) from storage.objects where bucket_id = 'invoice-documents') <> 1 then
+        raise exception 'The owner cannot read the private invoice object.';
+    end if;
+
+    begin
+        perform public.reserve_invoice_document(
+            current_setting('test.organization_a_id')::uuid,
+            current_setting('test.project_a_id')::uuid,
+            current_setting('test.subcontractor_a_id')::uuid,
+            '00000000-0000-4000-8000-000000000001',
+            'browser-bypass.pdf',
+            'application/pdf',
+            128,
+            repeat('b', 64)
+        );
+        raise exception 'A browser role invoked the service-only invoice reservation RPC.';
+    exception
+        when insufficient_privilege then null;
+    end;
+end;
+$$;
+
+reset role;
+set local role service_role;
+
+select document_id as duplicate_number_document_id
+from public.reserve_invoice_document(
+    current_setting('test.organization_a_id')::uuid,
+    current_setting('test.project_a_id')::uuid,
+    current_setting('test.subcontractor_a_id')::uuid,
+    '00000000-0000-4000-8000-000000000001',
+    'invoice-1042-copy.pdf',
+    'application/pdf',
+    96,
+    repeat('b', 64)
+)
+\gset
+
+select set_config(
+    'test.duplicate_number_document_id',
+    :'duplicate_number_document_id',
+    true
+);
+
+select public.complete_invoice_extraction(
+    :'duplicate_number_document_id',
+    'manual',
+    null,
+    null,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    'Manual review required.'
+);
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000001';
+
+do $$
+begin
+    begin
+        perform public.confirm_invoice_document(
+            current_setting('test.duplicate_number_document_id')::uuid,
+            ' inv-1042 ',
+            'Fine Finish Carpentry',
+            date '2026-11-20',
+            date '2026-12-20',
+            'CEDAR-01',
+            'Duplicate invoice number attempt',
+            528075,
+            'usd',
+            1000,
+            '06-100',
+            '[]'::jsonb
+        );
+        raise exception 'A duplicate subcontractor invoice number was accepted.';
+    exception
+        when unique_violation then null;
+    end;
+end;
+$$;
+
+reset role;
 set local role authenticated;
 set local "request.jwt.claim.sub" = '00000000-0000-4000-8000-000000000002';
 
@@ -2168,6 +2357,7 @@ declare
     visible_platform_fees integer;
     visible_retainage_releases integer;
     visible_disputes integer;
+    visible_invoices integer;
     visible_private_files integer;
 begin
     select count(*) into visible_organizations from public.organizations;
@@ -2187,9 +2377,10 @@ begin
     select count(*) into visible_platform_fees from public.organization_platform_fees;
     select count(*) into visible_retainage_releases from public.retainage_releases;
     select count(*) into visible_disputes from public.payment_disputes;
+    select count(*) into visible_invoices from public.invoice_documents;
     select count(*) into visible_private_files
     from storage.objects
-    where bucket_id = 'waiver-documents';
+    where bucket_id in ('waiver-documents', 'invoice-documents');
 
     if visible_organizations <> 0
        or visible_projects <> 0
@@ -2207,6 +2398,7 @@ begin
        or visible_platform_fees <> 0
        or visible_retainage_releases <> 0
        or visible_disputes <> 0
+       or visible_invoices <> 0
        or visible_private_files <> 0 then
         raise exception 'Tenant B could see Tenant A data.';
     end if;

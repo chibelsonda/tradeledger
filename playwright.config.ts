@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const applicationUrl = 'http://127.0.0.1:4173'
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
 
 export default defineConfig({
   testDir: './e2e',
@@ -17,12 +18,17 @@ export default defineConfig({
     serviceWorkers: 'block',
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
-    video: 'retain-on-failure',
+    video: process.env.PLAYWRIGHT_DISABLE_VIDEO ? 'off' : 'retain-on-failure',
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(chromiumExecutablePath
+          ? { launchOptions: { executablePath: chromiumExecutablePath } }
+          : {}),
+      },
     },
   ],
   webServer: {

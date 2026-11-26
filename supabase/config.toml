@@ -49,3 +49,9 @@ verify_jwt = true
 
 [functions.dispatch-notification]
 verify_jwt = true
+
+[functions.extract-invoice]
+verify_jwt = true
+
+[functions.download-invoice]
+verify_jwt = true

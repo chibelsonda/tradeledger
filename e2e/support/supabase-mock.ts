@@ -6,6 +6,8 @@ export const TEST_PROJECT_ID = '20000000-0000-4000-8000-000000000001'
 export const TEST_SUBCONTRACTOR_ID = '30000000-0000-4000-8000-000000000001'
 export const TEST_PAYOUT_ACCOUNT_ID = '35000000-0000-4000-8000-000000000001'
 export const TEST_PAYMENT_REQUEST_ID = '40000000-0000-4000-8000-000000000001'
+export const TEST_INVOICE_DOCUMENT_ID = '42000000-0000-4000-8000-000000000001'
+export const TEST_INVOICE_PAYMENT_REQUEST_ID = '43000000-0000-4000-8000-000000000001'
 export const TEST_RETAINAGE_RELEASE_ID = '45000000-0000-4000-8000-000000000001'
 export const TEST_DISPUTE_ID = '65000000-0000-4000-8000-000000000001'
 export const TEST_MEMBER_USER_ID = '00000000-0000-4000-8000-000000000002'
@@ -33,6 +35,7 @@ export interface SupabaseMockState {
   auditEvents: JsonRecord[]
   webhookFailures: JsonRecord[]
   waiverDocuments: JsonRecord[]
+  invoiceDocuments: JsonRecord[]
   notificationDeliveries: JsonRecord[]
   organizationMembers: JsonRecord[]
   demoWorkspaceStatus: JsonRecord | null
@@ -54,6 +57,8 @@ export interface SupabaseMockState {
   memberStatusChanges: JsonRecord[]
   platformFeeUpdates: JsonRecord[]
   demoRemovalPayloads: JsonRecord[]
+  invoiceUploads: string[]
+  invoiceConfirmations: JsonRecord[]
   unexpectedRequests: string[]
 }
 
@@ -77,6 +82,7 @@ export function createSupabaseMockState(
     auditEvents: [],
     webhookFailures: [],
     waiverDocuments: [],
+    invoiceDocuments: [],
     notificationDeliveries: [],
     organizationMembers: [ownerMemberRecord()],
     demoWorkspaceStatus: null,
@@ -97,6 +103,8 @@ export function createSupabaseMockState(
     memberStatusChanges: [],
     platformFeeUpdates: [],
     demoRemovalPayloads: [],
+    invoiceUploads: [],
+    invoiceConfirmations: [],
     unexpectedRequests: [],
     ...overrides,
   }
@@ -159,6 +167,65 @@ export async function installSupabaseMock(
             : paymentRequest,
         )
         await fulfillJson(route, 200, true)
+        return
+      }
+
+      if (rpcName === 'confirm_invoice_document') {
+        state.invoiceConfirmations.push(body)
+        const grossAmount = Number(body.p_gross_amount)
+        const retainageBasisPoints = Number(body.p_retainage_basis_points)
+        const retainageAmount = Math.floor(
+          (grossAmount * retainageBasisPoints + 5000) / 10_000,
+        )
+        state.invoiceDocuments = state.invoiceDocuments.map((document) =>
+          document.id === body.p_invoice_document_id
+            ? {
+                ...document,
+                payment_request_id: TEST_INVOICE_PAYMENT_REQUEST_ID,
+                reviewed_by: TEST_USER_ID,
+                status: 'confirmed',
+                invoice_number: body.p_invoice_number,
+                vendor_name: body.p_vendor_name,
+                invoice_date: body.p_invoice_date,
+                due_date: body.p_due_date,
+                project_reference: body.p_project_reference,
+                description: body.p_description,
+                gross_amount: grossAmount,
+                currency: body.p_currency,
+                retainage_basis_points: retainageBasisPoints,
+                cost_code: body.p_cost_code,
+                line_items: body.p_line_items,
+                reviewed_data: body,
+                reviewed_at: now,
+                updated_at: now,
+              }
+            : document,
+        )
+        state.paymentRequests.unshift({
+          id: TEST_INVOICE_PAYMENT_REQUEST_ID,
+          organization_id: TEST_ORGANIZATION_ID,
+          project_id: TEST_PROJECT_ID,
+          subcontractor_id: TEST_SUBCONTRACTOR_ID,
+          created_by: TEST_USER_ID,
+          approved_by: null,
+          description: body.p_description,
+          gross_amount: grossAmount,
+          retainage_basis_points: retainageBasisPoints,
+          retainage_amount: retainageAmount,
+          net_amount: grossAmount - retainageAmount,
+          currency: body.p_currency,
+          status: 'draft',
+          submitted_at: null,
+          approved_at: null,
+          checkout_started_at: null,
+          paid_at: null,
+          failed_at: null,
+          refunded_amount: 0,
+          refunded_at: null,
+          created_at: now,
+          updated_at: now,
+        })
+        await fulfillJson(route, 200, TEST_INVOICE_PAYMENT_REQUEST_ID)
         return
       }
 
@@ -305,6 +372,7 @@ export async function installSupabaseMock(
         audit_events: state.auditEvents,
         stripe_webhook_failures: state.webhookFailures,
         waiver_documents: state.waiverDocuments,
+        invoice_documents: state.invoiceDocuments,
         notification_deliveries: state.notificationDeliveries,
       }
 
@@ -312,6 +380,79 @@ export async function installSupabaseMock(
         await fulfillJson(route, 200, tableData[table])
         return
       }
+    }
+
+    if (
+      url.pathname === '/functions/v1/extract-invoice' &&
+      request.method() === 'POST'
+    ) {
+      state.invoiceUploads.push(request.headers()['content-type'] ?? '')
+      const extraction = {
+        vendor_name: 'Fine Finish Carpentry',
+        invoice_number: 'INV-1042',
+        invoice_date: '2026-11-20',
+        due_date: '2026-12-20',
+        project_reference: 'CEDAR-01',
+        description: 'AI suggested framing progress',
+        gross_amount_minor: 528075,
+        currency: 'usd',
+        retainage_basis_points: 1000,
+        cost_code: '06-100',
+        line_items: [{
+          description: 'Framing progress',
+          quantity: 1,
+          unit_amount_minor: 528075,
+          amount_minor: 528075,
+        }],
+        field_confidence: [{ field: 'invoice_number', confidence: 0.98 }],
+      }
+      state.invoiceDocuments.unshift({
+        id: TEST_INVOICE_DOCUMENT_ID,
+        organization_id: TEST_ORGANIZATION_ID,
+        project_id: TEST_PROJECT_ID,
+        subcontractor_id: TEST_SUBCONTRACTOR_ID,
+        payment_request_id: null,
+        uploaded_by: TEST_USER_ID,
+        reviewed_by: null,
+        storage_path: `${TEST_ORGANIZATION_ID}/${TEST_INVOICE_DOCUMENT_ID}.pdf`,
+        file_name: 'invoice-1042.pdf',
+        mime_type: 'application/pdf',
+        file_size: 16,
+        sha256: 'a'.repeat(64),
+        status: 'review_required',
+        extraction_provider: 'openai',
+        extraction_model: 'test-model',
+        provider_response_id: 'resp_invoice_001',
+        extracted_data: extraction,
+        extraction_confidence: { invoice_number: 0.98 },
+        extraction_note: 'AI-extracted values require human review before confirmation.',
+        invoice_number: null,
+        vendor_name: null,
+        invoice_date: null,
+        due_date: null,
+        project_reference: null,
+        description: null,
+        gross_amount: null,
+        currency: null,
+        retainage_basis_points: null,
+        cost_code: null,
+        line_items: [],
+        reviewed_data: null,
+        failure_reason: null,
+        extracted_at: now,
+        reviewed_at: null,
+        created_at: now,
+        updated_at: now,
+      })
+      await fulfillJson(route, 200, {
+        documentId: TEST_INVOICE_DOCUMENT_ID,
+        status: 'review_required',
+        mode: 'ai',
+        extraction,
+        confidence: { invoice_number: 0.98 },
+        note: 'AI-extracted values require human review before confirmation.',
+      })
+      return
     }
 
     if (

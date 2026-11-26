@@ -67,6 +67,57 @@ export const paymentRequestFormSchema = z.object({
     .max(100, 'Retainage cannot exceed 100%.'),
 })
 
+const optionalIsoDateSchema = z
+  .string()
+  .refine(
+    (value) => value === '' || /^\d{4}-\d{2}-\d{2}$/.test(value),
+    'Enter a valid date.',
+  )
+
+export const invoiceReviewSchema = z.object({
+  invoiceNumber: z
+    .string()
+    .trim()
+    .min(1, 'Enter the invoice number.')
+    .max(100, 'Invoice number must be 100 characters or fewer.'),
+  vendorName: z
+    .string()
+    .trim()
+    .max(160, 'Vendor name must be 160 characters or fewer.'),
+  invoiceDate: optionalIsoDateSchema,
+  dueDate: optionalIsoDateSchema,
+  projectReference: z
+    .string()
+    .trim()
+    .max(160, 'Project reference must be 160 characters or fewer.'),
+  description: z
+    .string()
+    .trim()
+    .min(3, 'Description must contain at least 3 characters.')
+    .max(500, 'Description must be 500 characters or fewer.'),
+  grossAmount: z
+    .string()
+    .refine(
+      (value) => dollarsToMinorUnits(value) !== null,
+      'Enter a positive amount with no more than 2 decimal places.',
+    )
+    .transform((value) => dollarsToMinorUnits(value) as number),
+  currency: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z]{3}$/, 'Enter a 3-letter currency code.'),
+  retainagePercentage: z.coerce
+    .number<number>()
+    .finite('Enter a valid retainage percentage.')
+    .min(0, 'Retainage cannot be below 0%.')
+    .max(100, 'Retainage cannot exceed 100%.'),
+  costCode: z
+    .string()
+    .trim()
+    .max(100, 'Cost code must be 100 characters or fewer.'),
+})
+
 export const organizationMemberFormSchema = z.object({
   email: z
     .string()
@@ -110,6 +161,7 @@ export const platformFeeFormSchema = z
 export type ProjectFormValues = z.infer<typeof projectFormSchema>
 export type SubcontractorFormValues = z.infer<typeof subcontractorFormSchema>
 export type PaymentRequestFormValues = z.infer<typeof paymentRequestFormSchema>
+export type InvoiceReviewValues = z.infer<typeof invoiceReviewSchema>
 export type OrganizationMemberFormValues = z.infer<
   typeof organizationMemberFormSchema
 >

@@ -6,7 +6,9 @@ TradeLedger is a production-deployed reference implementation of a secure,
 multi-tenant subcontractor payment operations platform. It coordinates project
 directories, retainage-aware payment requests, role-based approvals, Stripe
 Checkout, webhook reconciliation, refunds, private waiver documents, and an
-immutable operational audit trail.
+immutable operational audit trail. Its invoice intake workflow combines private
+document storage, optional structured AI extraction, duplicate detection, and
+mandatory human review before a draft payment request can be created.
 
 The project demonstrates an end-to-end SaaS architecture in which authorization
 and financial correctness are enforced below the presentation layer. PostgreSQL
@@ -41,9 +43,10 @@ workspace without treating browser-supplied data as authoritative.
 | Identity and tenancy | Supabase Auth with email verification, organization onboarding, isolated workspaces, role-aware membership, account suspension and restoration |
 | Operations directory | Project and subcontractor records, organization switching, opt-in demonstration data and guarded owner-controlled cleanup |
 | Payment requests | Draft, submission, approval, retainage calculation, net-payable preview, controlled lifecycle transitions |
+| Invoice intake | Private PDF/image upload, optional AI extraction, duplicate detection, editable human review, source evidence and draft-request creation |
 | Stripe payments | Server-priced Checkout Sessions, success and cancellation handling, signed webhooks, reconciliation and retry-safe processing |
 | Refunds | Authorized full-remaining refunds, durable refund records, idempotency protection and terminal-state enforcement |
-| Documents | Server-generated PDF payment waivers, private Supabase Storage, short-lived signed downloads and automatic refund voiding |
+| Documents | Source invoices and server-generated PDF payment waivers in private Supabase Storage, short-lived signed downloads and automatic refund voiding |
 | Operational controls | Webhook failure queue, request correlation, structured errors, audit events and payment-state recovery |
 | Dashboard experience | Financial summaries, workflow charts, role-aware navigation, responsive tables, loading, empty and failure states |
 | Quality assurance | Unit tests, browser workflows, executable PostgreSQL security scenarios, static analysis and continuous integration |
@@ -79,6 +82,11 @@ workspace without treating browser-supplied data as authoritative.
 - **Private payment documents.** Paid, non-refunded requests can generate a
   server-rendered PDF in a private Supabase Storage bucket. Downloads use
   short-lived signed URLs, and later refunds automatically void the record.
+- **Human-governed invoice extraction.** Uploaded invoices are tenant-private,
+  checked by content hash and invoice number, and optionally sent from an Edge
+  Function for schema-constrained extraction. A financial operator must verify
+  or correct the result before PostgreSQL creates a draft payment request; both
+  the machine output and reviewed data remain available as audit evidence.
 - **Auditable operations.** Sensitive workflow changes append immutable tenant
   audit events.
 - **Production-oriented UX.** Every authenticated state includes deliberate
@@ -99,7 +107,7 @@ workspace without treating browser-supplied data as authoritative.
 | Database | PostgreSQL, Row-Level Security, constraints, generated columns, transactional RPCs |
 | Authentication | Supabase Auth with email verification and password recovery |
 | Payments | Stripe Checkout and signed webhooks |
-| Documents | Server-rendered PDF waivers and private Supabase Storage |
+| Documents and AI | Private source invoices, server-rendered PDF waivers, Supabase Storage, and optional OpenAI structured extraction |
 | Hosting | Vercel frontend and Supabase managed services |
 | Transactional notifications | Tenant-safe outbox and delivery tracking; external email delivery intentionally deferred |
 | Verification | Vitest, Playwright, ESLint, TypeScript, Deno checks, executable PostgreSQL security scenarios |
@@ -124,6 +132,10 @@ create-checkout / create-refund ----> Stripe Checkout + Refunds
      Payment ledger + failure inbox + audit events
                     |
                     +----> Private waiver PDFs
+                    +----> Private source invoices
+                               |
+                               +----> optional OpenAI extraction
+                                      -> mandatory human review
 ```
 
 Secrets stay in Supabase Edge Function configuration. The browser receives only
@@ -137,7 +149,8 @@ the Supabase project URL and publishable key.
 | PostgreSQL | Enforces tenant isolation, roles, state transitions, retainage calculations, idempotency, and audit evidence |
 | Supabase Edge Functions | Authenticate requests, apply rate limits, retrieve trusted database state, protect provider secrets, and coordinate Stripe or Storage operations |
 | Stripe | Hosts payment collection and reports payment/refund outcomes through signed events and reconciliation APIs |
-| Private Storage | Holds generated waiver PDFs; access is granted only through short-lived, authorized signed URLs |
+| Private Storage | Holds source invoices and generated waiver PDFs; access is granted only through short-lived, authorized signed URLs |
+| OpenAI (optional) | Receives an invoice only when `OPENAI_API_KEY` is configured and returns schema-constrained suggestions; it never confirms financial data |
 
 This separation is deliberate: hiding a button is a usability decision, while
 authorization and financial integrity remain server-owned invariants.
@@ -150,21 +163,26 @@ authorization and financial integrity remain server-owned invariants.
    Before external side effects begin, the owner can remove only those
    registered sample records while preserving the workspace and audit trail.
 3. An owner or admin manages the project and subcontractor directory.
-4. A financial role creates a payment request with a gross amount and retainage.
-5. PostgreSQL calculates the retainage and persisted net payable in integer
+4. A financial role can upload a source invoice. The Edge Function stores it
+   privately, optionally extracts structured suggestions, and places it in the
+   human review queue. Without an AI key, the same workflow uses manual entry.
+5. The reviewer verifies the invoice number, dates, amount, retainage, cost
+   code, and line items against the original, then confirms a draft request.
+6. A financial role can also create a payment request manually.
+7. PostgreSQL calculates the retainage and persisted net payable in integer
    minor units.
-6. The request moves through draft, submitted, and approved states using
+8. The request moves through draft, submitted, and approved states using
    authorized transactional RPCs.
-7. An authorized user launches Stripe Checkout using only the approved request
+9. An authorized user launches Stripe Checkout using only the approved request
    identifier; the browser cannot override the trusted price or currency.
-8. A signed, idempotent webhook records the payment and advances the ledger.
-9. Operators can reconcile delayed Stripe state and inspect unresolved webhook
+10. A signed, idempotent webhook records the payment and advances the ledger.
+11. Operators can reconcile delayed Stripe state and inspect unresolved webhook
    failures without manufacturing payment outcomes in the browser.
-10. A paid request can generate a private PDF waiver with a short-lived signed
+12. A paid request can generate a private PDF waiver with a short-lived signed
     download URL.
-11. An owner or accountant can refund the remaining settled amount, which
+13. An owner or accountant can refund the remaining settled amount, which
     updates the ledger and voids the active waiver where applicable.
-12. Immutable audit events preserve evidence of sensitive tenant, payment,
+14. Immutable audit events preserve evidence of sensitive tenant, payment,
     document, and membership operations.
 
 ## Product evaluation walkthrough
@@ -176,7 +194,9 @@ vertical slice without production credentials:
 2. Create a workspace. Leave demonstration data disabled for a clean tenant, or
    explicitly enable it to review pre-populated lifecycle states.
 3. Add a project and subcontractor from **Directory**.
-4. Create a draft payment request from **Payments**. Confirm that retainage and
+4. From **Payments**, upload a PDF or image invoice, review the extracted or
+   manually entered values against the original, and confirm the draft. You can
+   also create a draft payment request manually. Confirm that retainage and
    net payable are calculated by the database-backed workflow.
 5. Submit and approve the request with an authorized role.
 6. Open Stripe Checkout and complete payment with a Stripe test payment method.
@@ -295,6 +315,8 @@ in Vite variables or source control:
 | `SITE_URL` | Canonical frontend origin used for Checkout return URLs |
 | `RESEND_API_KEY` | Optional future payment-notification provider credential |
 | `RESEND_FROM_EMAIL` | Optional verified sender identity |
+| `OPENAI_API_KEY` | Optional server-only key for invoice extraction; omit it to use manual review |
+| `OPENAI_INVOICE_MODEL` | Optional extraction model override; defaults to `gpt-4o-mini` |
 
 Deploy the Edge Functions after migrations and secrets are in place:
 
@@ -302,6 +324,8 @@ Deploy the Edge Functions after migrations and secrets are in place:
 npx supabase secrets set \
   STRIPE_SECRET=sk_test_replace_me \
   STRIPE_WEBHOOK_SECRET=whsec_replace_me \
+  OPENAI_API_KEY=replace_me \
+  OPENAI_INVOICE_MODEL=gpt-4o-mini \
   SITE_URL=http://localhost:5173
 
 npx supabase functions deploy create-checkout
@@ -310,8 +334,14 @@ npx supabase functions deploy create-refund
 npx supabase functions deploy reconcile-payment
 npx supabase functions deploy generate-waiver
 npx supabase functions deploy download-waiver
+npx supabase functions deploy extract-invoice
+npx supabase functions deploy download-invoice
 npx supabase functions deploy dispatch-notification
 ```
+
+`OPENAI_API_KEY` is optional. When it is absent or the provider is unavailable,
+the uploaded invoice remains private and moves to the same review screen with
+blank/manual fields. Provider output never bypasses human confirmation.
 
 Resend is intentionally deferred. The isolated outbox and dispatch function are
 kept as future-facing infrastructure, but active payment workflows do not call
@@ -379,7 +409,7 @@ without application secrets.
 
 Playwright also exercises authentication, explicit demonstration-data opt-in,
 owner-controlled sample cleanup, membership governance, payment approval, the
-Stripe handoff, and checkout result screens in Chromium. Exact Supabase and
+invoice upload/review workflow, Stripe handoff, and checkout result screens in Chromium. Exact Supabase and
 Stripe HTTP contracts are intercepted in the browser suite, so tests cannot
 create production users, records, emails, or charges. The same scenarios can
 run against an optimized production preview to catch bundling failures that do

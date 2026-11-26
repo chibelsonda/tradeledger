@@ -4,6 +4,7 @@ import {
   trustedStripeCheckoutSessionId,
   trustedStripeCheckoutUrl,
   trustedStripeConnectUrl,
+  trustedSupabaseInvoiceUrl,
   trustedSupabaseWaiverUrl,
 } from './navigation-security'
 
@@ -74,6 +75,31 @@ describe('trustedSupabaseWaiverUrl', () => {
     expect(
       trustedSupabaseWaiverUrl(
         'https://project-ref.supabase.co/storage/v1/object/sign/waiver-documents/file.pdf',
+        projectUrl,
+      ),
+    ).toBeNull()
+  })
+})
+
+describe('trustedSupabaseInvoiceUrl', () => {
+  const projectUrl = 'https://project-ref.supabase.co'
+
+  it('accepts only signed invoice URLs from the configured Supabase project', () => {
+    expect(
+      trustedSupabaseInvoiceUrl(
+        'https://project-ref.supabase.co/storage/v1/object/sign/invoice-documents/tenant/invoice.pdf?token=signed-token',
+        projectUrl,
+      ),
+    ).toContain('/storage/v1/object/sign/invoice-documents/')
+    expect(
+      trustedSupabaseInvoiceUrl(
+        'https://attacker.test/storage/v1/object/sign/invoice-documents/invoice.pdf?token=signed-token',
+        projectUrl,
+      ),
+    ).toBeNull()
+    expect(
+      trustedSupabaseInvoiceUrl(
+        'https://project-ref.supabase.co/storage/v1/object/sign/waiver-documents/invoice.pdf?token=signed-token',
         projectUrl,
       ),
     ).toBeNull()
