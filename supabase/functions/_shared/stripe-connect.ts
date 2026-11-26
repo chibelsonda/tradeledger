@@ -23,6 +23,22 @@ interface CreateRecipientAccountInput {
   subcontractorId: string
 }
 
+export async function credentialScopedIdempotencyKey(
+  namespace: string,
+  credential: string,
+  resourceId: string,
+): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(credential),
+  )
+  const fingerprint = Array.from(new Uint8Array(digest).slice(0, 8))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+
+  return `${namespace}-${fingerprint}-${resourceId}`
+}
+
 export function requiredEnvironment(name: string): string {
   const value = Deno.env.get(name)
 

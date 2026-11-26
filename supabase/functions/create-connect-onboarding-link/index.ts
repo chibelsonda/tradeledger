@@ -5,6 +5,7 @@ import { withObservability } from '../_shared/observability.ts'
 import { enforceUserRateLimit, safeDatabaseErrorResponse } from '../_shared/security.ts'
 import {
   createStripeRecipientAccount,
+  credentialScopedIdempotencyKey,
   requiredEnvironment,
   syncStripeAccountReadiness,
 } from '../_shared/stripe-connect.ts'
@@ -132,7 +133,8 @@ export default {
         )
       }
 
-      const stripe = new Stripe(requiredEnvironment('STRIPE_SECRET'), {
+      const stripeSecret = requiredEnvironment('STRIPE_SECRET')
+      const stripe = new Stripe(stripeSecret, {
         maxNetworkRetries: 2,
         timeout: 10_000,
       })
@@ -143,10 +145,16 @@ export default {
 
       try {
         if (!stripeAccountId) {
+          const idempotencyKey = await credentialScopedIdempotencyKey(
+            'payout-account-v2',
+            stripeSecret,
+            prepared.payout_account_id,
+          )
+
           stripeAccountId = await createStripeRecipientAccount(
             stripe,
             {
-              idempotencyKey: `payout-account-v1-default-${prepared.payout_account_id}`,
+              idempotencyKey,
               organizationId: prepared.organization_id,
               subcontractorId: prepared.subcontractor_id,
             },
