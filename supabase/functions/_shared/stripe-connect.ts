@@ -25,25 +25,6 @@ interface CreateRecipientAccountInput {
   subcontractorId: string
 }
 
-interface StripeApiErrorPayload {
-  error?: {
-    code?: string
-    message?: string
-  }
-}
-
-export class StripeConnectApiError extends Error {
-  readonly code: string | null
-  readonly status: number
-
-  constructor(message: string, status: number, code: string | null = null) {
-    super(message)
-    this.name = 'StripeConnectApiError'
-    this.status = status
-    this.code = code
-  }
-}
-
 export function requiredEnvironment(name: string): string {
   const value = Deno.env.get(name)
 
@@ -55,77 +36,34 @@ export function requiredEnvironment(name: string): string {
 }
 
 export async function createStripeRecipientAccount(
+  stripe: Stripe,
   input: CreateRecipientAccountInput,
 ): Promise<string> {
   const country = (Deno.env.get('STRIPE_CONNECT_COUNTRY') ?? 'US').toUpperCase()
-  const currency = (Deno.env.get('STRIPE_CONNECT_CURRENCY') ?? 'usd').toLowerCase()
-  const locale = Deno.env.get('STRIPE_CONNECT_LOCALE') ?? 'en-US'
-  const apiVersion = Deno.env.get('STRIPE_API_VERSION') ?? '2026-10-28.endive'
-  const response = await fetch('https://api.stripe.com/v2/core/accounts', {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${requiredEnvironment('STRIPE_SECRET')}`,
-      'content-type': 'application/json',
-      'idempotency-key': input.idempotencyKey,
-      'stripe-version': apiVersion,
-    },
-    body: JSON.stringify({
-      contact_email: input.contactEmail ?? undefined,
-      display_name: input.companyName,
-      dashboard: 'full',
-      identity: {
-        country,
-        entity_type: 'company',
-        business_details: {
-          registered_name: input.companyName,
-        },
-      },
-      configuration: {
-        recipient: {
-          capabilities: {
-            stripe_balance: {
-              stripe_transfers: {
-                requested: true,
-              },
-            },
-          },
-        },
-      },
-      defaults: {
-        currency,
-        locales: [locale],
+  const account = await stripe.accounts.create(
+    {
+      type: 'standard',
+      country,
+      email: input.contactEmail ?? undefined,
+      business_profile: {
+        name: input.companyName,
       },
       metadata: {
         organization_id: input.organizationId,
         subcontractor_id: input.subcontractorId,
       },
-      include: ['configuration.recipient', 'defaults', 'requirements'],
-    }),
-  })
-
-  const payload = (await response.json().catch(() => null)) as
-    | ({ id?: unknown } & StripeApiErrorPayload)
-    | null
-
-  if (!response.ok) {
-    throw new StripeConnectApiError(
-      payload?.error?.message ?? 'Stripe could not create the connected account.',
-      response.status,
-      payload?.error?.code ?? null,
-    )
-  }
+    },
+    { idempotencyKey: input.idempotencyKey },
+  )
 
   if (
-    typeof payload?.id !== 'string' ||
-    !/^acct_[A-Za-z0-9]{8,200}$/.test(payload.id)
+    typeof account.id !== 'string' ||
+    !/^acct_[A-Za-z0-9]{8,200}$/.test(account.id)
   ) {
-    throw new StripeConnectApiError(
-      'Stripe returned an invalid connected account.',
-      502,
-    )
+    throw new Error('Stripe returned an invalid connected account.')
   }
 
-  return payload.id
+  return account.id
 }
 
 export function stripeAccountReadiness(account: Stripe.Account) {

@@ -6,7 +6,6 @@ import { enforceUserRateLimit, safeDatabaseErrorResponse } from '../_shared/secu
 import {
   createStripeRecipientAccount,
   requiredEnvironment,
-  StripeConnectApiError,
   syncStripeAccountReadiness,
 } from '../_shared/stripe-connect.ts'
 
@@ -116,13 +115,16 @@ export default {
 
       try {
         if (!stripeAccountId) {
-          stripeAccountId = await createStripeRecipientAccount({
-            companyName: prepared.company_name,
-            contactEmail: prepared.contact_email,
-            idempotencyKey: `payout-account-${prepared.payout_account_id}`,
-            organizationId: prepared.organization_id,
-            subcontractorId: prepared.subcontractor_id,
-          })
+          stripeAccountId = await createStripeRecipientAccount(
+            stripe,
+            {
+              companyName: prepared.company_name,
+              contactEmail: prepared.contact_email,
+              idempotencyKey: `payout-account-${prepared.payout_account_id}`,
+              organizationId: prepared.organization_id,
+              subcontractorId: prepared.subcontractor_id,
+            },
+          )
 
           const { data: attached, error: attachError } = await context.supabaseAdmin
             .rpc('attach_subcontractor_stripe_account', {
@@ -170,14 +172,15 @@ export default {
 
         return Response.json({ url: accountLink.url })
       } catch (error) {
-        if (error instanceof StripeConnectApiError) {
-          console.error('Stripe Accounts v2 request failed:', {
-            code: error.code,
-            status: error.status,
-          })
-        } else {
-          console.error('Stripe Connect onboarding failed:', error)
-        }
+        console.error('Stripe Connect onboarding failed:', {
+          code: typeof error === 'object' && error !== null && 'code' in error
+            ? error.code
+            : null,
+          status: typeof error === 'object' && error !== null && 'statusCode' in error
+            ? error.statusCode
+            : null,
+          type: error instanceof Error ? error.name : 'UnknownError',
+        })
 
         return Response.json(
           { error: 'Payout onboarding is temporarily unavailable. Please try again.' },
