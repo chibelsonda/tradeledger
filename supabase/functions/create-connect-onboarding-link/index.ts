@@ -22,6 +22,31 @@ interface PreparedPayoutAccount {
   stripe_account_id: string | null
 }
 
+type StripeOnboardingStage =
+  | 'account_create'
+  | 'account_attach'
+  | 'account_retrieve'
+  | 'readiness_sync'
+  | 'account_link'
+
+function errorProperty(error: unknown, property: string): unknown {
+  return typeof error === 'object' && error !== null && property in error
+    ? error[property as keyof typeof error]
+    : null
+}
+
+function sanitizedStripeErrorMessage(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : null
+
+  if (!message) return null
+
+  return message
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]')
+    .replace(/\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]+\b/g, '[secret]')
+    .replace(/\bacct_[A-Za-z0-9]+\b/g, '[account]')
+    .slice(0, 500)
+}
+
 function isUuid(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -112,20 +137,22 @@ export default {
         timeout: 10_000,
       })
       let stripeAccountId = prepared.stripe_account_id
+      let stage: StripeOnboardingStage = stripeAccountId
+        ? 'account_retrieve'
+        : 'account_create'
 
       try {
         if (!stripeAccountId) {
           stripeAccountId = await createStripeRecipientAccount(
             stripe,
             {
-              companyName: prepared.company_name,
-              contactEmail: prepared.contact_email,
-              idempotencyKey: `payout-account-${prepared.payout_account_id}`,
+              idempotencyKey: `payout-account-v1-default-${prepared.payout_account_id}`,
               organizationId: prepared.organization_id,
               subcontractorId: prepared.subcontractor_id,
             },
           )
 
+          stage = 'account_attach'
           const { data: attached, error: attachError } = await context.supabaseAdmin
             .rpc('attach_subcontractor_stripe_account', {
               p_payout_account_id: prepared.payout_account_id,
@@ -143,7 +170,9 @@ export default {
           }
         }
 
+        stage = 'account_retrieve'
         const account = await stripe.accounts.retrieve(stripeAccountId)
+        stage = 'readiness_sync'
         const syncResult = await syncStripeAccountReadiness(
           context.supabaseAdmin,
           account,
@@ -160,6 +189,7 @@ export default {
           )
         }
 
+        stage = 'account_link'
         const accountLink = await stripe.accountLinks.create({
           account: stripeAccountId,
           refresh_url: applicationUrl(prepared.subcontractor_id, 'refresh'),
@@ -173,13 +203,13 @@ export default {
         return Response.json({ url: accountLink.url })
       } catch (error) {
         console.error('Stripe Connect onboarding failed:', {
-          code: typeof error === 'object' && error !== null && 'code' in error
-            ? error.code
-            : null,
-          status: typeof error === 'object' && error !== null && 'statusCode' in error
-            ? error.statusCode
-            : null,
-          type: error instanceof Error ? error.name : 'UnknownError',
+          code: errorProperty(error, 'code'),
+          message: sanitizedStripeErrorMessage(error),
+          param: errorProperty(error, 'param'),
+          stage,
+          status: errorProperty(error, 'statusCode') ?? errorProperty(error, 'status'),
+          type: errorProperty(error, 'type') ??
+            (error instanceof Error ? error.name : 'UnknownError'),
         })
 
         return Response.json(

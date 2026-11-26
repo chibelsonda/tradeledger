@@ -18,8 +18,6 @@ interface RpcClient {
 }
 
 interface CreateRecipientAccountInput {
-  companyName: string
-  contactEmail: string | null
   idempotencyKey: string
   organizationId: string
   subcontractorId: string
@@ -39,15 +37,8 @@ export async function createStripeRecipientAccount(
   stripe: Stripe,
   input: CreateRecipientAccountInput,
 ): Promise<string> {
-  const country = (Deno.env.get('STRIPE_CONNECT_COUNTRY') ?? 'US').toUpperCase()
   const account = await stripe.accounts.create(
     {
-      type: 'standard',
-      country,
-      email: input.contactEmail ?? undefined,
-      business_profile: {
-        name: input.companyName,
-      },
       metadata: {
         organization_id: input.organizationId,
         subcontractor_id: input.subcontractorId,

@@ -59,7 +59,11 @@ import {
   fieldErrorsFromZod,
   type FieldErrors,
 } from '@/lib/validation'
-import { isPayoutReady } from '@/features/operations/payout-readiness'
+import {
+  isPayoutActionForPaymentRequest,
+  isPayoutReady,
+  type PayoutActionTarget,
+} from '@/features/operations/payout-readiness'
 import { SelectControl } from '@/components/ui/SelectControl'
 import {
   SidePanel,
@@ -365,9 +369,8 @@ export function OperationsDashboard({
     null,
   )
   const [isSavingDirectoryRecord, setIsSavingDirectoryRecord] = useState(false)
-  const [payoutActionSubcontractorId, setPayoutActionSubcontractorId] = useState<
-    string | null
-  >(null)
+  const [payoutActionTarget, setPayoutActionTarget] =
+    useState<PayoutActionTarget | null>(null)
   const dashboardLoadSequence = useRef(0)
   const connectReturnHandled = useRef(false)
 
@@ -705,7 +708,7 @@ export function OperationsDashboard({
     const completeConnectReturn = async () => {
       await Promise.resolve()
       setActiveNavigationId('directory')
-      setPayoutActionSubcontractorId(subcontractorId)
+      setPayoutActionTarget({ subcontractorId, paymentRequestId: null })
 
       if (connectState === 'refresh') {
         const { data, error: onboardingError } = await supabase.functions.invoke(
@@ -720,7 +723,7 @@ export function OperationsDashboard({
               'Unable to continue payout onboarding. Please try again.',
             ),
           )
-          setPayoutActionSubcontractorId(null)
+          setPayoutActionTarget(null)
           return
         }
 
@@ -728,7 +731,7 @@ export function OperationsDashboard({
 
         if (!onboardingUrl) {
           setError('Stripe returned an invalid onboarding destination.')
-          setPayoutActionSubcontractorId(null)
+          setPayoutActionTarget(null)
           return
         }
 
@@ -741,7 +744,7 @@ export function OperationsDashboard({
         { body: { subcontractorId } },
       )
 
-      setPayoutActionSubcontractorId(null)
+      setPayoutActionTarget(null)
 
       if (refreshError) {
         setError(
@@ -1020,10 +1023,13 @@ export function OperationsDashboard({
     await loadDashboard()
   }
 
-  async function startPayoutOnboarding(subcontractorId: string) {
+  async function startPayoutOnboarding(
+    subcontractorId: string,
+    paymentRequestId: string | null = null,
+  ) {
     setError(null)
     setNotice(null)
-    setPayoutActionSubcontractorId(subcontractorId)
+    setPayoutActionTarget({ subcontractorId, paymentRequestId })
 
     const { data, error: onboardingError } = await supabase.functions.invoke(
       'create-connect-onboarding-link',
@@ -1037,7 +1043,7 @@ export function OperationsDashboard({
           'Unable to start payout onboarding. Please try again.',
         ),
       )
-      setPayoutActionSubcontractorId(null)
+      setPayoutActionTarget(null)
       return
     }
 
@@ -1045,7 +1051,7 @@ export function OperationsDashboard({
 
     if (!onboardingUrl) {
       setError('Stripe returned an invalid onboarding destination.')
-      setPayoutActionSubcontractorId(null)
+      setPayoutActionTarget(null)
       return
     }
 
@@ -1055,14 +1061,14 @@ export function OperationsDashboard({
   async function refreshPayoutReadiness(subcontractorId: string) {
     setError(null)
     setNotice(null)
-    setPayoutActionSubcontractorId(subcontractorId)
+    setPayoutActionTarget({ subcontractorId, paymentRequestId: null })
 
     const { error: refreshError } = await supabase.functions.invoke(
       'refresh-connect-account',
       { body: { subcontractorId } },
     )
 
-    setPayoutActionSubcontractorId(null)
+    setPayoutActionTarget(null)
 
     if (refreshError) {
       setError(
@@ -2189,7 +2195,8 @@ export function OperationsDashboard({
                               )}
                               canManage={canManageProjects}
                               isBusy={
-                                payoutActionSubcontractorId === subcontractor.id
+                                payoutActionTarget?.subcontractorId ===
+                                subcontractor.id
                               }
                               onRefresh={() => {
                                 void refreshPayoutReadiness(subcontractor.id)
@@ -2428,22 +2435,29 @@ export function OperationsDashboard({
                         (canManageProjects ? (
                           <Button
                             type="button"
-                            disabled={payoutActionSubcontractorId !== null}
+                            disabled={payoutActionTarget !== null}
                             aria-busy={
-                              payoutActionSubcontractorId ===
-                              request.subcontractor_id
+                              isPayoutActionForPaymentRequest(
+                                payoutActionTarget,
+                                request.id,
+                              )
                             }
                             onClick={() =>
                               void startPayoutOnboarding(
                                 request.subcontractor_id,
+                                request.id,
                               )
                             }
                             className="inline-flex min-w-28 items-center justify-center gap-2 border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 transition hover:border-amber-500 hover:bg-amber-100 disabled:cursor-wait disabled:opacity-55"
                           >
-                            {payoutActionSubcontractorId ===
-                              request.subcontractor_id && <ButtonSpinner />}
-                            {payoutActionSubcontractorId ===
-                            request.subcontractor_id
+                            {isPayoutActionForPaymentRequest(
+                              payoutActionTarget,
+                              request.id,
+                            ) && <ButtonSpinner />}
+                            {isPayoutActionForPaymentRequest(
+                              payoutActionTarget,
+                              request.id,
+                            )
                               ? 'Opening…'
                               : payoutAccount
                                 ? 'Finish payout setup'
