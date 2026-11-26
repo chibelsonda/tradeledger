@@ -7,7 +7,7 @@ import {
   createStripeRecipientAccount,
   credentialScopedIdempotencyKey,
   requiredEnvironment,
-  syncStripeAccountReadiness,
+  syncStripeV2AccountReadiness,
 } from '../_shared/stripe-connect.ts'
 
 interface OnboardingRequest {
@@ -146,7 +146,7 @@ export default {
       try {
         if (!stripeAccountId) {
           const idempotencyKey = await credentialScopedIdempotencyKey(
-            'payout-account-v2',
+            'payout-account-v3-accounts-v2',
             stripeSecret,
             prepared.payout_account_id,
           )
@@ -154,6 +154,8 @@ export default {
           stripeAccountId = await createStripeRecipientAccount(
             stripe,
             {
+              companyName: prepared.company_name,
+              contactEmail: prepared.contact_email,
               idempotencyKey,
               organizationId: prepared.organization_id,
               subcontractorId: prepared.subcontractor_id,
@@ -166,7 +168,7 @@ export default {
               p_payout_account_id: prepared.payout_account_id,
               p_user_id: userId,
               p_stripe_account_id: stripeAccountId,
-              p_dashboard_type: 'full',
+              p_dashboard_type: 'express',
             })
 
           if (attachError || attached !== true) {
@@ -179,9 +181,15 @@ export default {
         }
 
         stage = 'account_retrieve'
-        const account = await stripe.accounts.retrieve(stripeAccountId)
+        const account = await stripe.v2.core.accounts.retrieve(stripeAccountId, {
+          include: [
+            'configuration.recipient',
+            'future_requirements',
+            'requirements',
+          ],
+        })
         stage = 'readiness_sync'
-        const syncResult = await syncStripeAccountReadiness(
+        const syncResult = await syncStripeV2AccountReadiness(
           context.supabaseAdmin,
           account,
         )
@@ -198,13 +206,19 @@ export default {
         }
 
         stage = 'account_link'
-        const accountLink = await stripe.accountLinks.create({
+        const accountLink = await stripe.v2.core.accountLinks.create({
           account: stripeAccountId,
-          refresh_url: applicationUrl(prepared.subcontractor_id, 'refresh'),
-          return_url: applicationUrl(prepared.subcontractor_id, 'return'),
-          type: 'account_onboarding',
-          collection_options: {
-            fields: 'eventually_due',
+          use_case: {
+            type: 'account_onboarding',
+            account_onboarding: {
+              collection_options: {
+                fields: 'eventually_due',
+                future_requirements: 'include',
+              },
+              configurations: ['recipient'],
+              refresh_url: applicationUrl(prepared.subcontractor_id, 'refresh'),
+              return_url: applicationUrl(prepared.subcontractor_id, 'return'),
+            },
           },
         })
 

@@ -18,6 +18,8 @@ interface RpcClient {
 }
 
 interface CreateRecipientAccountInput {
+  companyName: string
+  contactEmail: string | null
   idempotencyKey: string
   organizationId: string
   subcontractorId: string
@@ -53,8 +55,49 @@ export async function createStripeRecipientAccount(
   stripe: Stripe,
   input: CreateRecipientAccountInput,
 ): Promise<string> {
-  const account = await stripe.accounts.create(
+  const country = (Deno.env.get('STRIPE_CONNECT_COUNTRY') ?? 'US')
+    .trim()
+    .toLowerCase()
+  const currency = (Deno.env.get('STRIPE_CONNECT_CURRENCY') ?? 'usd')
+    .trim()
+    .toLowerCase()
+
+  if (!/^[a-z]{2}$/.test(country)) {
+    throw new Error('STRIPE_CONNECT_COUNTRY must be a two-letter country code.')
+  }
+
+  if (!/^[a-z]{3}$/.test(currency)) {
+    throw new Error('STRIPE_CONNECT_CURRENCY must be a three-letter currency code.')
+  }
+
+  const account = await stripe.v2.core.accounts.create(
     {
+      configuration: {
+        recipient: {
+          capabilities: {
+            stripe_balance: {
+              stripe_transfers: { requested: true },
+            },
+          },
+        },
+      },
+      contact_email: input.contactEmail ?? undefined,
+      dashboard: 'express',
+      defaults: {
+        currency,
+        responsibilities: {
+          fees_collector: 'application',
+          losses_collector: 'application',
+        },
+      },
+      display_name: input.companyName,
+      identity: { country },
+      include: [
+        'configuration.recipient',
+        'future_requirements',
+        'identity',
+        'requirements',
+      ],
       metadata: {
         organization_id: input.organizationId,
         subcontractor_id: input.subcontractorId,
@@ -71,6 +114,54 @@ export async function createStripeRecipientAccount(
   }
 
   return account.id
+}
+
+function stripeV2Requirements(
+  account: Stripe.V2.Core.Account,
+  status: 'currently_due' | 'eventually_due' | 'past_due',
+): string[] {
+  const entries = [
+    ...(account.requirements?.entries ?? []),
+    ...(account.future_requirements?.entries ?? []),
+  ]
+
+  return [
+    ...new Set(
+      entries
+        .filter((entry) =>
+          entry.awaiting_action_from === 'user' &&
+          entry.minimum_deadline.status === status
+        )
+        .map((entry) =>
+          entry.reference?.resource ??
+            entry.reference?.inquiry ??
+            entry.description
+        ),
+    ),
+  ]
+}
+
+export function stripeV2AccountReadiness(account: Stripe.V2.Core.Account) {
+  const currentlyDue = stripeV2Requirements(account, 'currently_due')
+  const eventuallyDue = stripeV2Requirements(account, 'eventually_due')
+  const pastDue = stripeV2Requirements(account, 'past_due')
+  const transferStatus = account.configuration?.recipient?.capabilities
+    ?.stripe_balance?.stripe_transfers?.status
+
+  return {
+    p_stripe_account_id: account.id,
+    p_livemode: account.livemode,
+    p_details_submitted: currentlyDue.length === 0 && pastDue.length === 0,
+    p_charges_enabled: false,
+    p_payouts_enabled: transferStatus === 'active',
+    p_requirements_currently_due: currentlyDue,
+    p_requirements_eventually_due: eventuallyDue,
+    p_requirements_past_due: pastDue,
+    p_disabled_reason: transferStatus === 'restricted' ||
+        transferStatus === 'unsupported'
+      ? `recipient.stripe_transfers.${transferStatus}`
+      : null,
+  }
 }
 
 export function stripeAccountReadiness(account: Stripe.Account) {
@@ -96,5 +187,17 @@ export async function syncStripeAccountReadiness(
     ...stripeAccountReadiness(account),
     p_event_id: event?.id ?? null,
     p_event_type: event?.type ?? 'account.refresh',
+  })
+}
+
+export async function syncStripeV2AccountReadiness(
+  client: unknown,
+  account: Stripe.V2.Core.Account,
+  event?: { id: string; type: string },
+): Promise<RpcResult> {
+  return await (client as RpcClient).rpc('sync_subcontractor_stripe_account', {
+    ...stripeV2AccountReadiness(account),
+    p_event_id: event?.id ?? null,
+    p_event_type: event?.type ?? 'v2.core.account.refresh',
   })
 }

@@ -5,8 +5,8 @@ import { withObservability } from '../_shared/observability.ts'
 import { enforceUserRateLimit, safeDatabaseErrorResponse } from '../_shared/security.ts'
 import {
   requiredEnvironment,
-  stripeAccountReadiness,
-  syncStripeAccountReadiness,
+  stripeV2AccountReadiness,
+  syncStripeV2AccountReadiness,
 } from '../_shared/stripe-connect.ts'
 
 interface RefreshRequest {
@@ -99,8 +99,17 @@ export default {
           maxNetworkRetries: 2,
           timeout: 10_000,
         })
-        const account = await stripe.accounts.retrieve(prepared.stripe_account_id)
-        const syncResult = await syncStripeAccountReadiness(
+        const account = await stripe.v2.core.accounts.retrieve(
+          prepared.stripe_account_id,
+          {
+            include: [
+              'configuration.recipient',
+              'future_requirements',
+              'requirements',
+            ],
+          },
+        )
+        const syncResult = await syncStripeV2AccountReadiness(
           context.supabaseAdmin,
           account,
         )
@@ -116,7 +125,7 @@ export default {
           )
         }
 
-        const readiness = stripeAccountReadiness(account)
+        const readiness = stripeV2AccountReadiness(account)
 
         return Response.json({
           detailsSubmitted: readiness.p_details_submitted,
