@@ -22,6 +22,27 @@ describe('Edge Function security helpers', () => {
     })
   })
 
+  it('returns only explicitly allowlisted conflict guidance', async () => {
+    const response = safeDatabaseErrorResponse(
+      {
+        code: '55000',
+        message: 'The subcontractor must complete payout onboarding before checkout.',
+      },
+      'The request failed.',
+      {
+        conflictMessages: {
+          'The subcontractor must complete payout onboarding before checkout.':
+            'Set up payouts before starting checkout.',
+        },
+      },
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error: 'Set up payouts before starting checkout.',
+    })
+  })
+
   it('allows requests within the database-owned rate limit', async () => {
     const client = {
       rpc: vi.fn().mockResolvedValue({ data: true, error: null }),

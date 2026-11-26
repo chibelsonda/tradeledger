@@ -22,6 +22,10 @@ interface RateLimitOptions {
   windowSeconds: number
 }
 
+interface SafeDatabaseErrorOptions {
+  conflictMessages?: Record<string, string>
+}
+
 export function databaseErrorStatus(code?: string): number {
   if (code === '42501' || code === '28000') return 403
   if (code === 'P0002') return 404
@@ -32,12 +36,19 @@ export function databaseErrorStatus(code?: string): number {
 export function safeDatabaseErrorResponse(
   error: RpcError,
   fallback: string,
+  options: SafeDatabaseErrorOptions = {},
 ): Response {
   const status = databaseErrorStatus(error.code)
+  const allowedConflictMessage =
+    status === 409 && error.message
+      ? options.conflictMessages?.[error.message]
+      : undefined
   const messages: Record<number, string> = {
     403: 'You do not have permission to perform this action.',
     404: 'The requested record was not found.',
-    409: "The request conflicts with the record's current state.",
+    409:
+      allowedConflictMessage ??
+      "The request conflicts with the record's current state.",
   }
 
   return Response.json(

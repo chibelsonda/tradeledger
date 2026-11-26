@@ -6,6 +6,7 @@ import {
   membershipRecord,
   organizationRecord,
   paidPaymentRecord,
+  payoutAccountRecord,
   projectRecord,
   signInAsOwner,
   subcontractorRecord,
@@ -21,6 +22,7 @@ test('owner approves a request and starts server-priced Stripe checkout', async 
     memberships: [membershipRecord()],
     projects: [projectRecord()],
     subcontractors: [subcontractorRecord()],
+    payoutAccounts: [payoutAccountRecord()],
     paymentRequests: [submittedPaymentRequestRecord()],
   })
   await installSupabaseMock(page, state)
@@ -104,6 +106,7 @@ test('checkout refuses a non-Stripe redirect returned by the API', async ({
     projects: [projectRecord()],
     subcontractors: [subcontractorRecord()],
     paymentRequests: [submittedPaymentRequestRecord()],
+    payoutAccounts: [payoutAccountRecord()],
     checkoutUrl: 'https://checkout.stripe.com.attacker.test/phishing',
   })
   await installSupabaseMock(page, state)
@@ -117,6 +120,31 @@ test('checkout refuses a non-Stripe redirect returned by the API', async ({
     'did not return a valid checkout URL',
   )
   expect(state.checkoutRequestIds).toEqual([TEST_PAYMENT_REQUEST_ID])
+  expect(state.unexpectedRequests).toEqual([])
+})
+
+test('owner is directed to payout setup before checkout is available', async ({
+  page,
+}) => {
+  const state = createSupabaseMockState({
+    organizations: [organizationRecord()],
+    memberships: [membershipRecord()],
+    projects: [projectRecord()],
+    subcontractors: [subcontractorRecord()],
+    paymentRequests: [
+      { ...submittedPaymentRequestRecord(), status: 'approved' },
+    ],
+  })
+  await installSupabaseMock(page, state)
+  await signInAsOwner(page)
+  await page.getByRole('link', { name: /Payments/ }).click()
+
+  await expect(
+    page.getByRole('button', { name: 'Set up payouts' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Pay securely' }),
+  ).toHaveCount(0)
   expect(state.unexpectedRequests).toEqual([])
 })
 

@@ -1,6 +1,7 @@
 import { Button } from '@headlessui/react'
 
 import { ButtonSpinner } from '@/components/ui/ButtonSpinner'
+import { isPayoutReady } from '@/features/operations/payout-readiness'
 import type { SubcontractorPayoutAccount } from '@/lib/database.types'
 
 interface PayoutReadinessControlProps {
@@ -13,7 +14,8 @@ interface PayoutReadinessControlProps {
 
 function readinessLabel(account: SubcontractorPayoutAccount | undefined): string {
   if (!account) return 'Not configured'
-  if (account.onboarding_status === 'ready') return 'Ready'
+  if (isPayoutReady(account)) return 'Ready'
+  if (account.onboarding_status === 'ready') return 'Action required'
   if (account.onboarding_status === 'restricted') return 'Action required'
   return account.details_submitted ? 'Under review' : 'Setup incomplete'
 }
@@ -21,11 +23,14 @@ function readinessLabel(account: SubcontractorPayoutAccount | undefined): string
 function readinessClassName(
   account: SubcontractorPayoutAccount | undefined,
 ): string {
-  if (account?.onboarding_status === 'ready') {
+  if (isPayoutReady(account)) {
     return 'border-emerald-200 bg-emerald-50 text-emerald-800'
   }
 
-  if (account?.onboarding_status === 'restricted') {
+  if (
+    account?.onboarding_status === 'restricted' ||
+    account?.onboarding_status === 'ready'
+  ) {
     return 'border-red-200 bg-red-50 text-red-800'
   }
 
@@ -36,7 +41,7 @@ function readinessClassName(
 
 function actionLabel(account: SubcontractorPayoutAccount | undefined): string {
   if (!account) return 'Set up payouts'
-  if (account.onboarding_status === 'ready') return 'Refresh'
+  if (isPayoutReady(account)) return 'Refresh'
   return 'Continue setup'
 }
 
@@ -66,7 +71,7 @@ export function PayoutReadinessControl({
   onRefresh,
   onStartOnboarding,
 }: PayoutReadinessControlProps) {
-  const isReady = account?.onboarding_status === 'ready'
+  const isReady = isPayoutReady(account)
 
   return (
     <div className="flex min-w-[150px] flex-col items-start gap-2">

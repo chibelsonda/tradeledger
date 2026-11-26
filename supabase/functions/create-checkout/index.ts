@@ -123,6 +123,12 @@ export default {
           return safeDatabaseErrorResponse(
             preparationError,
             'Unable to prepare checkout. Please try again.',
+            {
+              conflictMessages: {
+                'The subcontractor must complete payout onboarding before checkout.':
+                  'Set up and verify this subcontractor\'s payout account before starting checkout.',
+              },
+            },
           )
         }
 

@@ -59,6 +59,7 @@ import {
   fieldErrorsFromZod,
   type FieldErrors,
 } from '@/lib/validation'
+import { isPayoutReady } from '@/features/operations/payout-readiness'
 import { SelectControl } from '@/components/ui/SelectControl'
 import {
   SidePanel,
@@ -2282,6 +2283,10 @@ export function OperationsDashboard({
               <tbody className="divide-y divide-ink/8">
                 {paymentRequests.map((request) => {
                   const waiver = waiverByRequestId.get(request.id)
+                  const payoutAccount = payoutAccountBySubcontractorId.get(
+                    request.subcontractor_id,
+                  )
+                  const payoutReady = isPayoutReady(payoutAccount)
 
                   return (
                     <tr key={request.id} className="align-middle transition-colors hover:bg-cream/40">
@@ -2394,7 +2399,8 @@ export function OperationsDashboard({
                       {['approved', 'checkout_created', 'failed'].includes(
                         request.status,
                       ) &&
-                        canManagePayments && (
+                        canManagePayments &&
+                        payoutReady && (
                           <Button
                             type="button"
                             disabled={checkoutRequestId !== null}
@@ -2414,6 +2420,40 @@ export function OperationsDashboard({
                                   : 'Pay securely'}
                           </Button>
                         )}
+                      {['approved', 'checkout_created', 'failed'].includes(
+                        request.status,
+                      ) &&
+                        canManagePayments &&
+                        !payoutReady &&
+                        (canManageProjects ? (
+                          <Button
+                            type="button"
+                            disabled={payoutActionSubcontractorId !== null}
+                            aria-busy={
+                              payoutActionSubcontractorId ===
+                              request.subcontractor_id
+                            }
+                            onClick={() =>
+                              void startPayoutOnboarding(
+                                request.subcontractor_id,
+                              )
+                            }
+                            className="inline-flex min-w-28 items-center justify-center gap-2 border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 transition hover:border-amber-500 hover:bg-amber-100 disabled:cursor-wait disabled:opacity-55"
+                          >
+                            {payoutActionSubcontractorId ===
+                              request.subcontractor_id && <ButtonSpinner />}
+                            {payoutActionSubcontractorId ===
+                            request.subcontractor_id
+                              ? 'Opening…'
+                              : payoutAccount
+                                ? 'Finish payout setup'
+                                : 'Set up payouts'}
+                          </Button>
+                        ) : (
+                          <span className="max-w-32 text-right text-xs font-semibold text-amber-800">
+                            Payout setup required
+                          </span>
+                        ))}
                       {request.status === 'processing' && (
                         <span className="text-xs font-semibold text-amber-700">
                           Confirming payment
