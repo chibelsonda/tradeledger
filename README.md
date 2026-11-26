@@ -17,6 +17,23 @@ workspace without treating browser-supplied data as authoritative.
 
 **Live demo:** [tradeledger-sepia.vercel.app](https://tradeledger-sepia.vercel.app)
 
+## Screenshots
+
+### Operations overview
+
+![TradeLedger operations overview](docs/screenshots/operations-overview.png)
+
+<table>
+  <tr>
+    <td width="50%"><strong>Payment operations</strong></td>
+    <td width="50%"><strong>Financial reporting</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/payment-operations.png" alt="TradeLedger payment operations" width="100%"></td>
+    <td><img src="docs/screenshots/financial-reporting.png" alt="TradeLedger financial reporting" width="100%"></td>
+  </tr>
+</table>
+
 ## Product capabilities
 
 | Area | Implemented capabilities |
