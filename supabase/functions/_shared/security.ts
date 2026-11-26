@@ -39,15 +39,13 @@ export function safeDatabaseErrorResponse(
   options: SafeDatabaseErrorOptions = {},
 ): Response {
   const status = databaseErrorStatus(error.code)
-  const allowedConflictMessage =
-    status === 409 && error.message
-      ? options.conflictMessages?.[error.message]
-      : undefined
+  const allowedConflictMessage = status === 409 && error.message
+    ? options.conflictMessages?.[error.message]
+    : undefined
   const messages: Record<number, string> = {
     403: 'You do not have permission to perform this action.',
     404: 'The requested record was not found.',
-    409:
-      allowedConflictMessage ??
+    409: allowedConflictMessage ??
       "The request conflicts with the record's current state.",
   }
 

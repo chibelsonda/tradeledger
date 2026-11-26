@@ -126,7 +126,7 @@ export default {
             {
               conflictMessages: {
                 'The subcontractor must complete payout onboarding before checkout.':
-                  'Set up and verify this subcontractor\'s payout account before starting checkout.',
+                  "Set up and verify this subcontractor's payout account before starting checkout.",
               },
             },
           )
